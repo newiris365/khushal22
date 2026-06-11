@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, DollarSign, TrendingUp, HelpCircle, Save, RefreshCw, BarChart2, CheckCircle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
+import Skeleton from '../../../components/Skeleton';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from '../../../lib/charts';
 
 export default function FinancialPLPage() {
   const [plData, setPlData] = useState<any>({
@@ -136,6 +137,31 @@ export default function FinancialPLPage() {
     Costs: f.projected_costs,
     Surplus: f.projected_surplus
   }));
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">
+        <div className="border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-6 py-6 space-y-2">
+            <Skeleton className="h-7 w-72" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-6 mt-8 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-3xl" />
+            ))}
+          </div>
+          <Skeleton className="h-64 rounded-3xl" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Skeleton className="h-80 rounded-3xl" />
+            <Skeleton className="h-80 rounded-3xl" />
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">

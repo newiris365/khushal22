@@ -29,6 +29,8 @@ import {
   getFeesReport,
   createConcession,
   triggerFeeReminders,
+  getReminderHistory,
+  toggleAutoReminders,
   getNotices,
   createNotice,
   publishNotice,
@@ -111,6 +113,8 @@ router.get('/fees/student/:studentId', getStudentFees);
 router.get('/fees/report', requireRole(['Admin', 'SuperAdmin']), getFeesReport);
 router.post('/fees/concession', requireRole(['Admin', 'SuperAdmin']), createConcession);
 router.post('/fees/reminder/trigger', requireRole(['Admin', 'SuperAdmin']), triggerFeeReminders);
+router.get('/fees/reminder/history', requireRole(['Admin', 'SuperAdmin']), getReminderHistory);
+router.post('/fees/reminder/schedule', requireRole(['Admin', 'SuperAdmin']), toggleAutoReminders);
 router.post('/fees/installment-plan', requireRole(['Admin', 'SuperAdmin']), createInstallmentPlan);
 router.get('/fees/scholarship/eligible', requireRole(['Admin', 'SuperAdmin']), getEligibleScholarships);
 
@@ -138,6 +142,7 @@ router.get('/exams/marksheet/:studentId/:examId', getMarksheetMetadata);
 // =========================================================================
 router.get('/idcards/template', getCardTemplate);
 router.post('/idcards/template', requireRole(['Admin', 'SuperAdmin']), saveCardTemplate);
+router.get('/idcards/generate/:studentId', requireRole(['Admin', 'SuperAdmin', 'Student']), generateCard);
 router.post('/idcards/generate/:studentId', requireRole(['Admin', 'SuperAdmin']), generateCard);
 router.post('/idcards/generate/bulk', requireRole(['Admin', 'SuperAdmin']), generateBulkCards);
 

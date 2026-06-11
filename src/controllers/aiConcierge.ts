@@ -293,9 +293,13 @@ export async function chatQuery(req: Request, res: Response) {
       .eq('session_id', sessionId)
       .maybeSingle();
 
-    const appendMessages = checkConv
+    let appendMessages = checkConv
       ? [...(checkConv.messages as any[]), { role: 'user', content: message }, { role: 'assistant', content: finalResponse }]
       : [{ role: 'user', content: message }, { role: 'assistant', content: finalResponse }];
+
+    if (appendMessages.length > 20) {
+      appendMessages = appendMessages.slice(-20);
+    }
 
     if (checkConv) {
       await supabaseAdmin

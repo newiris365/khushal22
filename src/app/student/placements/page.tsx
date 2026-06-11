@@ -73,28 +73,27 @@ export default function StudentPlacementsDashboard() {
 
   const loadPlacementsData = async () => {
     try {
-      // Load active drives
-      const driveRes = await apiGet('/placements/drives');
+      const localProfile = localStorage.getItem('iris_user_profile');
+      const user = localProfile ? JSON.parse(localProfile) : null;
+
+      const [driveRes, statsRes, offersRes] = await Promise.all([
+        apiGet('/placements/drives'),
+        apiGet('/placements/analytics/dashboard'),
+        user ? apiGet(`/placements/offers/student/${user.id}`) : Promise.resolve({ success: false } as any),
+      ]);
+
       if (driveRes.success && driveRes.drives?.length > 0) {
         setDrives(driveRes.drives);
       }
 
-      // Load analytics stats
-      const statsRes = await apiGet('/placements/analytics/dashboard');
       if (statsRes.success && statsRes.dashboard) {
         setStats(statsRes.dashboard);
       }
 
-      // Resolve student profile
-      const localProfile = localStorage.getItem('iris_user_profile');
-      if (localProfile) {
-        const user = JSON.parse(localProfile);
-        const offersRes = await apiGet(`/placements/offers/student/${user.id}`);
-        if (offersRes.success && offersRes.offers?.length > 0) {
-          setProfile({ is_placed: true, placed_role: offersRes.offers[0].role, placed_ctc: offersRes.offers[0].ctc, placed_company: offersRes.offers[0].companies?.name });
-        } else {
-          setProfile({ is_placed: false });
-        }
+      if (offersRes.success && offersRes.offers?.length > 0) {
+        setProfile({ is_placed: true, placed_role: offersRes.offers[0].role, placed_ctc: offersRes.offers[0].ctc, placed_company: offersRes.offers[0].companies?.name });
+      } else {
+        setProfile({ is_placed: false });
       }
     } catch (err) {
       console.log('Using fallback mock data');

@@ -5,13 +5,24 @@ import { supabaseAdmin } from '../config/supabase';
 
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'iris-365-super-secret-key-for-jwt-signing';
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required and must be at least 32 characters in length to prevent brute-force signature forgery!');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function getFingerprintHash(req: Request): string {
   const userAgent = req.headers['user-agent'] || 'unknown';
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const ipSegment = ip.split('.').slice(0, 3).join('.'); // Use IP subnet to tolerate mobile network switching
-  const raw = `${userAgent}-${ipSegment}`;
+  const deviceId = req.headers['x-client-device-id'] || 'unknown-device';
+  
+  let ipSegment = ip;
+  if (ip.includes(':')) {
+    ipSegment = ip.split(':').slice(0, 4).join(':');
+  } else if (ip.includes('.')) {
+    ipSegment = ip.split('.').slice(0, 3).join('.');
+  }
+  
+  const raw = `${userAgent}-${ipSegment}-${deviceId}`;
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 

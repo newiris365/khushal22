@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { authLocalStorage } from '../config/supabase';
 
-const fallbackSecret = 'iris-365-super-secret-key-for-jwt-signing';
-if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === fallbackSecret)) {
-  throw new Error('PRODUCTION SECURITY VIOLATION: A strong JWT_SECRET environment variable is required in production mode!');
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required and must be at least 32 characters in length to prevent brute-force signature forgery!');
 }
-const JWT_SECRET = process.env.JWT_SECRET || fallbackSecret;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 import crypto from 'crypto';
 
@@ -29,6 +29,7 @@ declare global {
 function getFingerprintHash(req: Request): string {
   const userAgent = req.headers['user-agent'] || 'unknown';
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const deviceId = req.headers['x-client-device-id'] || 'unknown-device';
   
   let ipSegment = ip;
   if (ip.includes(':')) {
@@ -39,7 +40,7 @@ function getFingerprintHash(req: Request): string {
     ipSegment = ip.split('.').slice(0, 3).join('.');
   }
   
-  const raw = `${userAgent}-${ipSegment}`;
+  const raw = `${userAgent}-${ipSegment}-${deviceId}`;
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
@@ -52,25 +53,27 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   const token = authHeader.split(' ')[1];
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
-    
-    // Verify device fingerprint claim if present
-    if (decoded.fingerprint) {
-      const currentFingerprint = getFingerprintHash(req);
-      if (decoded.fingerprint !== currentFingerprint) {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Session security integrity compromised (device mismatch). Re-authentication required.' 
-        });
+  authLocalStorage.run(token, () => {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+      
+      // Verify device fingerprint claim if present
+      if (decoded.fingerprint) {
+        const currentFingerprint = getFingerprintHash(req);
+        if (decoded.fingerprint !== currentFingerprint) {
+          return res.status(403).json({ 
+            success: false, 
+            error: 'Session security integrity compromised (device mismatch). Re-authentication required.' 
+          });
+        }
       }
+      
+      req.user = decoded;
+      next();
+    } catch (err) {
+      return res.status(403).json({ success: false, error: 'Invalid or expired authentication token.' });
     }
-    
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(403).json({ success: false, error: 'Invalid or expired authentication token.' });
-  }
+  });
 }
 
 // Role-based claim gateway

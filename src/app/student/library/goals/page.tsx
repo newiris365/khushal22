@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Zap, BookOpen, Trophy, Plus, CheckCircle, BarChart3, TrendingUp } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from '../../../../lib/charts';
 
 export default function ReadingGoalsPage() {
   const [stats, setStats] = useState<any>(null);

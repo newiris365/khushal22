@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bus, ShieldCheck, Clock, ShieldAlert, ArrowRight, User } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
-import io from 'socket.io-client';
+import { getSocket } from '../../../lib/socket';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
@@ -24,14 +24,7 @@ export default function AdminFleetDashboard() {
   useEffect(() => {
     loadFleetData();
 
-    // Initialize socket connection to /transit namespace
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api/v1', '') : 'https://api.iris365.in';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
-
-    const socket = io(`${socketUrl}/transit`, {
-      auth: { token },
-      transports: ['websocket']
-    });
+    const socket = getSocket('/transit');
 
     socket.on('connect', () => {
       socket.emit('subscribe_admin');
@@ -82,7 +75,6 @@ export default function AdminFleetDashboard() {
 
     return () => {
       socket.emit('unsubscribe_admin');
-      socket.disconnect();
       clearInterval(mockInterval);
     };
   }, []);

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase';
 
 // ──────────────────────────────────────────────────────────────
@@ -314,68 +315,45 @@ export async function placeOrder(req: Request, res: Response) {
 
     const final_amount = total_amount - discount_amount;
 
-    // Wallet balance check & deduction
-    if (payment_method === 'Wallet') {
-      const { data: wallet, error: walletError } = await supabaseAdmin
-        .from('canteen_wallets')
-        .select('id, balance')
-        .eq('student_id', student_id)
-        .single();
-
-      if (walletError || !wallet) {
-        return res.status(404).json({ success: false, error: 'Canteen wallet not found for this student.' });
-      }
-
-      if (Number(wallet.balance) < final_amount) {
-        return res.status(400).json({
-          success: false,
-          error: `Insufficient wallet balance. Required: ₹${final_amount.toFixed(2)}, Available: ₹${Number(wallet.balance).toFixed(2)}`
-        });
-      }
-
-      const newBalance = Number(wallet.balance) - final_amount;
-      await supabaseAdmin
-        .from('canteen_wallets')
-        .update({ balance: newBalance, last_updated: new Date() })
-        .eq('student_id', student_id);
-
-      // Record transaction
-      await supabaseAdmin
-        .from('wallet_transactions')
-        .insert({
-          institution_id: req.user?.institution_id,
-          wallet_id: wallet.id,
-          student_id,
-          type: 'debit',
-          amount: final_amount,
-          reference_type: 'order_payment',
-          description: `Order payment for ${items.length} item(s)`,
-          balance_after: newBalance
-        });
-    }
-
     // Generate order number
     const order_number = `ORD-${Date.now().toString(36).toUpperCase()}`;
 
-    // Insert order
+    // Call atomic canteen order RPC
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('place_canteen_order_atomic', {
+      p_student_id: student_id,
+      p_institution_id: req.user?.institution_id,
+      p_total_amount: final_amount,
+      p_items: items,
+      p_payment_method: payment_method,
+      p_special_instructions: special_instructions || '',
+      p_offer_id: offer_id,
+      p_discount_amount: discount_amount,
+      p_order_number: order_number
+    });
+
+    if (rpcError) {
+      return res.status(500).json({ success: false, error: rpcError.message });
+    }
+
+    if (!rpcData || !rpcData.success) {
+      return res.status(400).json({ success: false, error: rpcData?.error || 'Failed to place order.' });
+    }
+
+    // Retrieve full order details
     const { data: order, error: orderError } = await supabaseAdmin
       .from('canteen_orders')
-      .insert({
-        institution_id: req.user?.institution_id,
-        student_id,
-        items,
-        total_amount: final_amount,
-        status: 'Received',
-        payment_method,
-        special_instructions,
-        offer_id,
-        discount_amount,
-        order_number
-      })
-      .select()
+      .select('*')
+      .eq('id', rpcData.order_id)
       .single();
 
-    if (orderError) return res.status(500).json({ success: false, error: orderError.message });
+    if (orderError) {
+      return res.status(200).json({
+        success: true,
+        message: 'Order placed successfully.',
+        order: { id: rpcData.order_id, order_number: rpcData.order_number }
+      });
+    }
+
     return res.status(200).json({ success: true, message: 'Order placed successfully.', order });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal server error processing order.' });
@@ -1018,8 +996,20 @@ export async function initiateWalletTopup(req: Request, res: Response) {
 
 export async function verifyWalletTopup(req: Request, res: Response) {
   try {
-    const { razorpay_payment_id, student_id, amount } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, amount } = req.body;
     
+    // Verify payment signature
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (secret && razorpay_order_id && !razorpay_order_id.startsWith('order_mock_')) {
+      const generatedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+      if (generatedSignature !== razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Razorpay wallet top-up payment signature validation failed.' });
+      }
+    }
+
     let { data: wallet } = await supabaseAdmin
       .from('canteen_wallets')
       .select('id, balance')

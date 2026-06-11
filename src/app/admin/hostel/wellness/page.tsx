@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Heart, HelpCircle, AlertTriangle, TrendingDown, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from '../../../../lib/charts';
 
 export default function AdminHostelWellness() {
   const [trends, setTrends] = useState<any[]>([]);

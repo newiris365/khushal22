@@ -42,8 +42,10 @@ export default function DirectorReportsPage() {
   const loadReportsData = async () => {
     setLoading(true);
     try {
-      const reportsRes = await apiGet('/director/reports');
-      const scheduleRes = await apiGet('/director/reports/schedule');
+      const [reportsRes, scheduleRes] = await Promise.all([
+        apiGet('/director/reports'),
+        apiGet('/director/reports/schedule'),
+      ]);
 
       if (reportsRes.success) setReports(reportsRes.reports || []);
       if (scheduleRes.success) setSchedules(scheduleRes.schedule || schedules);

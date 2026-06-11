@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, ArrowLeft, BarChart2, Calendar, TrendingUp } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from '../../../../lib/charts';
 import Link from 'next/link';
 
 export default function AdminGymAnalytics() {

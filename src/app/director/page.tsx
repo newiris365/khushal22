@@ -6,8 +6,9 @@ import {
   Bell, BrainCircuit, ArrowRight, MessageSquare, Plus, RefreshCw, Activity 
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../lib/api';
-import io from 'socket.io-client';
+import { getSocket } from '../../lib/socket';
 import Link from 'next/link';
+import Skeleton from '../../components/Skeleton';
 
 export default function DirectorDashboard() {
   const [kpis, setKpis] = useState({
@@ -29,16 +30,7 @@ export default function DirectorDashboard() {
   useEffect(() => {
     loadDashboard();
 
-    // Socket.io Realtime updates
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL 
-      ? process.env.NEXT_PUBLIC_API_URL.replace('/api/v1', '') 
-      : 'https://api.iris365.in';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
-
-    const socket = io(`${socketUrl}/director`, {
-      auth: { token },
-      transports: ['websocket']
-    });
+    const socket = getSocket('/director');
 
     socket.on('connect', () => {
       socket.emit('subscribe_director_kpis');
@@ -58,15 +50,16 @@ export default function DirectorDashboard() {
     });
 
     return () => {
-      socket.disconnect();
     };
   }, []);
 
   const loadDashboard = async () => {
     try {
-      const kpiRes = await apiGet('/director/overview');
-      const feedRes = await apiGet('/director/activity-feed');
-      const alertRes = await apiGet('/director/alerts');
+      const [kpiRes, feedRes, alertRes] = await Promise.all([
+        apiGet('/director/overview'),
+        apiGet('/director/activity-feed'),
+        apiGet('/director/alerts')
+      ]);
 
       if (kpiRes.success) setKpis(kpiRes.kpis);
       if (feedRes.success) setFeed(feedRes.feed || []);
@@ -119,6 +112,37 @@ export default function DirectorDashboard() {
     if (rate >= 75) return 'text-amber-400';
     return 'text-red-400';
   };
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">
+        <div className="border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-6 py-6 space-y-2">
+            <Skeleton className="h-7 w-64" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-6 mt-8 space-y-8">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-[#13102A]/60 p-4 rounded-3xl border border-white/5 h-32 flex flex-col justify-between">
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-8 w-1/3" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-2xl" />
+              ))}
+            </div>
+            <Skeleton className="h-80 rounded-3xl" />
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">

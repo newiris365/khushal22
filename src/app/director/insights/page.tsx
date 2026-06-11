@@ -52,9 +52,11 @@ export default function DirectorAIInsightsPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const insRes = await apiGet('/director/insights');
-      const dropRes = await apiGet('/director/insights/dropout-risk');
-      const feeRes = await apiGet('/director/insights/fee-risk');
+      const [insRes, dropRes, feeRes] = await Promise.all([
+        apiGet('/director/insights'),
+        apiGet('/director/insights/dropout-risk'),
+        apiGet('/director/insights/fee-risk'),
+      ]);
 
       if (insRes.success) setInsights(insRes.insights || []);
       if (dropRes.success) setDropoutStudents(dropRes.students || []);

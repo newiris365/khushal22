@@ -13,6 +13,10 @@
 /build
 /dist
 
+# runtime logs
+logs/
+*.log
+
 # misc
 .DS_Store
 *.pem

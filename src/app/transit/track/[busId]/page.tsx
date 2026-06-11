@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Navigation, MapPin, ShieldAlert, Users, Compass } from 'lucide-react';
 import Link from 'next/link';
-import io from 'socket.io-client';
+import { getSocket } from '../../../../lib/socket';
 import dynamic from 'next/dynamic';
 import { apiGet } from '../../../../lib/api';
+import Skeleton from '../../../../components/Skeleton';
 
 const MapComponent = dynamic(() => import('./MapComponent'), { ssr: false });
 
@@ -23,17 +24,9 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'offline'>('connecting');
 
   useEffect(() => {
-    // 1. Fetch active route stops for mapping
     loadRouteDetails();
 
-    // 2. Initialize Socket.io client connection to /transit namespace
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api/v1', '') : 'https://api.iris365.in';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
-
-    const socket = io(`${socketUrl}/transit`, {
-      auth: { token },
-      transports: ['websocket']
-    });
+    const socket = getSocket('/transit');
 
     socket.on('connect', () => {
       setConnectionStatus('connected');
@@ -101,7 +94,6 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
     }, 4000);
 
     return () => {
-      socket.disconnect();
       clearTimeout(fallbackTimer);
       if (mockInterval) clearInterval(mockInterval);
     };
@@ -109,10 +101,10 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
 
   const loadRouteDetails = async () => {
     try {
-      const res = await apiGet(`/transit/buses`);
-      if (res.success && res.buses) {
-        const activeBus = res.buses.find((b: any) => b.id === params.busId);
-        if (activeBus && activeBus.route_id) {
+      const busRes = await apiGet('/transit/buses');
+      if (busRes.success && busRes.buses) {
+        const activeBus = busRes.buses.find((b: any) => b.id === params.busId);
+        if (activeBus?.route_id) {
           const routeRes = await apiGet(`/transit/routes/${activeBus.route_id}`);
           if (routeRes.success && routeRes.route?.stops) {
             setStops(routeRes.route.stops);
@@ -141,7 +133,16 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0D0A1A] flex items-center justify-center text-white">
-        <div className="w-10 h-10 border-2 border-[#6C2BD9] border-t-transparent rounded-full animate-spin" />
+        <div className="max-w-7xl mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-4 gap-8 w-full">
+          <div className="lg:col-span-1 space-y-6">
+            <Skeleton className="h-32 rounded-3xl" />
+            <Skeleton className="h-48 rounded-3xl" />
+          </div>
+          <div className="lg:col-span-3 space-y-6">
+            <Skeleton className="h-[500px] rounded-3xl" />
+            <Skeleton className="h-40 rounded-3xl" />
+          </div>
+        </div>
       </main>
     );
   }

@@ -26,21 +26,21 @@ export default function StudentTransitPage() {
       if (subRes.success && subRes.has_subscription) {
         setSubscription(subRes.subscription);
 
-        // Fetch ML predictive arrival
         const routeId = subRes.subscription.route_id;
-        const predRes = await apiGet(`/transit/routes/${routeId}/predictive-arrival`);
+        const busId = subRes.subscription?.bus_routes?.buses?.[0]?.id;
+
+        const [predRes, tripRes] = await Promise.all([
+          apiGet(`/transit/routes/${routeId}/predictive-arrival`),
+          busId ? apiGet(`/transit/trips/${busId}`) : Promise.resolve({ success: false } as any),
+        ]);
+
         if (predRes.success) {
           setPrediction(predRes);
         }
 
-        // 2. Fetch active trip if bus exists
-        if (subRes.subscription?.bus_routes?.buses?.length > 0) {
-          const busId = subRes.subscription.bus_routes.buses[0].id;
-          const tripRes = await apiGet(`/transit/trips/${busId}`);
-          if (tripRes.success && tripRes.trips?.length > 0) {
-            const currentTrip = tripRes.trips.find((t: any) => t.status === 'active') || tripRes.trips[0];
-            setActiveTrip(currentTrip);
-          }
+        if (tripRes.success && tripRes.trips?.length > 0) {
+          const currentTrip = tripRes.trips.find((t: any) => t.status === 'active') || tripRes.trips[0];
+          setActiveTrip(currentTrip);
         }
       }
     } catch (err) {

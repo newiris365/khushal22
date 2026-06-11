@@ -13,11 +13,15 @@ interface ApiResponse<T = any> {
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
+  const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (deviceId) {
+    headers['X-Client-Device-ID'] = deviceId;
   }
   return headers;
 }
@@ -32,16 +36,22 @@ function handleAuthError(status: number): void {
   }
 }
 
-export async function apiGet<T = any>(endpoint: string, params?: Record<string, string>): Promise<ApiResponse<T>> {
+export async function apiGet<T = any>(endpoint: string, params?: Record<string, string>, cacheSeconds = 0): Promise<ApiResponse<T>> {
   try {
     const url = new URL(`${API_BASE}${endpoint}`, window.location.origin);
     if (params) {
       Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
     }
 
+    const headers = getAuthHeaders();
+    if (cacheSeconds > 0) {
+      headers['Cache-Control'] = `public, max-age=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 5}`;
+    }
+
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers,
+      next: cacheSeconds > 0 ? { revalidate: cacheSeconds } : undefined,
     });
 
     if (!response.ok) {

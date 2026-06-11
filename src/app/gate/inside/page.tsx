@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, User, Search, Users, ShieldAlert, ArrowLeft, RefreshCw, Layers } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 import Link from 'next/link';
+import Skeleton from '../../../components/Skeleton';
 
 export default function InsideOccupantsPage() {
   const [occupants, setOccupants] = useState<any[]>([]);
@@ -19,8 +20,10 @@ export default function InsideOccupantsPage() {
   const loadInsideOccupants = async () => {
     setLoading(true);
     try {
-      const occRes = await apiGet('/gate/occupants/inside');
-      const visRes = await apiGet('/gate/visitors/inside');
+      const [occRes, visRes] = await Promise.all([
+        apiGet('/gate/occupants/inside'),
+        apiGet('/gate/visitors/inside'),
+      ]);
 
       let fetchedOccupants = [];
       let fetchedVisitors = [];
@@ -172,9 +175,10 @@ export default function InsideOccupantsPage() {
         {/* Occupants grid/list */}
         <div className="bg-[#13102A]/60 rounded-3xl border border-white/5 overflow-hidden shadow-xl">
           {loading ? (
-            <div className="py-24 text-center space-y-3">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-[#A78BFA]" />
-              <p className="text-xs text-white/40 font-bold uppercase tracking-wider">Locating active user signatures inside campus...</p>
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-xl" />
+              ))}
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="py-24 text-center space-y-2 text-white/30">

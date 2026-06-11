@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { supabaseAdmin, isSupabaseOffline } from '../config/supabase';
 import logger from '../config/logger';
 
@@ -590,7 +591,19 @@ export async function verifyPayment(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     }
 
-    const { razorpay_order_id, razorpay_payment_id, applicant_id, fee_type, amount } = parse.data;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, applicant_id, fee_type, amount } = parse.data;
+
+    // Verify signature
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (secret && !razorpay_order_id.startsWith('order_mock_')) {
+      const generatedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+      if (generatedSignature !== razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Razorpay signature validation failed.' });
+      }
+    }
 
     // Complete transaction verification in Supabase
     const { data: record, error: fetchErr } = await supabaseAdmin

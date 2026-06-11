@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Cpu, RefreshCw, AlertTriangle, TrendingUp, Download, Zap, Droplet } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from '../../../../lib/charts';
 
 export default function AdminHostelIot() {
   const [trends, setTrends] = useState<any[]>([]);

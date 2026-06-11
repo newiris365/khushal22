@@ -4,7 +4,7 @@ const nextConfig = {
   swcMinify: true,
 
   // Reduces unnecessary double-renders in dev mode
-  reactStrictMode: false,
+  reactStrictMode: true,
 
   // Optimize image handling
   images: {
@@ -50,10 +50,11 @@ const nextConfig = {
   },
 
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_HOST || 'http://localhost:4000';
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://localhost:4000/api/v1/:path*',
+        destination: `${apiUrl}/api/v1/:path*`,
       },
     ];
   },

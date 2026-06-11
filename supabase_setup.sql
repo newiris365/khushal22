@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL, -- SuperAdmin, Admin, Staff, Student, Parent, Warden, Driver, Vendor, Security
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255),
+    email VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     avatar_url TEXT,
     employee_id VARCHAR(50),
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS canteen_wallets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE,
     student_id UUID REFERENCES students(id) ON DELETE CASCADE UNIQUE,
-    balance DECIMAL(10, 2) DEFAULT 0.00,
+    balance DECIMAL(10, 2) DEFAULT 0.00 CHECK (balance >= 0.00),
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -272,7 +272,7 @@ CREATE TABLE IF NOT EXISTS hostel_rooms (
     block_id UUID REFERENCES hostel_blocks(id) ON DELETE CASCADE,
     room_number VARCHAR(30) NOT NULL,
     capacity INTEGER NOT NULL,
-    occupied INTEGER DEFAULT 0,
+    occupied INTEGER DEFAULT 0 CHECK (occupied >= 0),
     amenities TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_room_per_block UNIQUE (block_id, room_number)
@@ -663,22 +663,32 @@ ALTER TABLE notification_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_query_logs ENABLE ROW LEVEL SECURITY;
 
--- Define tenant-isolation helper function (extracts institution_id from metadata)
+-- Define tenant-isolation helper function (securely looks up from public.users table)
 CREATE OR REPLACE FUNCTION get_auth_institution_id()
 RETURNS UUID AS $$
+DECLARE
+    inst_id UUID;
 BEGIN
-    RETURN (auth.jwt() -> 'user_metadata' ->> 'institution_id')::UUID;
+    SELECT institution_id INTO inst_id 
+    FROM public.users 
+    WHERE email = auth.jwt() ->> 'email' OR id = (auth.jwt() ->> 'sub')::UUID;
+    RETURN inst_id;
 EXCEPTION
     WHEN OTHERS THEN
         RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Define tenant-isolation role helper
+-- Define tenant-isolation role helper (securely looks up from public.users table)
 CREATE OR REPLACE FUNCTION get_auth_user_role()
 RETURNS VARCHAR AS $$
+DECLARE
+    u_role VARCHAR;
 BEGIN
-    RETURN auth.jwt() -> 'user_metadata' ->> 'role';
+    SELECT role INTO u_role 
+    FROM public.users 
+    WHERE email = auth.jwt() ->> 'email' OR id = (auth.jwt() ->> 'sub')::UUID;
+    RETURN u_role;
 EXCEPTION
     WHEN OTHERS THEN
         RETURN NULL;
@@ -821,6 +831,17 @@ DECLARE
   v_room_number VARCHAR;
   v_block_name VARCHAR;
 BEGIN
+  -- Check if student already has an active allocation
+  IF EXISTS (
+    SELECT 1 FROM hostel_allocations 
+    WHERE student_id = p_student_id AND is_current = TRUE
+  ) THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', 'Student already has an active hostel allocation.'
+    );
+  END IF;
+
   UPDATE hostel_rooms
     SET occupied = occupied + 1
     WHERE id = p_room_id
@@ -865,6 +886,17 @@ DECLARE
   v_title VARCHAR;
   v_copies_remaining INTEGER;
 BEGIN
+  -- Check if student already has this book issued and unreturned
+  IF EXISTS (
+    SELECT 1 FROM book_issues 
+    WHERE student_id = p_student_id AND book_id = p_book_id AND status = 'Issued'
+  ) THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', 'Student already has an active issue of this book. Duplicate issue denied.'
+    );
+  END IF;
+
   UPDATE books
     SET copies_available = copies_available - 1
     WHERE id = p_book_id
@@ -958,6 +990,17 @@ DECLARE
   v_start_time TIME;
   v_end_time TIME;
 BEGIN
+  -- Check if student already booked this slot
+  IF EXISTS (
+    SELECT 1 FROM gym_bookings 
+    WHERE student_id = p_student_id AND slot_id = p_slot_id AND status = 'Booked'
+  ) THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', 'Student already has an active booking for this gym slot. Duplicate booking denied.'
+    );
+  END IF;
+
   UPDATE gym_slots
     SET booked_count = booked_count + 1
     WHERE id = p_slot_id
@@ -2687,3 +2730,95 @@ VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Independence Day', '2026-08-15', 'national', 2026),
   ('a0000000-0000-0000-0000-000000000001', 'Republic Day', '2026-01-26', 'national', 2026)
 ON CONFLICT DO NOTHING;
+
+-- ==========================================================
+-- SECTION 5: SECURITY AUDIT INDEXES, PROCEDURES, AND CLEANUP
+-- ==========================================================
+
+-- Partial unique indexes to prevent duplicate active entities
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hostel_allocations_active_student ON hostel_allocations(student_id) WHERE (is_current = TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_book_issues_active_student_book ON book_issues(student_id, book_id) WHERE (status = 'Issued');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_gym_bookings_active_student_slot ON gym_bookings(student_id, slot_id) WHERE (status = 'Booked');
+
+-- Performance optimized composite index for transit live tracking queries
+CREATE INDEX IF NOT EXISTS idx_bus_tracking_composite ON bus_tracking(bus_id, timestamp DESC);
+
+-- Performance partial index for unread notifications retrieval
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE (is_read = FALSE);
+
+-- Atomic checkout procedure for canteen cashless wallet purchases (Overdraft protection)
+CREATE OR REPLACE FUNCTION place_canteen_order_atomic(
+  p_student_id UUID,
+  p_institution_id UUID,
+  p_total_amount DECIMAL,
+  p_items JSONB,
+  p_payment_method VARCHAR,
+  p_special_instructions TEXT,
+  p_offer_id UUID,
+  p_discount_amount DECIMAL,
+  p_order_number VARCHAR
+) RETURNS JSON AS $$
+DECLARE
+  v_wallet_id UUID;
+  v_wallet_balance DECIMAL(10,2);
+  v_new_balance DECIMAL(10,2);
+  v_order_id UUID;
+BEGIN
+  -- If payment method is Wallet, perform atomic balance check and debit
+  IF p_payment_method = 'Wallet' THEN
+    -- Lock wallet row to prevent concurrent race condition modifications
+    SELECT id, balance INTO v_wallet_id, v_wallet_balance
+    FROM canteen_wallets
+    WHERE student_id = p_student_id AND institution_id = p_institution_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RETURN json_build_object(
+        'success', false,
+        'error', 'Canteen wallet not found for this student.'
+      );
+    END IF;
+
+    IF v_wallet_balance < p_total_amount THEN
+      RETURN json_build_object(
+        'success', false,
+        'error', 'Insufficient wallet balance for canteen order.'
+      );
+    END IF;
+
+    v_new_balance := v_wallet_balance - p_total_amount;
+
+    -- Update balance
+    UPDATE canteen_wallets
+    SET balance = v_new_balance, last_updated = NOW()
+    WHERE id = v_wallet_id;
+
+    -- Insert wallet transaction
+    INSERT INTO wallet_transactions (institution_id, wallet_id, student_id, type, amount, reference_type, description, balance_after)
+    VALUES (p_institution_id, v_wallet_id, p_student_id, 'debit', p_total_amount, 'order_payment', 'Order payment for canteen items', v_new_balance);
+
+  END IF;
+
+  -- Insert order
+  INSERT INTO canteen_orders (
+    institution_id, student_id, items, total_amount, status, payment_method, special_instructions, offer_id, discount_amount, order_number, order_time
+  ) VALUES (
+    p_institution_id, p_student_id, p_items, p_total_amount, 'Received', p_payment_method, p_special_instructions, p_offer_id, p_discount_amount, p_order_number, NOW()
+  ) RETURNING id INTO v_order_id;
+
+  RETURN json_build_object(
+    'success', true,
+    'order_id', v_order_id,
+    'order_number', p_order_number
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Telemetry coordinates data cleanup/archival strategy (logs older than 30 days)
+CREATE OR REPLACE FUNCTION cleanup_old_bus_tracking_data()
+RETURNS VOID AS $$
+BEGIN
+  DELETE FROM bus_tracking
+  WHERE timestamp < NOW() - INTERVAL '30 days';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

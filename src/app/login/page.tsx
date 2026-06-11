@@ -143,6 +143,16 @@ export default function LoginPage() {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [useOfflineBypass, setUseOfflineBypass] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let id = localStorage.getItem('iris_client_device_id');
+      if (!id) {
+        id = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('iris_client_device_id', id);
+      }
+    }
+  }, []);
+
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema)
   });
@@ -152,9 +162,13 @@ export default function LoginPage() {
     setSubmitError(null);
 
     try {
+      const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : '';
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(deviceId ? { 'X-Client-Device-ID': deviceId } : {})
+        },
         body: JSON.stringify(data)
       });
 
@@ -237,9 +251,13 @@ export default function LoginPage() {
 
     // Attempt backend login, with fallback
     try {
+      const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : '';
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(deviceId ? { 'X-Client-Device-ID': deviceId } : {})
+        },
         body: JSON.stringify({ email, password: 'password123' })
       });
 

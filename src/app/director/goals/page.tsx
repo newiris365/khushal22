@@ -25,8 +25,10 @@ export default function StrategicGoalsPage() {
   const loadGoalsData = async () => {
     setLoading(true);
     try {
-      const goalsRes = await apiGet('/director/goals');
-      const histRes = await apiGet('/director/goals/history');
+      const [goalsRes, histRes] = await Promise.all([
+        apiGet('/director/goals'),
+        apiGet('/director/goals/history'),
+      ]);
       if (goalsRes.success) setGoals(goalsRes.goals || []);
       if (histRes.success) setHistory(histRes.history || {});
     } catch {

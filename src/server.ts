@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { Server as SocketServer } from 'socket.io';
+import jwt from 'jsonwebtoken';
 import logger from './config/logger';
 import { globalLimiter, authLimiter } from './middleware/rateLimit';
 import authRouter from './routes/auth';
@@ -29,6 +30,11 @@ import { initGateHardware } from './services/gateHardware';
 
 dotenv.config();
 
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required and must be at least 32 characters in length to prevent brute-force signature forgery!');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
+
 // Defer cron jobs initialization to avoid blocking server startup
 // Cron jobs are loaded after the server is listening (see httpServer.listen below)
 
@@ -43,6 +49,23 @@ const io = new SocketServer(httpServer, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
+  }
+});
+
+// Enforce authentication on all Socket.io connections
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+  if (!token) {
+    logger.warn('Socket connection rejected: Authentication token missing', { socketId: socket.id });
+    return next(new Error('Authentication error: Token missing'));
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    (socket as any).user = decoded;
+    next();
+  } catch (err) {
+    logger.warn('Socket connection rejected: Invalid authentication token', { socketId: socket.id });
+    return next(new Error('Authentication error: Invalid token'));
   }
 });
 
@@ -213,6 +236,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Stale-while-revalidate cache headers for read-only GET endpoints
+const CACHEABLE_PATHS = [
+  '/api/v1/director/overview',
+  '/api/v1/director/activity-feed',
+  '/api/v1/director/alerts',
+  '/api/v1/transit/routes',
+  '/api/v1/transit/buses',
+  '/api/v1/hostel',
+  '/api/v1/library',
+  '/api/v1/events',
+  '/api/v1/obe',
+  '/api/v1/naac',
+];
+app.use((req, res, next) => {
+  if (req.method === 'GET' && CACHEABLE_PATHS.some(p => req.path.startsWith(p))) {
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  }
+  next();
+});
+
 // Routes mapping (auth gets stricter rate limiter)
 app.use('/api/v1/auth', authLimiter, authRouter);
 app.use('/api/v1/core', coreRouter);
@@ -263,6 +306,16 @@ httpServer.listen(PORT, () => {
       logger.error('Failed to initialize cron jobs:', err);
     }
   }, 2000);
+
+  setTimeout(() => {
+    try {
+      const { startFeeReminderScheduler } = require('./services/feeReminderScheduler');
+      startFeeReminderScheduler();
+      logger.info('Fee reminder scheduler started.');
+    } catch (err) {
+      logger.error('Failed to start fee reminder scheduler:', err);
+    }
+  }, 4000);
 
   // Defer gate hardware init to avoid blocking startup with native module loading
   setTimeout(() => {

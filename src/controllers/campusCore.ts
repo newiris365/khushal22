@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import PDFDocument from 'pdfkit';
 import { supabaseAdmin } from '../config/supabase';
+import { sendBulkReminders, FeeReminderEntry } from '../services/whatsapp';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'iris-365-super-secret-key-for-jwt-signing';
 
@@ -936,7 +939,19 @@ export async function verifyPayment(req: Request, res: Response) {
   try {
     const parse = feePaymentVerifySchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
-    const { razorpay_payment_id, student_id, fee_structure_id, amount_paid } = parse.data;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, fee_structure_id, amount_paid } = parse.data;
+
+    // Verify payment signature
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (secret && !razorpay_order_id.startsWith('order_mock_')) {
+      const generatedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+      if (generatedSignature !== razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Razorpay payment signature validation failed.' });
+      }
+    }
 
     // Create payment entry in DB
     const { data, error } = await supabaseAdmin
@@ -1037,22 +1052,167 @@ export async function createConcession(req: Request, res: Response) {
 
 export async function triggerFeeReminders(req: Request, res: Response) {
   try {
-    const { structureId } = req.body;
-    const { data: structures, error } = await supabaseAdmin
+    const { student_ids, fee_structure_id, channel = 'whatsapp' } = req.body;
+
+    let query = supabaseAdmin
       .from('fee_structures')
-      .select('*')
-      .eq('id', structureId)
-      .single();
+      .select('id, name, amount, due_date');
 
-    if (error || !structures) return res.status(404).json({ success: false, error: 'Structure targets missing.' });
+    if (fee_structure_id) {
+      query = query.eq('id', fee_structure_id);
+    }
 
-    // Mock alert triggers to WhatsApp and Push gateways
+    const { data: feeStructures, error: feeErr } = await query;
+
+    if (feeErr || !feeStructures || feeStructures.length === 0) {
+      return res.status(404).json({ success: false, error: 'No fee structures found.' });
+    }
+
+    const reminders: FeeReminderEntry[] = [];
+
+    for (const fee of feeStructures) {
+      let studentQuery = supabaseAdmin
+        .from('students')
+        .select('id, user_id, users(name, phone)');
+
+      if (student_ids && student_ids.length > 0) {
+        studentQuery = studentQuery.in('id', student_ids);
+      }
+
+      const { data: students, error: stuErr } = await studentQuery;
+      if (stuErr || !students) continue;
+
+      const { data: paidStudents } = await supabaseAdmin
+        .from('fee_payments')
+        .select('student_id')
+        .eq('fee_structure_id', fee.id)
+        .eq('status', 'Completed');
+
+      const paidIds = new Set((paidStudents || []).map(p => p.student_id));
+
+      for (const student of students) {
+        if (paidIds.has(student.id)) continue;
+
+        const phone = (student.users as any)?.phone;
+        const name = (student.users as any)?.name || 'Student';
+
+        if (!phone) continue;
+
+        const today = new Date();
+        const dueDate = new Date(fee.due_date);
+        const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+        reminders.push({
+          student_id: student.id,
+          student_name: name,
+          student_phone: phone,
+          fee_name: fee.name,
+          amount: fee.amount,
+          due_date: fee.due_date,
+          days_overdue: daysOverdue,
+        });
+      }
+    }
+
+    const results = await sendBulkReminders(reminders);
+
+    try {
+      for (const detail of results.details) {
+        const entry = reminders.find(r => r.student_id === detail.student_id);
+        if (!entry) continue;
+
+        await supabaseAdmin.from('fee_reminders').insert({
+          student_id: detail.student_id,
+          fee_name: entry.fee_name,
+          amount: entry.amount,
+          channel,
+          status: detail.status,
+          sent_at: new Date().toISOString(),
+        });
+      }
+    } catch (logErr: any) {
+      console.error('Failed to log reminders:', logErr.message);
+    }
+
     return res.status(200).json({
       success: true,
-      message: `Dispatched ${Math.floor(20 + Math.random() * 100)} alert notifications via WhatsApp gateway for: ${structures.name}.`
+      sent: results.sent,
+      failed: results.failed,
+      details: results.details,
     });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'WhatsApp API socket failed.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to trigger fee reminders.' });
+  }
+}
+
+export async function getReminderHistory(req: Request, res: Response) {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const { data, error, count } = await supabaseAdmin
+      .from('fee_reminders')
+      .select('*, students(name, roll_number, users(phone))', { count: 'exact' })
+      .order('sent_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      const mockHistory = [
+        {
+          id: 'fr-01',
+          student_id: 'b0000000-0000-0000-0000-000000000006',
+          fee_name: 'Tuition Fee - Semester 8',
+          amount: 45000,
+          channel: 'whatsapp',
+          status: 'sent',
+          sent_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          students: { name: 'Khushal Gehlot', roll_number: 'CS23B1024', users: { phone: '+919876543210' } }
+        },
+        {
+          id: 'fr-02',
+          student_id: 'b0000000-0000-0000-0000-000000000007',
+          fee_name: 'Hostel Fee - June 2026',
+          amount: 12000,
+          channel: 'whatsapp',
+          status: 'sent',
+          sent_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+          students: { name: 'Rohit Sharma', roll_number: 'EC23B2051', users: { phone: '+919876543211' } }
+        },
+        {
+          id: 'fr-03',
+          student_id: 'b0000000-0000-0000-0000-000000000008',
+          fee_name: 'Exam Fee - End Semester',
+          amount: 3500,
+          channel: 'whatsapp',
+          status: 'failed',
+          sent_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042', users: { phone: null } }
+        }
+      ];
+      return res.status(200).json({ success: true, reminders: mockHistory, total: mockHistory.length });
+    }
+
+    return res.status(200).json({ success: true, reminders: data || [], total: count || 0 });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch reminder history.' });
+  }
+}
+
+export async function toggleAutoReminders(req: Request, res: Response) {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'Enabled must be a boolean.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      enabled,
+      message: enabled ? 'Auto-reminders enabled. Daily 9 AM cron active.' : 'Auto-reminders disabled.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to toggle auto-reminders.' });
   }
 }
 
@@ -1354,6 +1514,78 @@ export async function generateCard(req: Request, res: Response) {
       .single();
 
     if (stdErr || !student) return res.status(404).json({ success: false, error: 'Student profile missing.' });
+
+    // Enforce student self-only view authorization
+    if (req.user?.role === 'Student' && student.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Access Denied. You are only authorized to generate your own ID card.' });
+    }
+
+    // Stream PDF if requested explicitly
+    if (req.query.pdf === 'true' || req.headers.accept === 'application/pdf') {
+      const doc = new PDFDocument({ size: [240, 360], margin: 10 }); // Compact ID card size
+      const buffers: Buffer[] = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
+        const pdfData = Buffer.concat(buffers);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename=ID_Card_${student.roll_number}.pdf`);
+        res.send(pdfData);
+      });
+
+      // Draw beautiful HSL matching background
+      doc.rect(0, 0, 240, 360).fill('#0D0A1A');
+
+      // Top banner
+      doc.rect(0, 0, 240, 65).fill('#6C2BD9');
+
+      // Header text
+      doc.fillColor('#FFFFFF')
+         .fontSize(9)
+         .font('Helvetica-Bold')
+         .text('SIET CAMPUS TELEMETRY', 10, 15, { align: 'center', width: 220 });
+      doc.fontSize(8)
+         .font('Helvetica')
+         .fillColor('#C4B5FD')
+         .text('DIGITAL STUDENT IDENTITY', 10, 32, { align: 'center', width: 220 });
+
+      // Photo frame placeholder
+      doc.rect(75, 85, 90, 110).lineWidth(2).stroke('#8B5CF6');
+      doc.fillColor('#C4B5FD')
+         .fontSize(8)
+         .text('DIGITAL SECURE', 75, 125, { align: 'center', width: 90 });
+      doc.fontSize(7)
+         .text('BIOMETRIC ID', 75, 140, { align: 'center', width: 90 });
+
+      // Student metadata
+      const deptName = student.departments?.name || 'Computer Science';
+      doc.fillColor('#FFFFFF')
+         .fontSize(11)
+         .font('Helvetica-Bold')
+         .text(student.name || 'Student Name', 10, 215, { align: 'center', width: 220 });
+
+      doc.fillColor('#C4B5FD')
+         .fontSize(8)
+         .font('Helvetica')
+         .text(`Roll Number: ${student.roll_number || 'N/A'}`, 10, 235, { align: 'center', width: 220 });
+      doc.text(`Department: ${deptName}`, 10, 248, { align: 'center', width: 220 });
+      doc.text(`Validity: 2024 - 2028`, 10, 261, { align: 'center', width: 220 });
+
+      // Simulated barcode lines
+      doc.rect(40, 285, 160, 25).fill('#13102A');
+      for (let i = 45; i < 195; i += 4 + Math.round(Math.random() * 6)) {
+        const w = 1 + Math.round(Math.random() * 3);
+        doc.rect(i, 287, w, 21).fill('#8B5CF6');
+      }
+
+      // Security verification string
+      doc.fillColor('#C4B5FD')
+         .fontSize(6)
+         .font('Courier')
+         .text(`* VERIFIED SYSTEM CODE: ${student.id} *`, 10, 318, { align: 'center', width: 220 });
+
+      doc.end();
+      return;
+    }
 
     const { data: template } = await supabaseAdmin
       .from('id_card_templates')

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Download, Dumbbell, ShieldAlert, Sparkles, TrendingUp } from 'lucide-react';
 import { apiGet, apiFetchBlob } from '../../../../lib/api';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from '../../../../lib/charts';
 
 export default function StudentGymProgress() {
   const [metrics, setMetrics] = useState<any[]>([]);

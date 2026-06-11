@@ -1,7 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { AsyncLocalStorage } from 'async_hooks';
 
 dotenv.config();
+
+// Request context store for dynamic JWT scoping
+export const authLocalStorage = new AsyncLocalStorage<string>();
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -10,8 +14,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.warn('Supabase URL or Service Key is missing. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are configured.');
 }
 
-// Admin client to bypass RLS for administrative updates (like auth syncs)
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+// Internal admin client to bypass RLS for administrative updates
+const _supabaseAdminInternal = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -45,3 +49,60 @@ async function checkConnectivity() {
 }
 checkConnectivity();
 
+// Helper to get client dynamically
+export function getDynamicSupabaseClient(): SupabaseClient {
+  const token = authLocalStorage.getStore();
+  if (token && supabaseUrl) {
+    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseServiceKey;
+    return createClient(supabaseUrl, anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+  }
+  return _supabaseAdminInternal;
+}
+
+// Export supabaseAdmin as a Proxy that dynamically routes to getDynamicSupabaseClient()
+export const supabaseAdmin = new Proxy(_supabaseAdminInternal, {
+  get(target, prop, receiver) {
+    const dynamicClient = getDynamicSupabaseClient();
+    const value = Reflect.get(dynamicClient, prop, dynamicClient);
+    if (typeof value === 'function') {
+      return value.bind(dynamicClient);
+    }
+    return value;
+  }
+});
+
+// Export a raw, un-proxied client for explicit administrative actions
+export const supabaseServiceRole = _supabaseAdminInternal;
+
+import { Request } from 'express';
+
+export function getSupabaseClient(req?: Request) {
+  const authHeader = req?.headers?.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+  if (token && supabaseUrl) {
+    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseServiceKey;
+    return createClient(supabaseUrl, anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+  }
+  return _supabaseAdminInternal;
+}

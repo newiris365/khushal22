@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, User, QrCode, Cpu, UserCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { apiGet, apiPost } from '../../lib/api';
-import io from 'socket.io-client';
+import { getSocket } from '../../lib/socket';
 import Link from 'next/link';
 
 export default function SecurityGuardDashboard() {
@@ -37,14 +37,7 @@ export default function SecurityGuardDashboard() {
   useEffect(() => {
     loadDashboardData();
 
-    // Connect to /gate Socket.io namespace
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api/v1', '') : 'https://api.iris365.in';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
-
-    const socket = io(`${socketUrl}/gate`, {
-      auth: { token },
-      transports: ['websocket']
-    });
+    const socket = getSocket('/gate');
 
     socket.on('connect', () => {
       socket.emit('subscribe_admin_gate');
@@ -68,17 +61,18 @@ export default function SecurityGuardDashboard() {
     });
 
     return () => {
-      socket.disconnect();
     };
   }, []);
 
   const loadDashboardData = async () => {
     try {
-      const logsRes = await apiGet('/gate/logs');
+      const [logsRes] = await Promise.all([
+        apiGet('/gate/logs'),
+        loadOccupancyData(),
+      ]);
       if (logsRes.success) {
         setLogs(logsRes.logs || []);
       }
-      await loadOccupancyData();
     } catch {
       // Mock Fallbacks
       setLogs([
