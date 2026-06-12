@@ -56,11 +56,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (savedProfile) {
       try {
         const parsed = JSON.parse(savedProfile);
-        setUserRole(parsed.role || '');
-        if (parsed.role === 'SuperAdmin') {
+        const role = parsed.role || '';
+        setUserRole(role);
+        if (role === 'SuperAdmin') {
           setLinks([
             { label: 'Global Tenants', href: '/admin/global', icon: Shield },
-            ...adminLinks.filter(l => l.href !== '/admin/settings'),
             { label: 'Settings', href: '/admin/settings', icon: Settings },
           ]);
         } else {
@@ -75,8 +75,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <PortalShell
-      portalName="Admin Console"
-      portalBadge="Admin"
+      portalName={userRole === 'SuperAdmin' ? "SuperAdmin Console" : "Admin Console"}
+      portalBadge={userRole === 'SuperAdmin' ? "SuperAdmin" : "Admin"}
       sidebarLinks={links}
       accentColor="#6C2BD9"
     >
