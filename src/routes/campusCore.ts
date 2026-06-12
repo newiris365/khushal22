@@ -466,4 +466,33 @@ router.put('/vendor/menu/:id/stock', requireRole(['Vendor', 'Admin', 'SuperAdmin
 router.get('/vendor/sales', requireRole(['Vendor', 'Admin', 'SuperAdmin']), getVendorDailySales);
 router.get('/vendor/prep-list', requireRole(['Vendor', 'Admin', 'SuperAdmin']), getPrepList);
 
+// =========================================================================
+// 31. WHATSAPP API CONFIGURATION (Admin only)
+// =========================================================================
+import { getWhatsAppConfig, saveWhatsAppConfig, testWhatsAppMessage, getWhatsAppDeliveryLog } from '../controllers/whatsappConfig';
+
+router.get('/whatsapp/config', requireRole(['Admin', 'SuperAdmin']), getWhatsAppConfig);
+router.post('/whatsapp/config', requireRole(['Admin', 'SuperAdmin']), saveWhatsAppConfig);
+router.post('/whatsapp/test', requireRole(['Admin', 'SuperAdmin']), testWhatsAppMessage);
+router.get('/whatsapp/delivery-log', requireRole(['Admin', 'SuperAdmin']), getWhatsAppDeliveryLog);
+
+// =========================================================================
+// 32. USER MANAGEMENT (Admin only)
+// =========================================================================
+import {
+  listUsers, getUserById, createUser, updateUser,
+  deactivateUser, reactivateUser, resetUserPassword,
+  getUserRoleStats, getDepartments
+} from '../controllers/userManagement';
+
+router.get('/users', requireRole(['Admin', 'SuperAdmin']), listUsers);
+router.get('/users/stats', requireRole(['Admin', 'SuperAdmin']), getUserRoleStats);
+router.get('/users/departments', requireRole(['Admin', 'SuperAdmin']), getDepartments);
+router.get('/users/:userId', requireRole(['Admin', 'SuperAdmin']), getUserById);
+router.post('/users', requireRole(['Admin', 'SuperAdmin']), createUser);
+router.put('/users/:userId', requireRole(['Admin', 'SuperAdmin']), updateUser);
+router.post('/users/:userId/deactivate', requireRole(['Admin', 'SuperAdmin']), deactivateUser);
+router.post('/users/:userId/reactivate', requireRole(['Admin', 'SuperAdmin']), reactivateUser);
+router.post('/users/:userId/reset-password', requireRole(['Admin', 'SuperAdmin']), resetUserPassword);
+
 export default router;

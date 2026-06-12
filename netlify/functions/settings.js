@@ -35,8 +35,18 @@ exports.handler = async (event) => {
     const params = new URLSearchParams(event.queryStringParameters || {});
     const action = params.get('action');
 
+    // Parse body if present
+    let body = {};
+    if (event.body) {
+      try {
+        body = JSON.parse(event.body);
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
     // Verify JWT token from Authorization header
-    const authHeader = event.headers.authorization;
+    const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return { statusCode: 401, headers, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
     }
@@ -60,13 +70,16 @@ exports.handler = async (event) => {
     const institutionId = userPayload.institution_id;
     const role = userPayload.role;
 
+    // Determine target institution ID for SuperAdmin
+    const targetInstitutionId = (role === 'SuperAdmin' && (params.get('institution_id') || params.get('institutionId') || body.institution_id || body.institutionId)) || institutionId;
+
     switch (action) {
       // ==================== FEATURES ====================
       case 'get_features': {
         const { data, error } = await supabase
           .from('institution_features')
           .select('feature_key, enabled')
-          .eq('institution_id', institutionId);
+          .eq('institution_id', targetInstitutionId);
 
         if (error) throw error;
 
@@ -83,14 +96,13 @@ exports.handler = async (event) => {
         if (role !== 'SuperAdmin') {
           return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin can toggle modules.' }) };
         }
-        const body = JSON.parse(event.body || '{}');
         const { features } = body;
         if (!Array.isArray(features)) {
           return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'features array required' }) };
         }
 
         const rows = features.map(f => ({
-          institution_id: institutionId,
+          institution_id: targetInstitutionId,
           feature_key: f.feature_key,
           enabled: f.enabled
         }));
@@ -112,7 +124,7 @@ exports.handler = async (event) => {
         const { data, error } = await supabase
           .from('module_permissions')
           .select('role, module, can_read, can_write, can_delete')
-          .eq('institution_id', institutionId);
+          .eq('institution_id', targetInstitutionId);
 
         if (error) throw error;
 
@@ -126,14 +138,13 @@ exports.handler = async (event) => {
         if (role !== 'SuperAdmin') {
           return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin can manage permissions.' }) };
         }
-        const body = JSON.parse(event.body || '{}');
         const { permissions } = body;
         if (!Array.isArray(permissions)) {
           return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'permissions array required' }) };
         }
 
         const rows = permissions.map(p => ({
-          institution_id: institutionId,
+          institution_id: targetInstitutionId,
           role: p.role,
           module: p.module,
           can_read: p.can_read ?? true,
@@ -183,7 +194,7 @@ exports.handler = async (event) => {
 
         // Seed all features as enabled
         const featureRows = ALL_FEATURES.map(key => ({
-          institution_id: institutionId,
+          institution_id: targetInstitutionId,
           feature_key: key,
           enabled: true
         }));
@@ -196,7 +207,7 @@ exports.handler = async (event) => {
 
         // Seed Admin full CRUD on all modules
         const adminPerms = ALL_FEATURES.map(mod => ({
-          institution_id: institutionId,
+          institution_id: targetInstitutionId,
           role: 'Admin',
           module: mod,
           can_read: true,

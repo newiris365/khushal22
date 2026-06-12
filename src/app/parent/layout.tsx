@@ -1,7 +1,7 @@
 "use client";
 
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Calendar, Link2, Bell, Bus, Wallet } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Calendar, Link2, Bell, Bus, Wallet, UserCircle } from 'lucide-react';
 
 const parentLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
@@ -12,6 +12,7 @@ const parentLinks: SidebarLink[] = [
   { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
   { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },
   { label: 'Link Child', href: '/parent/link', icon: Link2 },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {

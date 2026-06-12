@@ -1,7 +1,7 @@
 "use client";
 
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, BookOpen, FileText, AlertTriangle, Upload, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, BookOpen, FileText, AlertTriangle, Upload, ClipboardList, UserCircle } from 'lucide-react';
 
 const librarianLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/librarian/library', icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const librarianLinks: SidebarLink[] = [
   { label: 'Overdue Books', href: '/librarian/library/overdue', icon: AlertTriangle },
   { label: 'E-Books', href: '/librarian/library/ebooks', icon: FileText },
   { label: 'Reports', href: '/librarian/library/reports', icon: ClipboardList },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function LibrarianLayout({ children }: { children: React.ReactNode }) {

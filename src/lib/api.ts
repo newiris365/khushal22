@@ -161,19 +161,19 @@ export interface ModulePermission {
 }
 
 export async function getFeatureToggles(institutionId: string): Promise<ApiResponse<{ features: FeatureToggle[] }>> {
-  return settingsApi('get_features');
+  return settingsApi('get_features', { institution_id: institutionId });
 }
 
 export async function setFeatureToggles(institutionId: string, features: FeatureToggle[]): Promise<ApiResponse> {
-  return settingsApi('save_features', { features });
+  return settingsApi('save_features', { institution_id: institutionId }, { features });
 }
 
 export async function getRolePermissions(institutionId: string): Promise<ApiResponse<{ permissions: ModulePermission[]; all_roles: string[]; all_modules: string[] }>> {
-  return settingsApi('get_permissions');
+  return settingsApi('get_permissions', { institution_id: institutionId });
 }
 
 export async function setRolePermissions(institutionId: string, permissions: ModulePermission[]): Promise<ApiResponse> {
-  return settingsApi('save_permissions', { permissions });
+  return settingsApi('save_permissions', { institution_id: institutionId }, { permissions });
 }
 
 export async function getMyPermissions(): Promise<ApiResponse<{ features: FeatureToggle[]; permissions: ModulePermission[] }>> {
@@ -181,17 +181,24 @@ export async function getMyPermissions(): Promise<ApiResponse<{ features: Featur
 }
 
 export async function seedPermissions(institutionId: string): Promise<ApiResponse> {
-  return settingsApi('seed');
+  return settingsApi('seed', { institution_id: institutionId }, {});
 }
 
 // Netlify Function helper for settings operations
-async function settingsApi(action: string, body?: any): Promise<ApiResponse> {
+async function settingsApi(action: string, queryParams?: Record<string, string>, body?: any): Promise<ApiResponse> {
   try {
     const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`/api/settings?action=${action}`, {
+    const urlParams = new URLSearchParams({ action });
+    if (queryParams) {
+      Object.entries(queryParams).forEach(([k, v]) => {
+        if (v) urlParams.set(k, v);
+      });
+    }
+
+    const response = await fetch(`/api/settings?${urlParams.toString()}`, {
       method: body ? 'POST' : 'GET',
       headers,
       body: body ? JSON.stringify(body) : undefined,

@@ -23,7 +23,7 @@ export default function AdminNaacDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/naac/score/estimate', {
+      const res = await fetch('/api/v1/naac/score/estimate', {
         headers: getAuthHeaders()
       });
       const data = await res.json();

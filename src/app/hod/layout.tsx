@@ -1,7 +1,7 @@
 "use client";
 
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, GraduationCap, BarChart3, Target, Users } from 'lucide-react';
+import { LayoutDashboard, GraduationCap, BarChart3, Target, Users, UserCircle } from 'lucide-react';
 
 const hodLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/hod/dashboard', icon: LayoutDashboard },
@@ -9,6 +9,7 @@ const hodLinks: SidebarLink[] = [
   { label: 'CO-PO Attainment', href: '/hod/obe/po-attainment', icon: Target },
   { label: 'Gap Analysis', href: '/hod/obe/gap-analysis', icon: BarChart3 },
   { label: 'My Team', href: '/faculty/students', icon: Users },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function HodLayout({ children }: { children: React.ReactNode }) {

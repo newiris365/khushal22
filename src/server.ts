@@ -260,6 +260,7 @@ app.use((req, res, next) => {
 // Routes mapping (auth gets stricter rate limiter)
 app.use('/api/v1/auth', authLimiter, authRouter);
 app.use('/api/v1/core', coreRouter);
+app.use('/api/v1/campusCore', coreRouter);
 app.use('/api/canteen', canteenRouter);
 app.use('/api/v1/canteen', canteenRouter);
 app.use('/api/v1/hostel-gate', hostelGateRouter);

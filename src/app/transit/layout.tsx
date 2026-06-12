@@ -1,7 +1,7 @@
 "use client";
 
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, MapPin, Route, CreditCard, Car, Leaf, AlertOctagon } from 'lucide-react';
+import { LayoutDashboard, MapPin, Route, CreditCard, Car, Leaf, AlertOctagon, UserCircle } from 'lucide-react';
 
 const transitLinks: SidebarLink[] = [
   { label: 'Live Tracker', href: '/transit', icon: LayoutDashboard },
@@ -11,6 +11,7 @@ const transitLinks: SidebarLink[] = [
   { label: 'Parking Pass', href: '/transit/parking', icon: Car },
   { label: 'Carbon Offset', href: '/transit/carbon', icon: Leaf },
   { label: 'Parent SOS', href: '/transit/sos', icon: AlertOctagon },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function TransitLayout({ children }: { children: React.ReactNode }) {

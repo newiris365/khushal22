@@ -3,7 +3,7 @@
 import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
-  LayoutDashboard, PlayCircle, MapPin, Users, AlertTriangle, Bus
+  LayoutDashboard, PlayCircle, MapPin, Users, AlertTriangle, Bus, UserCircle
 } from 'lucide-react';
 
 const driverLinks: SidebarLink[] = [
@@ -12,6 +12,7 @@ const driverLinks: SidebarLink[] = [
   { label: 'Stops', href: '/driver/stops', icon: MapPin },
   { label: 'Headcount', href: '/driver/headcount', icon: Users },
   { label: 'Emergency', href: '/driver/emergency', icon: AlertTriangle },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function DriverLayout({ children }: { children: React.ReactNode }) {

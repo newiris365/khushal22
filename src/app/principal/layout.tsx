@@ -3,7 +3,7 @@
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Users, FileText, Award, IndianRupee,
-  ClipboardList, BarChart3, GraduationCap
+  ClipboardList, BarChart3, GraduationCap, UserCircle
 } from 'lucide-react';
 
 const principalLinks: SidebarLink[] = [
@@ -15,6 +15,7 @@ const principalLinks: SidebarLink[] = [
   { label: 'Academics', href: '/principal/academics', icon: GraduationCap },
   { label: 'Notices', href: '/principal/notices', icon: FileText },
   { label: 'Achievements', href: '/principal/achievements', icon: Award },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function PrincipalLayout({ children }: { children: React.ReactNode }) {

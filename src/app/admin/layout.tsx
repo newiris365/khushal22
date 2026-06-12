@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Users, CalendarDays, CreditCard, ShoppingBag, BookOpen,
   Shield, Dumbbell, Bus, BrainCircuit, ClipboardList, GraduationCap,
   Home, Bell, Award, FileText, UserCheck, Briefcase, HeartPulse, Settings,
-  Armchair, Package, Link2, AlertTriangle, Calendar, BarChart3, Wand2
+  Armchair, Package, Link2, AlertTriangle, Calendar, BarChart3, Wand2, UserCircle, MessageSquare,
+  Sliders, UserPlus
 } from 'lucide-react';
 
 const adminLinks: SidebarLink[] = [
@@ -14,6 +15,8 @@ const adminLinks: SidebarLink[] = [
   { label: 'Admissions', href: '/admin/admissions', icon: UserCheck },
   { label: 'New Admission', href: '/admin/admissions/new', icon: Users },
   { label: 'Students', href: '/admin/students', icon: GraduationCap },
+  { label: 'Users & Roles', href: '/admin/users', icon: UserPlus },
+  { label: 'Permissions', href: '/admin/permissions', icon: Sliders },
   { label: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/admin/timetable', icon: ClipboardList },
   { label: 'Timetable Auto', href: '/admin/timetable/auto', icon: Wand2 },
@@ -44,7 +47,9 @@ const adminLinks: SidebarLink[] = [
   { label: 'Driver Portal', href: '/driver/dashboard', icon: Bus },
   { label: 'Vendor Portal', href: '/vendor/dashboard', icon: ShoppingBag },
   { label: 'Achievements', href: '/admin/achievements', icon: FileText },
+  { label: 'WhatsApp API', href: '/admin/whatsapp', icon: MessageSquare },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -60,8 +65,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         setUserRole(role);
         if (role === 'SuperAdmin') {
           setLinks([
-            { label: 'Global Tenants', href: '/admin/global', icon: Shield },
-            { label: 'Settings', href: '/admin/settings', icon: Settings },
+            { label: 'Global Console', href: '/admin/global', icon: Shield },
+            { label: 'Profile', href: '/profile', icon: UserCircle },
           ]);
         } else {
           // Admin cannot see Settings

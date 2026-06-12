@@ -1,16 +1,95 @@
 import logger from '../config/logger';
+import { supabaseAdmin } from '../config/supabase';
 
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
+// Cached config - reloaded every 5 minutes
+let cachedConfig: any = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-function isSandboxMode(): boolean {
-  return !TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN;
+export interface WhatsAppConfig {
+  provider: string;
+  api_url: string;
+  api_key: string | null;
+  phone_number_id: string | null;
+  from_number: string;
+  verify_token: string | null;
+  access_token: string | null;
+  template_namespace: string | null;
+  extra_config: Record<string, any>;
 }
 
-async function twilioFetch(endpoint: string, body: URLSearchParams): Promise<any> {
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}${endpoint}`;
-  const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+async function loadConfig(): Promise<WhatsAppConfig | null> {
+  const now = Date.now();
+  if (cachedConfig && (now - cacheTimestamp) < CACHE_TTL_MS) {
+    return cachedConfig;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('whatsapp_api_config')
+      .select('*')
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) {
+      // Fallback to env vars for backward compatibility
+      const envFallback: WhatsAppConfig = {
+        provider: 'twilio',
+        api_url: 'https://api.twilio.com/2010-04-01/Accounts',
+        api_key: process.env.TWILIO_AUTH_TOKEN || null,
+        phone_number_id: null,
+        from_number: process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886',
+        verify_token: process.env.WHATSAPP_VERIFY_TOKEN || 'iris365-whatsapp-verify',
+        access_token: null,
+        template_namespace: process.env.TWILIO_ACCOUNT_SID || null,
+        extra_config: {},
+      };
+
+      if (!envFallback.api_key) {
+        cachedConfig = null;
+        cacheTimestamp = now;
+        return null; // No config at all - sandbox mode
+      }
+
+      cachedConfig = envFallback;
+      cacheTimestamp = now;
+      return envFallback;
+    }
+
+    cachedConfig = {
+      provider: data.provider || 'twilio',
+      api_url: data.api_url,
+      api_key: data.api_key,
+      phone_number_id: data.phone_number_id,
+      from_number: data.from_number,
+      verify_token: data.verify_token,
+      access_token: data.access_token,
+      template_namespace: data.template_namespace,
+      extra_config: data.extra_config || {},
+    };
+    cacheTimestamp = now;
+    return cachedConfig;
+  } catch (err: any) {
+    logger.error(`Failed to load WhatsApp config: ${err.message}`);
+    return null;
+  }
+}
+
+/** Force-reload config (called after admin saves new config) */
+export function reloadWhatsAppConfig(): void {
+  cachedConfig = null;
+  cacheTimestamp = 0;
+}
+
+function isSandboxMode(): boolean {
+  return !cachedConfig && Date.now() - cacheTimestamp > CACHE_TTL_MS;
+}
+
+// ─── Twilio Provider ──────────────────────────────────────────
+
+async function twilioSend(to: string, body: string, config: WhatsAppConfig): Promise<boolean> {
+  const url = `${config.api_url}/${config.template_namespace}/Messages.json`;
+  const auth = Buffer.from(`${config.template_namespace}:${config.api_key}`).toString('base64');
 
   const response = await fetch(url, {
     method: 'POST',
@@ -18,15 +97,153 @@ async function twilioFetch(endpoint: string, body: URLSearchParams): Promise<any
       'Authorization': `Basic ${auth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: body.toString(),
+    body: new URLSearchParams({
+      To: to,
+      From: config.from_number,
+      Body: body,
+    }).toString(),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Twilio API error ${response.status}: ${errorText}`);
   }
+  return true;
+}
 
-  return response.json();
+async function twilioSendTemplate(to: string, templateName: string, params: Record<string, string>, config: WhatsAppConfig): Promise<boolean> {
+  const url = `${config.api_url}/${config.template_namespace}/Messages.json`;
+  const auth = Buffer.from(`${config.template_namespace}:${config.api_key}`).toString('base64');
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      To: to,
+      From: config.from_number,
+      ContentTemplateSid: templateName,
+      ContentVariables: JSON.stringify(params),
+    }).toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twilio API error ${response.status}: ${errorText}`);
+  }
+  return true;
+}
+
+// ─── Meta Cloud API Provider ──────────────────────────────────
+
+async function metaCloudSend(to: string, body: string, config: WhatsAppConfig): Promise<boolean> {
+  const url = `${config.api_url}/${config.phone_number_id}/messages`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: to.replace('whatsapp:', '').replace('+', ''),
+      type: 'text',
+      text: { body },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Meta Cloud API error ${response.status}: ${errorText}`);
+  }
+  return true;
+}
+
+// ─── Generic HTTP Provider (Gupshup, WATI, Custom) ────────────
+
+async function genericSend(to: string, body: string, config: WhatsAppConfig): Promise<boolean> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (config.access_token) {
+    headers['Authorization'] = `Bearer ${config.access_token}`;
+  }
+  if (config.api_key) {
+    headers['apikey'] = config.api_key;
+    headers['api-key'] = config.api_key;
+  }
+
+  const phone = to.replace('whatsapp:', '').replace('+', '');
+
+  const response = await fetch(config.api_url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      to: phone,
+      message: body,
+      text: body,
+      ...config.extra_config,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`WhatsApp API error ${response.status}: ${errorText}`);
+  }
+  return true;
+}
+
+// ─── Unified Send ─────────────────────────────────────────────
+
+export async function sendTextMessage(to: string, body: string, channelPurpose: string = 'general'): Promise<boolean> {
+  const config = await loadConfig();
+
+  // Log to delivery log
+  const logEntry: any = {
+    to_phone: to,
+    from_phone: config?.from_number || null,
+    message_body: body,
+    status: 'sent',
+    provider: config?.provider || 'sandbox',
+    channel_purpose: channelPurpose,
+  };
+
+  if (!config) {
+    logger.info(`[WHATSAPP SANDBOX] To: ${to}, Purpose: ${channelPurpose}, Body: ${body.substring(0, 80)}...`);
+    logEntry.status = 'sandbox';
+    try { await supabaseAdmin.from('whatsapp_delivery_log').insert(logEntry); } catch {}
+    return true;
+  }
+
+  try {
+    switch (config.provider) {
+      case 'twilio':
+        await twilioSend(to, body, config);
+        break;
+      case 'meta_cloud':
+        await metaCloudSend(to, body, config);
+        break;
+      case 'gupshup':
+      case 'wati':
+      case 'custom':
+      default:
+        await genericSend(to, body, config);
+        break;
+    }
+
+    logger.info(`WhatsApp message sent to ${to} via ${config.provider} (${channelPurpose})`);
+    logEntry.status = 'sent';
+    try { await supabaseAdmin.from('whatsapp_delivery_log').insert(logEntry); } catch {}
+    return true;
+  } catch (err: any) {
+    logger.error(`Failed to send WhatsApp to ${to}: ${err.message}`);
+    logEntry.status = 'failed';
+    logEntry.error_message = err.message;
+    try { await supabaseAdmin.from('whatsapp_delivery_log').insert(logEntry); } catch {}
+    return false;
+  }
 }
 
 export async function sendWhatsAppMessage(
@@ -34,20 +251,24 @@ export async function sendWhatsAppMessage(
   templateName: string,
   params: Record<string, string>
 ): Promise<boolean> {
-  if (isSandboxMode()) {
+  const config = await loadConfig();
+
+  if (!config) {
     logger.info(`[WHATSAPP SANDBOX] To: ${to}, Template: ${templateName}, Params: ${JSON.stringify(params)}`);
     return true;
   }
 
   try {
-    const body = new URLSearchParams({
-      To: to,
-      From: TWILIO_WHATSAPP_FROM,
-      ContentTemplateSid: templateName,
-      ContentVariables: JSON.stringify(params),
-    });
-
-    await twilioFetch('/Messages.json', body);
+    if (config.provider === 'twilio') {
+      await twilioSendTemplate(to, templateName, params, config);
+    } else {
+      // For non-Twilio providers, render template as text
+      let body = templateName;
+      for (const [key, value] of Object.entries(params)) {
+        body = body.replace(new RegExp(`{{${key}}}`, 'g'), value);
+      }
+      await sendTextMessage(to, body, 'template');
+    }
     logger.info(`WhatsApp message sent to ${to} using template ${templateName}`);
     return true;
   } catch (err: any) {
@@ -64,31 +285,11 @@ export async function sendFeeReminder(
   dueDate: string,
   daysOverdue: number
 ): Promise<boolean> {
-  if (isSandboxMode()) {
-    logger.info(
-      `[WHATSAPP FEE REMINDER SANDBOX] To: ${studentPhone}, Student: ${studentName}, Fee: ${feeName}, Amount: ₹${amount}, Due: ${dueDate}, Days Overdue: ${daysOverdue}`
-    );
-    return true;
-  }
+  const messageBody = daysOverdue > 0
+    ? `Dear ${studentName}, your fee payment of ₹${amount} for "${feeName}" was due on ${dueDate} and is now ${daysOverdue} day(s) overdue. Please pay immediately to avoid late charges. - IRIS 365`
+    : `Dear ${studentName}, this is a reminder that your fee payment of ₹${amount} for "${feeName}" is due on ${dueDate}. Please ensure timely payment. - IRIS 365`;
 
-  try {
-    const messageBody = daysOverdue > 0
-      ? `Dear ${studentName}, your fee payment of ₹${amount} for "${feeName}" was due on ${dueDate} and is now ${daysOverdue} day(s) overdue. Please pay immediately to avoid late charges. - IRIS 365`
-      : `Dear ${studentName}, this is a reminder that your fee payment of ₹${amount} for "${feeName}" is due on ${dueDate}. Please ensure timely payment. - IRIS 365`;
-
-    const body = new URLSearchParams({
-      To: studentPhone,
-      From: TWILIO_WHATSAPP_FROM,
-      Body: messageBody,
-    });
-
-    await twilioFetch('/Messages.json', body);
-    logger.info(`Fee reminder sent to ${studentPhone} for ${feeName}`);
-    return true;
-  } catch (err: any) {
-    logger.error(`Failed to send fee reminder to ${studentPhone}: ${err.message}`);
-    return false;
-  }
+  return sendTextMessage(studentPhone, messageBody, 'fee_reminder');
 }
 
 export interface FeeReminderEntry {
@@ -128,38 +329,12 @@ export async function sendAttendanceWarning(entry: AttendanceWarningEntry): Prom
   let studentSent = false;
   let parentSent = false;
 
-  // Send to student
   if (entry.student_phone) {
-    try {
-      if (isSandboxMode()) {
-        logger.info(`[WHATSAPP ATTENDANCE SANDBOX] Student: ${entry.student_phone}, Pct: ${entry.attendance_pct}%, Level: ${level.label}`);
-        studentSent = true;
-      } else {
-        const body = new URLSearchParams({ To: entry.student_phone, From: TWILIO_WHATSAPP_FROM, Body: studentMsg });
-        await twilioFetch('/Messages.json', body);
-        studentSent = true;
-        logger.info(`Attendance ${level.label} sent to student ${entry.student_phone}`);
-      }
-    } catch (err: any) {
-      logger.error(`Failed to send attendance warning to student ${entry.student_phone}: ${err.message}`);
-    }
+    studentSent = await sendTextMessage(entry.student_phone, studentMsg, 'attendance_warning');
   }
 
-  // Send to parent
   if (entry.guardian_phone) {
-    try {
-      if (isSandboxMode()) {
-        logger.info(`[WHATSAPP ATTENDANCE SANDBOX] Parent: ${entry.guardian_phone}, Student: ${entry.student_name}, Pct: ${entry.attendance_pct}%`);
-        parentSent = true;
-      } else {
-        const body = new URLSearchParams({ To: entry.guardian_phone, From: TWILIO_WHATSAPP_FROM, Body: parentMsg });
-        await twilioFetch('/Messages.json', body);
-        parentSent = true;
-        logger.info(`Attendance ${level.label} sent to parent ${entry.guardian_phone}`);
-      }
-    } catch (err: any) {
-      logger.error(`Failed to send attendance warning to parent ${entry.guardian_phone}: ${err.message}`);
-    }
+    parentSent = await sendTextMessage(entry.guardian_phone, parentMsg, 'attendance_warning');
   }
 
   return { student: studentSent, parent: parentSent };
@@ -194,54 +369,18 @@ export async function sendFeeEscalation(entry: FeeEscalationEntry): Promise<{ st
 
   const msg = stageMessages[entry.stage] || stageMessages.reminder_7day;
 
-  // Send to student
   if (entry.student_phone) {
-    try {
-      if (isSandboxMode()) {
-        logger.info(`[WHATSAPP FEE ESCALATION SANDBOX] Student: ${entry.student_phone}, Stage: ${entry.stage}, Amount: ₹${entry.amount_overdue}`);
-        studentSent = true;
-      } else {
-        const body = new URLSearchParams({ To: entry.student_phone, From: TWILIO_WHATSAPP_FROM, Body: msg });
-        await twilioFetch('/Messages.json', body);
-        studentSent = true;
-      }
-    } catch (err: any) {
-      logger.error(`Failed to send fee escalation to student: ${err.message}`);
-    }
+    studentSent = await sendTextMessage(entry.student_phone, msg, 'fee_escalation');
   }
 
-  // Send to parent (for overdue stages)
   if (entry.guardian_phone && ['due_today', 'overdue_7day', 'overdue_30day'].includes(entry.stage)) {
     const parentMsg = `Dear Parent, your child ${entry.student_name} has an overdue fee "${entry.fee_name}" of ₹${entry.total_due} (${entry.days_overdue} days overdue). Please ensure timely payment. - IRIS 365`;
-    try {
-      if (isSandboxMode()) {
-        logger.info(`[WHATSAPP FEE ESCALATION SANDBOX] Parent: ${entry.guardian_phone}, Student: ${entry.student_name}`);
-        parentSent = true;
-      } else {
-        const body = new URLSearchParams({ To: entry.guardian_phone, From: TWILIO_WHATSAPP_FROM, Body: parentMsg });
-        await twilioFetch('/Messages.json', body);
-        parentSent = true;
-      }
-    } catch (err: any) {
-      logger.error(`Failed to send fee escalation to parent: ${err.message}`);
-    }
+    parentSent = await sendTextMessage(entry.guardian_phone, parentMsg, 'fee_escalation');
   }
 
-  // Send to HOD (for overdue_7day and beyond)
   if (entry.hod_phone && ['overdue_7day', 'overdue_30day'].includes(entry.stage)) {
     const hodMsg = `NOTICE: Student ${entry.student_name} has fee "${entry.fee_name}" overdue by ${entry.days_overdue} days (₹${entry.total_due} total). Please follow up. - IRIS 365`;
-    try {
-      if (isSandboxMode()) {
-        logger.info(`[WHATSAPP FEE ESCALATION SANDBOX] HOD: ${entry.hod_phone}, Student: ${entry.student_name}`);
-        hodSent = true;
-      } else {
-        const body = new URLSearchParams({ To: entry.hod_phone, From: TWILIO_WHATSAPP_FROM, Body: hodMsg });
-        await twilioFetch('/Messages.json', body);
-        hodSent = true;
-      }
-    } catch (err: any) {
-      logger.error(`Failed to send fee escalation to HOD: ${err.message}`);
-    }
+    hodSent = await sendTextMessage(entry.hod_phone, hodMsg, 'fee_escalation');
   }
 
   return { student: studentSent, parent: parentSent, hod: hodSent };
@@ -277,24 +416,7 @@ export async function sendDailyDigest(entry: DailyDigestEntry): Promise<boolean>
     `— IRIS 365`,
   ].filter(Boolean).join('\n');
 
-  if (isSandboxMode()) {
-    logger.info(`[WHATSAPP DAILY DIGEST SANDBOX] To: ${entry.parent_phone}, Student: ${entry.student_name}, Attendance: ${entry.attendance_pct}%, Spend: ₹${entry.canteen_spend}`);
-    return true;
-  }
-
-  try {
-    const body = new URLSearchParams({
-      To: entry.parent_phone,
-      From: TWILIO_WHATSAPP_FROM,
-      Body: message,
-    });
-    await twilioFetch('/Messages.json', body);
-    logger.info(`Daily digest sent to ${entry.parent_phone} for ${entry.student_name}`);
-    return true;
-  } catch (err: any) {
-    logger.error(`Failed to send daily digest to ${entry.parent_phone}: ${err.message}`);
-    return false;
-  }
+  return sendTextMessage(entry.parent_phone, message, 'daily_digest');
 }
 
 export async function sendBulkReminders(reminders: FeeReminderEntry[]): Promise<{ sent: number; failed: number; details: { student_id: string; status: string }[] }> {

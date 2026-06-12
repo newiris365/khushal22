@@ -3,7 +3,7 @@
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Building2, Briefcase, Users,
-  FileSpreadsheet, LogOut
+  FileSpreadsheet, LogOut, UserCircle
 } from 'lucide-react';
 
 const tpoLinks: SidebarLink[] = [
@@ -12,6 +12,7 @@ const tpoLinks: SidebarLink[] = [
   { label: 'Hiring Drives', href: '/tpo/drives', icon: Briefcase },
   { label: 'Student Roster', href: '/tpo/students', icon: Users },
   { label: 'Brochures & NIRF', href: '/tpo/reports', icon: FileSpreadsheet },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function TpoLayout({ children }: { children: React.ReactNode }) {

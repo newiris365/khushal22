@@ -4,7 +4,7 @@ import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, CalendarDays, ClipboardList, FileText,
-  BookOpen, Users, Award, Bell
+  BookOpen, Users, Award, Bell, UserCircle
 } from 'lucide-react';
 
 const facultyLinks: SidebarLink[] = [
@@ -16,6 +16,7 @@ const facultyLinks: SidebarLink[] = [
   { label: 'Study Materials', href: '/faculty/study-materials', icon: BookOpen },
   { label: 'Notices', href: '/faculty/notices', icon: Bell },
   { label: 'Students', href: '/faculty/students', icon: Users },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function FacultyLayout({ children }: { children: React.ReactNode }) {

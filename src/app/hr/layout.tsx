@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, CalendarDays, FileText, ClipboardList,
-  IndianRupee, FolderOpen, Calculator, Star
+  IndianRupee, FolderOpen, Calculator, Star, UserCircle
 } from 'lucide-react';
 
 const hrStaffLinks: SidebarLink[] = [
@@ -15,12 +15,14 @@ const hrStaffLinks: SidebarLink[] = [
   { label: 'Self Appraisal', href: '/hr/my/appraisal', icon: Star },
   { label: 'Documents', href: '/hr/my/documents', icon: FolderOpen },
   { label: 'TDS Declaration', href: '/hr/my/tds', icon: Calculator },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 const hrHodLinks: SidebarLink[] = [
   { label: 'Team Overview', href: '/hr/hod/team', icon: LayoutDashboard },
   { label: 'Leave Approvals', href: '/hr/hod/leave-approvals', icon: CalendarDays },
   { label: 'Appraisal Reviews', href: '/hr/hod/appraisals', icon: FileText },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 // Determine portal mode from pathname

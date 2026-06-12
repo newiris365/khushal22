@@ -3,7 +3,7 @@
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, FileSpreadsheet, FolderGit, MessageSquareCode,
-  FileCheck, ShieldQuestion, Award
+  FileCheck, ShieldQuestion, Award, UserCircle
 } from 'lucide-react';
 
 const iqacLinks: SidebarLink[] = [
@@ -13,7 +13,8 @@ const iqacLinks: SidebarLink[] = [
   { label: 'Survey Desk', href: '/iqac/surveys', icon: MessageSquareCode },
   { label: 'SSR Generator', href: '/iqac/ssr/generate', icon: FileCheck },
   { label: 'DVV Queries', href: '/iqac/dvv', icon: ShieldQuestion },
-  { label: 'OBE Overview', href: '/iqac/obe/overview', icon: Award }
+  { label: 'OBE Overview', href: '/iqac/obe/overview', icon: Award },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function IQACLayout({ children }: { children: React.ReactNode }) {

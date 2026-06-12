@@ -26,6 +26,7 @@ import {
   getWalletTransactions,
   initiateWalletTopup,
   verifyWalletTopup,
+  adjustWallet,
   // Feedback
   submitFeedback,
   getAllFeedback,
@@ -96,6 +97,7 @@ router.put('/orders/:id/status', requireRole(['Admin', 'SuperAdmin', 'Vendor']),
 router.post('/wallet/topup', topupWallet);
 router.post('/wallet/topup/initiate', initiateWalletTopup);
 router.post('/wallet/topup/verify', verifyWalletTopup);
+router.post('/wallet/adjust', requireRole(['Admin', 'SuperAdmin']), adjustWallet);
 router.get('/wallet/:studentId', getWalletBalance);
 router.get('/wallet/transactions/:studentId', getWalletTransactions);
 

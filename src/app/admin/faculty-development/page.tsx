@@ -47,7 +47,7 @@ export default function AdminFacultyDevelopment() {
     setLoading(true);
     try {
       // Load stats
-      const statsRes = await fetch('/api/obe/publications/stats', {
+      const statsRes = await fetch('/api/v1/obe/publications/stats', {
         headers: getAuthHeaders()
       });
       const statsData = await statsRes.json();

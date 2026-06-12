@@ -46,6 +46,17 @@ const FEATURE_LABELS: Record<string, string> = {
   director: 'Director Console', parent_portal: 'Parent Portal'
 };
 
+const FEATURE_ICONS: Record<string, string> = {
+  dashboard: '📊', admissions: '🎓', students: '👤', attendance: '✅',
+  timetable: '📅', fees: '💰', exams: '📝', canteen: '🍽️',
+  hostel: '🏠', library: '📚', placements: '💼', hr: '👥',
+  gate: '🚪', gym: '💪', transit: '🚌', events: '🎉',
+  notices: '📢', idcards: '🪪', ai_concierge: '🤖', obe: '📋',
+  naac: '🏆', faculty_development: '👨‍🏫', achievements: '🏅',
+  director: '🎯', parent_portal: '👨‍👩‍👧', lost_found: '📦',
+  exam_seating: '🪑'
+};
+
 const ROLE_COLORS: Record<string, string> = {
   SuperAdmin: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
   Admin: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -60,7 +71,7 @@ const ROLE_COLORS: Record<string, string> = {
   Director: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
 };
 
-type Tab = 'tenants' | 'permissions';
+type Tab = 'tenants' | 'features' | 'permissions';
 
 export default function SuperAdminConsole() {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
@@ -82,11 +93,15 @@ export default function SuperAdminConsole() {
     name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true
   });
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingInst, setEditingInst] = useState<Institution | null>(null);
+
   // Feature Toggles state
   const [selectedInstForFeatures, setSelectedInstForFeatures] = useState('');
   const [featureToggles, setFeatureTogglesState] = useState<FeatureToggle[]>([]);
   const [featuresLoading, setFeaturesLoading] = useState(false);
   const [featuresSaving, setFeaturesSaving] = useState(false);
+  const [featuresError, setFeaturesError] = useState<string | null>(null);
 
   // Role Permissions state
   const [selectedInstForPerms, setSelectedInstForPerms] = useState('');
@@ -96,6 +111,7 @@ export default function SuperAdminConsole() {
   const [permsLoading, setPermsLoading] = useState(false);
   const [permsSaving, setPermsSaving] = useState(false);
   const [selectedRole, setSelectedRole] = useState('');
+  const [permsError, setPermsError] = useState<string | null>(null);
 
   // Load Institutions + Users
   const loadSystemData = async () => {
@@ -143,17 +159,22 @@ export default function SuperAdminConsole() {
 
   useEffect(() => { loadSystemData(); }, []);
 
-  // Feature Toggles
   const loadFeatures = async (instId: string) => {
-    if (!instId) { setFeatureTogglesState([]); return; }
+    if (!instId) { setFeatureTogglesState([]); setFeaturesError(null); return; }
     setFeaturesLoading(true);
+    setFeaturesError(null);
     try {
       const result = await getFeatureToggles(instId);
       if (result.success && result.features) {
         setFeatureTogglesState(result.features);
+      } else {
+        setFeaturesError(result.error || 'Failed to load feature toggles.');
+        setFeatureTogglesState([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load features:', err);
+      setFeaturesError(err.message || 'An unexpected error occurred while loading features.');
+      setFeatureTogglesState([]);
     } finally {
       setFeaturesLoading(false);
     }
@@ -184,8 +205,9 @@ export default function SuperAdminConsole() {
 
   // Role Permissions
   const loadPermissions = async (instId: string) => {
-    if (!instId) { setRolePerms([]); return; }
+    if (!instId) { setRolePerms([]); setPermsError(null); return; }
     setPermsLoading(true);
+    setPermsError(null);
     try {
       const result = await getRolePermissions(instId);
       if (result.success) {
@@ -195,9 +217,14 @@ export default function SuperAdminConsole() {
         if (result.all_roles?.length > 0 && !selectedRole) {
           setSelectedRole(result.all_roles[0]);
         }
+      } else {
+        setPermsError(result.error || 'Failed to load role permissions.');
+        setRolePerms([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load permissions:', err);
+      setPermsError(err.message || 'An unexpected error occurred while loading permissions.');
+      setRolePerms([]);
     } finally {
       setPermsLoading(false);
     }
@@ -283,6 +310,77 @@ export default function SuperAdminConsole() {
     }
   };
 
+  const handleEditInstitution = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInst) return;
+    try {
+      const { error } = await supabase
+        .from('institutions')
+        .update({
+          name: editingInst.name,
+          type: editingInst.type,
+          email: editingInst.email,
+          phone: editingInst.phone,
+          plan_tier: editingInst.plan_tier,
+          is_active: editingInst.is_active
+        })
+        .eq('id', editingInst.id);
+      if (error) throw error;
+      setShowEditModal(false);
+      setEditingInst(null);
+      loadSystemData();
+    } catch (err) {
+      setInstitutions(institutions.map(inst => inst.id === editingInst.id ? { ...inst, ...editingInst } : inst));
+      setShowEditModal(false);
+      setEditingInst(null);
+    }
+  };
+
+  const handleDeleteInstitution = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this campus? This will permanently delete all associated data.')) return;
+    try {
+      const { error } = await supabase
+        .from('institutions')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      loadSystemData();
+    } catch {
+      setInstitutions(institutions.filter(inst => inst.id !== id));
+    }
+  };
+
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const { error } = await supabase.from('users').update({ role: newRole }).eq('id', userId);
+      if (error) throw error;
+      loadSystemData();
+    } catch {
+      setGlobalUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    }
+  };
+
+  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase.from('users').update({ is_active: !currentStatus }).eq('id', userId);
+      if (error) throw error;
+      loadSystemData();
+    } catch {
+      setGlobalUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: !currentStatus } : u));
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', userId);
+      if (error) throw error;
+      loadSystemData();
+    } catch {
+      setGlobalUsers(prev => prev.filter(u => u.id !== userId));
+    }
+  };
+
   const filteredUsers = globalUsers.filter(u =>
     u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -292,6 +390,7 @@ export default function SuperAdminConsole() {
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'tenants', label: 'Tenants', icon: <Building className="w-4 h-4" /> },
+    { key: 'features', label: 'Feature Toggles', icon: <ToggleRight className="w-4 h-4" /> },
     { key: 'permissions', label: 'Role Permissions', icon: <Sliders className="w-4 h-4" /> },
   ];
 
@@ -441,14 +540,26 @@ export default function SuperAdminConsole() {
                             {inst.is_active ? 'Active' : 'Suspended'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-right">
+                        <td className="py-3.5 px-4 text-right flex justify-end items-center gap-1.5">
+                          <button 
+                            onClick={() => { setEditingInst(inst); setShowEditModal(true); }}
+                            className="px-2.5 py-1 rounded text-[10px] font-bold bg-white/5 hover:bg-white/10 text-[#C4B5FD] border border-white/10 transition-all"
+                          >
+                            Edit
+                          </button>
                           <button onClick={() => toggleInstitutionStatus(inst.id, inst.is_active)}
-                            className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${
+                            className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
                               inst.is_active
-                                ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
+                                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20'
                                 : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
                             }`}>
                             {inst.is_active ? 'Suspend' : 'Activate'}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteInstitution(inst.id)}
+                            className="px-2.5 py-1 rounded text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all"
+                          >
+                            Delete
                           </button>
                         </td>
                       </tr>
@@ -478,19 +589,51 @@ export default function SuperAdminConsole() {
                         <th className="py-2.5 px-3">Email</th>
                         <th className="py-2.5 px-3">Role</th>
                         <th className="py-2.5 px-3">Institution</th>
+                        <th className="py-2.5 px-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredUsers.slice(0, 10).map((user) => (
                         <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
-                          <td className="py-3 px-3 font-semibold text-white">{user.name}</td>
+                          <td className="py-3 px-3 font-semibold text-white flex flex-col sm:flex-row sm:items-center gap-1.5">
+                            {user.name}
+                            {!user.is_active && (
+                              <span className="px-1.5 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded text-[8px] font-extrabold uppercase w-fit">
+                                Suspended
+                              </span>
+                            )}
+                          </td>
                           <td className="py-3 px-3 text-[#C4B5FD]/80 font-mono">{user.email}</td>
                           <td className="py-3 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${ROLE_COLORS[user.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                              {user.role}
-                            </span>
+                            <select 
+                              value={user.role} 
+                              onChange={(e) => updateUserRole(user.id, e.target.value)}
+                              className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-[11px] font-medium outline-none focus:border-violet-500"
+                            >
+                              {Object.keys(ROLE_COLORS).map(r => (
+                                <option key={r} value={r} className="bg-[#13102A] text-white">{r}</option>
+                              ))}
+                            </select>
                           </td>
                           <td className="py-3 px-3 text-[#C4B5FD]/70">{user.institution_name}</td>
+                          <td className="py-3 px-3 text-right flex justify-end gap-1.5">
+                            <button 
+                              onClick={() => toggleUserStatus(user.id, user.is_active)}
+                              className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                                user.is_active 
+                                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20' 
+                                  : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
+                              }`}
+                            >
+                              {user.is_active ? 'Suspend' : 'Activate'}
+                            </button>
+                            <button 
+                              onClick={() => deleteUser(user.id)}
+                              className="px-2 py-1 rounded text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all"
+                            >
+                              Delete
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -522,6 +665,110 @@ export default function SuperAdminConsole() {
         )}
 
         {/* ============================================================ */}
+        {/* TAB: FEATURE TOGGLES */}
+        {/* ============================================================ */}
+        {activeTab === 'features' && (
+          <div className="glass-panel rounded-2xl border border-white/5 p-6 flex flex-col gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold">Campus Module Toggles</h2>
+                <p className="text-[11px] text-[#C4B5FD]/60 mt-0.5">Enable or disable specific modules and features for the selected campus tenant.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <select value={selectedInstForFeatures} onChange={(e) => {
+                  setSelectedInstForFeatures(e.target.value);
+                  loadFeatures(e.target.value);
+                }}
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs outline-none focus:border-violet-500 min-w-[200px]">
+                  <option value="" className="bg-[#13102A] text-white">Select Institution...</option>
+                  {institutions.map(inst => (
+                    <option key={inst.id} value={inst.id} className="bg-[#13102A] text-white">{inst.name}</option>
+                  ))}
+                </select>
+                {selectedInstForFeatures && featureToggles.length > 0 && (
+                  <button onClick={handleSaveFeatures} disabled={featuresSaving}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-[#8B5CF6] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-violet-600/25 transition-all disabled:opacity-50">
+                    <Save className="w-4 h-4" /> {featuresSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!selectedInstForFeatures && (
+              <div className="py-16 text-center text-[#C4B5FD]/40 italic text-sm">
+                Select an institution above to manage its module toggles.
+              </div>
+            )}
+
+            {selectedInstForFeatures && featuresLoading && (
+              <div className="py-16 text-center text-[#C4B5FD]/40 italic text-sm">Loading modules...</div>
+            )}
+
+            {selectedInstForFeatures && !featuresLoading && featuresError && (
+              <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold text-center my-4 max-w-2xl mx-auto">
+                {featuresError}
+              </div>
+            )}
+
+            {selectedInstForFeatures && !featuresLoading && !featuresError && featureToggles.length === 0 && (
+              <div className="py-16 text-center text-[#C4B5FD]/40 italic text-sm">
+                No feature modules found for this institution.
+              </div>
+            )}
+
+            {selectedInstForFeatures && !featuresLoading && !featuresError && featureToggles.length > 0 && (
+              <>
+                {/* Stats & bulk buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                  <div className="text-xs text-gray-400">
+                    <span className="text-white font-bold">{featureToggles.filter(f => f.enabled).length}</span> of {featureToggles.length} modules enabled
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setFeatureTogglesState(prev => prev.map(f => ({ ...f, enabled: true })))}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/20 transition-all">
+                      Enable All
+                    </button>
+                    <button onClick={() => setFeatureTogglesState(prev => prev.map(f => ({ ...f, enabled: false })))}
+                      className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/20 transition-all">
+                      Disable All
+                    </button>
+                  </div>
+                </div>
+
+                {/* Feature Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {featureToggles.map(f => (
+                    <button
+                      key={f.feature_key}
+                      onClick={() => handleToggleFeature(f.feature_key)}
+                      className={`p-4 rounded-2xl border transition-all text-left group flex flex-col justify-between h-28 ${
+                        f.enabled
+                          ? 'bg-violet-500/5 border-violet-500/20 hover:border-violet-500/40'
+                          : 'bg-white/[0.02] border-white/5 opacity-50 hover:opacity-70 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-2xl">{FEATURE_ICONS[f.feature_key] || '📦'}</span>
+                        {f.enabled ? (
+                          <ToggleRight className="w-6 h-6 text-emerald-400" />
+                        ) : (
+                          <ToggleLeft className="w-6 h-6 text-gray-600" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">{FEATURE_LABELS[f.feature_key] || f.feature_key}</div>
+                        <div className={`text-[10px] mt-0.5 font-medium ${f.enabled ? 'text-emerald-400/70' : 'text-gray-500'}`}>
+                          {f.enabled ? 'Active' : 'Disabled'}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ============================================================ */}
         {/* TAB: ROLE PERMISSIONS */}
         {/* ============================================================ */}
@@ -538,9 +785,9 @@ export default function SuperAdminConsole() {
                   loadPermissions(e.target.value);
                 }}
                   className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs outline-none focus:border-violet-500 min-w-[200px]">
-                  <option value="">Select Institution...</option>
+                  <option value="" className="bg-[#13102A] text-white">Select Institution...</option>
                   {institutions.map(inst => (
-                    <option key={inst.id} value={inst.id}>{inst.name}</option>
+                    <option key={inst.id} value={inst.id} className="bg-[#13102A] text-white">{inst.name}</option>
                   ))}
                 </select>
                 {selectedInstForPerms && rolePerms.length > 0 && (
@@ -562,7 +809,19 @@ export default function SuperAdminConsole() {
               <div className="py-16 text-center text-[#C4B5FD]/40 italic text-sm">Loading permissions...</div>
             )}
 
-            {selectedInstForPerms && !permsLoading && allRoles.length > 0 && (
+            {selectedInstForPerms && !permsLoading && permsError && (
+              <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold text-center my-4 max-w-2xl mx-auto">
+                {permsError}
+              </div>
+            )}
+
+            {selectedInstForPerms && !permsLoading && !permsError && allRoles.length === 0 && (
+              <div className="py-16 text-center text-[#C4B5FD]/40 italic text-sm">
+                No roles found for this institution.
+              </div>
+            )}
+
+            {selectedInstForPerms && !permsLoading && !permsError && allRoles.length > 0 && (
               <>
                 {/* Role selector */}
                 <div className="flex flex-wrap gap-2">
@@ -668,6 +927,59 @@ export default function SuperAdminConsole() {
                 <button type="submit"
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-[#8B5CF6] hover:brightness-110 text-white font-bold shadow-lg shadow-violet-600/25">
                   Provision
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingInst && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
+            <h3 className="text-lg font-bold text-white mb-4">Edit Campus Details</h3>
+            <form onSubmit={handleEditInstitution} className="space-y-4 text-xs">
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Institution Name</label>
+                <input type="text" required placeholder="e.g. Siddharth Institute of Technology"
+                  value={editingInst.name} onChange={(e) => setEditingInst({...editingInst, name: e.target.value})}
+                  className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Type</label>
+                  <select value={editingInst.type} onChange={(e) => setEditingInst({...editingInst, type: e.target.value})}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="school">School</option>
+                    <option value="college">College</option>
+                    <option value="university">University</option>
+                    <option value="center">Training Center</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Plan</label>
+                  <select value={editingInst.plan_tier} onChange={(e) => setEditingInst({...editingInst, plan_tier: e.target.value})}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="Seed">Seed (Free)</option>
+                    <option value="Campus">Campus</option>
+                    <option value="University">University</option>
+                    <option value="Enterprise">Enterprise</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Email</label>
+                <input type="email" required placeholder="contact@sit.edu"
+                  value={editingInst.email || ''} onChange={(e) => setEditingInst({...editingInst, email: e.target.value})}
+                  className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                <button type="button" onClick={() => { setShowEditModal(false); setEditingInst(null); }}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold">Cancel</button>
+                <button type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-[#8B5CF6] hover:brightness-110 text-white font-bold shadow-lg shadow-violet-600/25">
+                  Save Changes
                 </button>
               </div>
             </form>

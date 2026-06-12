@@ -4,7 +4,7 @@ import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, ClipboardList, UtensilsCrossed, BarChart3, ChefHat,
-  ListOrdered, Package, ShieldCheck, TrendingUp
+  ListOrdered, Package, ShieldCheck, TrendingUp, UserCircle
 } from 'lucide-react';
 
 const vendorLinks: SidebarLink[] = [
@@ -17,6 +17,7 @@ const vendorLinks: SidebarLink[] = [
   { label: 'Analytics', href: '/vendor/canteen/analytics', icon: TrendingUp },
   { label: 'Daily Sales', href: '/vendor/sales', icon: BarChart3 },
   { label: 'Prep List', href: '/vendor/prep', icon: ChefHat },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {

@@ -213,8 +213,10 @@ export default function LoginPage() {
         else if (data.email === 'canteen@siet.edu.in') role = 'Vendor';
 
         const mockProfile = getMockProfile(data.email, role);
+        const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+        const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
 
-        localStorage.setItem('iris_jwt_token', 'mock-sandbox-jwt-token-value');
+        localStorage.setItem('iris_jwt_token', mockToken);
         localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
 
         window.location.href = getRedirectPath(mockProfile.role);
@@ -239,8 +241,10 @@ export default function LoginPage() {
       // Direct client bypass
       setTimeout(() => {
         const mockProfile = getMockProfile(email, role);
+        const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+        const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
 
-        localStorage.setItem('iris_jwt_token', 'mock-sandbox-jwt-token-value');
+        localStorage.setItem('iris_jwt_token', mockToken);
         localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
 
         setIsLoading(false);
@@ -274,8 +278,10 @@ export default function LoginPage() {
     } catch (err: any) {
       console.warn('Quick login backend failed. Activating instant client fallback:', err);
       const mockProfile = getMockProfile(email, role);
+      const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+      const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
 
-      localStorage.setItem('iris_jwt_token', 'mock-sandbox-jwt-token-value');
+      localStorage.setItem('iris_jwt_token', mockToken);
       localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
 
       setIsLoading(false);

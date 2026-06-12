@@ -4,7 +4,7 @@ import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Activity, CreditCard, TrendingUp, AlertTriangle,
   Award, ShieldAlert, Lightbulb, FileText, GraduationCap, Settings,
-  Home, BarChart3, Target, Briefcase, Users
+  Home, BarChart3, Target, Briefcase, Users, UserCircle
 } from 'lucide-react';
 
 const directorLinks: SidebarLink[] = [
@@ -26,6 +26,7 @@ const directorLinks: SidebarLink[] = [
   { label: 'Financial P&L', href: '/director/financial-pl', icon: CreditCard },
   { label: 'Benchmarks', href: '/director/benchmarks', icon: Users },
   { label: 'Settings', href: '/director/settings', icon: Settings },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function DirectorLayout({ children }: { children: React.ReactNode }) {

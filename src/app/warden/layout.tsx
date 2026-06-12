@@ -4,7 +4,7 @@ import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Users, Home, ClipboardList, UtensilsCrossed,
-  ArrowLeftRight, Shield, Bell
+  ArrowLeftRight, Shield, Bell, UserCircle
 } from 'lucide-react';
 
 const wardenLinks: SidebarLink[] = [
@@ -15,6 +15,7 @@ const wardenLinks: SidebarLink[] = [
   { label: 'Meal Subscriptions', href: '/warden/meals', icon: UtensilsCrossed },
   { label: 'Room Transfers', href: '/warden/transfers', icon: ArrowLeftRight },
   { label: 'Complaints', href: '/warden/complaints', icon: Bell },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
 export default function WardenLayout({ children }: { children: React.ReactNode }) {

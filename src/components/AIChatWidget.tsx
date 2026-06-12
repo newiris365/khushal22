@@ -59,7 +59,7 @@ export default function AIChatWidget() {
 
   const loadHistory = async (sessId: string) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
-    if (!token || token === 'mock-sandbox-jwt-token-value') {
+    if (!token || token.startsWith('mock-sandbox-jwt-token-value')) {
       // Sandbox fallback history directly without making API calls when unauthorized
       setMessages([
         {

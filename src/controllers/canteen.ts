@@ -584,6 +584,48 @@ export async function getWalletTransactions(req: Request, res: Response) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// WALLET ADJUST (Admin)
+// ──────────────────────────────────────────────────────────────
+
+/** POST /canteen/wallet/adjust - Admin adjust wallet balance */
+export async function adjustWallet(req: Request, res: Response) {
+  try {
+    const { student_id, amount, reason } = req.body;
+    if (!student_id || amount === undefined || amount === null) {
+      return res.status(400).json({ success: false, error: 'student_id and amount required.' });
+    }
+    const { data: wallet, error: wErr } = await supabaseAdmin
+      .from('canteen_wallets')
+      .select('id, balance')
+      .eq('student_id', student_id)
+      .single();
+    if (wErr || !wallet) {
+      return res.status(404).json({ success: false, error: 'Wallet not found.' });
+    }
+    const newBalance = wallet.balance + Number(amount);
+    if (newBalance < 0) {
+      return res.status(400).json({ success: false, error: 'Insufficient balance.' });
+    }
+    const { error: uErr } = await supabaseAdmin
+      .from('canteen_wallets')
+      .update({ balance: newBalance })
+      .eq('id', wallet.id);
+    if (uErr) throw uErr;
+    await supabaseAdmin.from('wallet_transactions').insert({
+      student_id,
+      amount: Number(amount),
+      type: Number(amount) > 0 ? 'credit' : 'debit',
+      reason: reason || 'Admin adjustment',
+      reference_type: 'admin_adjust',
+      balance_after: newBalance,
+    });
+    return res.json({ success: true, balance: newBalance });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
 // FEEDBACK
 // ──────────────────────────────────────────────────────────────
 

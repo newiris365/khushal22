@@ -33,7 +33,7 @@ export default function AdminStudentAchievements() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const statsRes = await fetch('/api/obe/student-achievements/stats', {
+      const statsRes = await fetch('/api/v1/obe/student-achievements/stats', {
         headers: getAuthHeaders()
       });
       const statsData = await statsRes.json();

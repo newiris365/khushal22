@@ -50,8 +50,8 @@ export default function ExamSeatingPage() {
     setLoading(true);
     try {
       const [hallsRes, examsRes] = await Promise.all([
-        apiGet('/core/exam-halls'),
-        apiGet('/core/exams'),
+        apiGet('campusCore/exam-halls'),
+        apiGet('campusCore/exams'),
       ]);
       if (hallsRes.success) setHalls(hallsRes.halls || []);
       if (examsRes.success) setExams(examsRes.exams || []);
@@ -67,7 +67,7 @@ export default function ExamSeatingPage() {
   const fetchSeating = async (examId: string) => {
     if (!examId) return;
     try {
-      const res = await apiGet(`/core/exam-seating?exam_id=${examId}`);
+      const res = await apiGet(`campusCore/exam-seating?exam_id=${examId}`);
       if (res.success) setSeating(res.seating || []);
     } catch (err) {
       console.error('Failed to load seating', err);
@@ -80,7 +80,7 @@ export default function ExamSeatingPage() {
     if (!selectedExam) return;
     setAllocating(true);
     try {
-      const res = await apiPost('/core/exam-seating/allocate', { exam_id: selectedExam });
+      const res = await apiPost('campusCore/exam-seating/allocate', { exam_id: selectedExam });
       if (res.success) {
         fetchSeating(selectedExam);
       }
@@ -93,7 +93,7 @@ export default function ExamSeatingPage() {
 
   const handleAddHall = async () => {
     try {
-      const res = await apiPost('/core/exam-halls', newHall);
+      const res = await apiPost('campusCore/exam-halls', newHall);
       if (res.success) {
         setShowAddHall(false);
         setNewHall({ hall_name: '', room_number: '', capacity: 30, building: '', has_ac: false });
