@@ -68,6 +68,7 @@ ON CONFLICT (institution_id, role, module) DO NOTHING;`;
 
 export default function AdminSettingsPage() {
   const [institutionId, setInstitutionId] = useState('');
+  const [userRole, setUserRole] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('features');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,6 +91,7 @@ export default function AdminSettingsPage() {
       try {
         const parsed = JSON.parse(profile);
         setInstitutionId(parsed.institution_id || '');
+        setUserRole(parsed.role || '');
       } catch {}
     }
   }, []);
@@ -210,6 +212,24 @@ export default function AdminSettingsPage() {
   };
 
   const enabledCount = features.filter(f => f.enabled).length;
+
+  // SuperAdmin-only guard
+  if (userRole && userRole !== 'SuperAdmin') {
+    return (
+      <main className="min-h-screen bg-[#0D0A1A] text-white p-6">
+        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center h-[60vh] gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-red-400" />
+          </div>
+          <h1 className="text-2xl font-extrabold text-white">Access Restricted</h1>
+          <p className="text-sm text-slate-400 text-center max-w-md">
+            Module toggles and role permissions can only be managed by the <span className="text-violet-400 font-semibold">SuperAdmin</span>.
+            Contact your institution&apos;s SuperAdmin to make changes.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6">

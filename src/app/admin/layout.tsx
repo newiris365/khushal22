@@ -49,17 +49,23 @@ const adminLinks: SidebarLink[] = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [links, setLinks] = useState<SidebarLink[]>(adminLinks);
+  const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
       try {
         const parsed = JSON.parse(savedProfile);
+        setUserRole(parsed.role || '');
         if (parsed.role === 'SuperAdmin') {
           setLinks([
             { label: 'Global Tenants', href: '/admin/global', icon: Shield },
-            ...adminLinks
+            ...adminLinks.filter(l => l.href !== '/admin/settings'),
+            { label: 'Settings', href: '/admin/settings', icon: Settings },
           ]);
+        } else {
+          // Admin cannot see Settings
+          setLinks(adminLinks.filter(l => l.href !== '/admin/settings'));
         }
       } catch (e) {
         console.error('Failed parsing profile for SuperAdmin nav check:', e);

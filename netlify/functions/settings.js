@@ -80,8 +80,8 @@ exports.handler = async (event) => {
       }
 
       case 'save_features': {
-        if (role !== 'Admin') {
-          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only Admin can toggle modules.' }) };
+        if (role !== 'SuperAdmin') {
+          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin can toggle modules.' }) };
         }
         const body = JSON.parse(event.body || '{}');
         const { features } = body;
@@ -123,8 +123,8 @@ exports.handler = async (event) => {
       }
 
       case 'save_permissions': {
-        if (role !== 'SuperAdmin' && role !== 'Admin') {
-          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Forbidden' }) };
+        if (role !== 'SuperAdmin') {
+          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin can manage permissions.' }) };
         }
         const body = JSON.parse(event.body || '{}');
         const { permissions } = body;
@@ -177,8 +177,8 @@ exports.handler = async (event) => {
 
       // ==================== SEED ====================
       case 'seed': {
-        if (role !== 'SuperAdmin' && role !== 'Admin') {
-          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Forbidden' }) };
+        if (role !== 'SuperAdmin') {
+          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin can seed defaults.' }) };
         }
 
         // Seed all features as enabled

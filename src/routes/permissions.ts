@@ -64,7 +64,7 @@ router.get('/features/:institutionId', requireRole(['SuperAdmin', 'Admin']), asy
 // =========================================================================
 // POST /permissions/features - Toggle feature(s) for an institution
 // =========================================================================
-router.post('/features', requireRole(['Admin']), async (req: Request, res: Response) => {
+router.post('/features', requireRole(['SuperAdmin']), async (req: Request, res: Response) => {
   try {
     const { institution_id, features } = req.body;
     // features: Array<{ feature_key: string; enabled: boolean }>
@@ -73,10 +73,7 @@ router.post('/features', requireRole(['Admin']), async (req: Request, res: Respo
       return res.status(400).json({ success: false, error: 'institution_id and features array required.' });
     }
 
-    // Admin can only modify their own institution
-    if (req.user?.institution_id !== institution_id) {
-      return res.status(403).json({ success: false, error: 'Access denied to this institution.' });
-    }
+    // SuperAdmin can modify any institution
 
     const rows = features.map((f: any) => ({
       institution_id,
@@ -125,7 +122,7 @@ router.get('/roles/:institutionId', requireRole(['SuperAdmin', 'Admin']), async 
 // =========================================================================
 // POST /permissions/roles - Set role permissions for an institution
 // =========================================================================
-router.post('/roles', requireRole(['SuperAdmin', 'Admin']), async (req: Request, res: Response) => {
+router.post('/roles', requireRole(['SuperAdmin']), async (req: Request, res: Response) => {
   try {
     const { institution_id, permissions } = req.body;
     // permissions: Array<{ role: string; module: string; can_read: boolean; can_write: boolean; can_delete: boolean }>
@@ -219,7 +216,7 @@ router.get('/my', async (req: Request, res: Response) => {
 // =========================================================================
 // POST /permissions/seed - Seed default permissions for a new institution
 // =========================================================================
-router.post('/seed', requireRole(['SuperAdmin', 'Admin']), async (req: Request, res: Response) => {
+router.post('/seed', requireRole(['SuperAdmin']), async (req: Request, res: Response) => {
   try {
     const { institution_id } = req.body;
 
