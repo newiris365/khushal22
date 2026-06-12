@@ -20,6 +20,31 @@ interface PortalShellProps {
   children: React.ReactNode;
 }
 
+const FEATURE_TO_LINK_MAP: Record<string, string[]> = {
+  admissions: ['/admin/admissions'],
+  students: ['/admin/students'],
+  attendance: ['/admin/attendance'],
+  timetable: ['/admin/timetable'],
+  fees: ['/admin/fees'],
+  exams: ['/admin/exams'],
+  canteen: ['/admin/canteen', '/student/canteen', '/vendor/canteen'],
+  hostel: ['/admin/hostel', '/student/hostel', '/warden/hostel'],
+  library: ['/admin/library', '/student/library', '/librarian/library'],
+  placements: ['/admin/placements', '/student/placements', '/tpo/placements'],
+  hr: ['/admin/hr', '/hr'],
+  gate: ['/admin/gate', '/gate'],
+  gym: ['/admin/gym', '/student/gym', '/teacher/gym'],
+  transit: ['/admin/transit', '/transit'],
+  events: ['/admin/events', '/student/events'],
+  notices: ['/admin/notices', '/student/notices'],
+  idcards: ['/admin/idcards', '/student/idcard'],
+  ai_concierge: ['/admin/ai', '/ai'],
+  obe: ['/admin/obe', '/teacher/obe', '/hod/obe', '/iqac/obe'],
+  naac: ['/admin/naac', '/iqac'],
+  director: ['/director'],
+  parent_portal: ['/parent'],
+};
+
 export default function PortalShell({
   portalName,
   portalBadge,
@@ -30,12 +55,49 @@ export default function PortalShell({
   const pathname = usePathname();
   const [profile, setProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [disabledFeatures, setDisabledFeatures] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
       try { setProfile(JSON.parse(savedProfile)); } catch {}
     }
+  }, []);
+
+  // Fetch enabled features and compute disabled link hrefs
+  useEffect(() => {
+    const fetchFeatures = async () => {
+      try {
+        const savedProfile = localStorage.getItem('iris_user_profile');
+        const token = localStorage.getItem('iris_jwt_token');
+        if (!savedProfile || !token) return;
+
+        const parsed = JSON.parse(savedProfile);
+        if (parsed.role === 'SuperAdmin') return; // SuperAdmin sees everything
+
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const res = await fetch(`${API_BASE}/permissions/my`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (!data.success || !data.features) return;
+
+        const disabled = new Set<string>();
+        for (const f of data.features) {
+          if (!f.enabled && FEATURE_TO_LINK_MAP[f.feature_key]) {
+            for (const href of FEATURE_TO_LINK_MAP[f.feature_key]) {
+              disabled.add(href);
+            }
+          }
+        }
+        setDisabledFeatures(disabled);
+      } catch {
+        // Fail open - show all links
+      }
+    };
+    fetchFeatures();
   }, []);
 
   const handleSignOut = () => {
@@ -104,7 +166,9 @@ export default function PortalShell({
 
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5 scrollbar-thin">
-          {sidebarLinks.map((link) => {
+          {sidebarLinks
+            .filter(link => !disabledFeatures.has(link.href))
+            .map((link) => {
             const active = isActive(link.href);
             const IconComp = link.icon;
             return (

@@ -5,7 +5,7 @@ import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Users, CalendarDays, CreditCard, ShoppingBag, BookOpen,
   Shield, Dumbbell, Bus, BrainCircuit, ClipboardList, GraduationCap,
-  Home, Bell, Award, FileText, UserCheck, Briefcase, HeartPulse
+  Home, Bell, Award, FileText, UserCheck, Briefcase, HeartPulse, Settings
 } from 'lucide-react';
 
 const adminLinks: SidebarLink[] = [
@@ -32,6 +32,7 @@ const adminLinks: SidebarLink[] = [
   { label: 'NAAC Scorecard', href: '/admin/naac', icon: Award },
   { label: 'Faculty Dev', href: '/admin/faculty-development', icon: ClipboardList },
   { label: 'Achievements', href: '/admin/achievements', icon: FileText },
+  { label: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

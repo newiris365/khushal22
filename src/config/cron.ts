@@ -1048,4 +1048,133 @@ cron.schedule('0 0 * * *', async () => {
   }
 });
 
+/**
+ * MODULE 23: QR Token Rotation & Session Auto-Close
+ * Runs every minute to:
+ *   1. Rotate expired QR tokens for active sessions
+ *   2. Auto-close sessions that have exceeded their time slot
+ *   3. Auto-mark absent students after session closes
+ */
+cron.schedule('* * * * *', async () => {
+  logger.debug('Running QR Token Rotation & Session Auto-Close cron job...');
+  try {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    // 1. Deactivate expired QR tokens
+    const { data: expiredTokens } = await supabaseAdmin
+      .from('qr_tokens')
+      .update({ is_active: false })
+      .eq('is_active', true)
+      .lt('expires_at', now.toISOString())
+      .select('id, session_id');
+
+    if (expiredTokens && expiredTokens.length > 0) {
+      logger.debug(`QR Rotation: Deactivated ${expiredTokens.length} expired tokens.`);
+    }
+
+    // 2. Auto-close sessions that have exceeded their time slot
+    // Parse time_slot (e.g. "09:00-10:00") and calculate end time
+    const { data: activeSessions } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('id, time_slot, institution_id, department_id, qr_rotate_interval')
+      .eq('is_active', true)
+      .eq('date', today);
+
+    if (activeSessions && activeSessions.length > 0) {
+      for (const session of activeSessions) {
+        const timeSlot = session.time_slot; // e.g. "09:00-10:00"
+        const parts = timeSlot.split('-');
+        if (parts.length !== 2) continue;
+
+        const [endHour, endMin] = parts[1].split(':').map(Number);
+        const sessionEnd = new Date(now);
+        sessionEnd.setHours(endHour, endMin, 0, 0);
+
+        // Add 15-minute grace period after slot ends
+        const graceEnd = new Date(sessionEnd.getTime() + 15 * 60 * 1000);
+
+        if (now > graceEnd) {
+          // Session has expired - auto-close it
+          logger.info(`Auto-closing expired session ${session.id} (slot: ${timeSlot})`);
+
+          // Deactivate QR tokens
+          await supabaseAdmin
+            .from('qr_tokens')
+            .update({ is_active: false })
+            .eq('session_id', session.id)
+            .eq('is_active', true);
+
+          // Find marked students
+          const { data: marked } = await supabaseAdmin
+            .from('attendance')
+            .select('student_id')
+            .eq('session_id', session.id);
+
+          const markedIds = new Set((marked || []).map(m => m.student_id));
+
+          // Get department students
+          const { data: deptStudents } = await supabaseAdmin
+            .from('students')
+            .select('id')
+            .eq('department_id', session.department_id)
+            .eq('is_active', true);
+
+          // Auto-mark absent
+          const absentRecords = (deptStudents || [])
+            .filter(s => !markedIds.has(s.id))
+            .map(s => ({
+              institution_id: session.institution_id,
+              student_id: s.id,
+              session_id: session.id,
+              date: today,
+              status: 'absent',
+              method: 'auto'
+            }));
+
+          if (absentRecords.length > 0) {
+            await supabaseAdmin
+              .from('attendance')
+              .upsert(absentRecords, { onConflict: 'student_id,session_id' });
+          }
+
+          // Close session
+          await supabaseAdmin
+            .from('attendance_sessions')
+            .update({ is_active: false, closed_at: now.toISOString() })
+            .eq('id', session.id);
+
+          logger.info(`Session ${session.id} auto-closed. ${absentRecords.length} students auto-marked absent.`);
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error running QR rotation cron: ' + err.message);
+  }
+});
+
+/**
+ * MODULE 24: Device Heartbeat Monitor
+ * Runs every 5 minutes to flag devices that haven't sent a heartbeat in 10 minutes
+ */
+cron.schedule('*/5 * * * *', async () => {
+  logger.debug('Running Device Heartbeat Monitor cron job...');
+  try {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    const { data: staleDevices } = await supabaseAdmin
+      .from('attendance_devices')
+      .select('id, device_name')
+      .eq('is_active', true)
+      .not('last_heartbeat', 'is', null)
+      .lt('last_heartbeat', tenMinutesAgo);
+
+    if (staleDevices && staleDevices.length > 0) {
+      // Log warning but don't auto-disable
+      logger.warn(`Device Heartbeat: ${staleDevices.length} devices stale: ${staleDevices.map(d => d.device_name).join(', ')}`);
+    }
+  } catch (err: any) {
+    logger.error('Error running device heartbeat monitor: ' + err.message);
+  }
+});
 

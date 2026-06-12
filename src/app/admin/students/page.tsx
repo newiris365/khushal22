@@ -139,12 +139,12 @@ export default function AdminStudentsPage() {
           </div>
 
           <div className="flex gap-3">
-            <button 
-              onClick={handleBulkImportMock}
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center gap-1.5 transition-all"
+            <a 
+              href="/admin/import/students"
+              className="px-4 py-2.5 rounded-xl border border-violet-500/30 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 font-bold text-xs flex items-center gap-1.5 transition-all"
             >
-              <Upload className="w-4 h-4" /> Bulk Mock Import
-            </button>
+              <Upload className="w-4 h-4" /> Import Students
+            </a>
             <button 
               onClick={() => setShowAddModal(true)}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-[#6C2BD9]/25 transition-all"

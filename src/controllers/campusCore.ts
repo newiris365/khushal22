@@ -8,10 +8,10 @@ import { sendBulkReminders, FeeReminderEntry } from '../services/whatsapp';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'iris-365-super-secret-key-for-jwt-signing';
 
-// Campus Coordinates for Geo-fencing (e.g., JIET Jodhpur)
-const CAMPUS_LAT = 26.2389;
-const CAMPUS_LNG = 73.0243;
-const MAX_RADIUS_METERS = 200; // 200m geofence
+// Default campus coordinates (overridden per institution from attendance_methods config)
+const DEFAULT_CAMPUS_LAT = 26.2389;
+const DEFAULT_CAMPUS_LNG = 73.0243;
+const DEFAULT_MAX_RADIUS_METERS = 200;
 
 // Utility function to calculate distance using Haversine formula
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -27,6 +27,93 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // in meters
+}
+
+// Check if an attendance method is enabled for an institution
+async function isMethodEnabled(institutionId: string, method: string): Promise<boolean> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('attendance_methods')
+      .select('is_enabled')
+      .eq('institution_id', institutionId)
+      .eq('method_key', method)
+      .maybeSingle();
+    return data?.is_enabled ?? true; // default to enabled if no record
+  } catch {
+    return true;
+  }
+}
+
+// Get attendance method config for an institution
+async function getMethodConfig(institutionId: string, method: string): Promise<Record<string, any>> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('attendance_methods')
+      .select('config')
+      .eq('institution_id', institutionId)
+      .eq('method_key', method)
+      .maybeSingle();
+    return data?.config || {};
+  } catch {
+    return {};
+  }
+}
+
+// Generate a rotating QR token and store in qr_tokens table
+async function generateRotatingQrToken(sessionId: string, institutionId: string, rotateIntervalMinutes: number): Promise<string> {
+  const expiresAt = new Date(Date.now() + rotateIntervalMinutes * 60 * 1000).toISOString();
+  const token = jwt.sign(
+    { session_id: sessionId, type: 'ATTENDANCE_QR', iat: Math.floor(Date.now() / 1000) },
+    JWT_SECRET,
+    { expiresIn: `${rotateIntervalMinutes}m` }
+  );
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  // Deactivate previous tokens for this session
+  await supabaseAdmin
+    .from('qr_tokens')
+    .update({ is_active: false })
+    .eq('session_id', sessionId)
+    .eq('is_active', true);
+
+  // Store new token
+  await supabaseAdmin
+    .from('qr_tokens')
+    .insert({
+      institution_id: institutionId,
+      session_id: sessionId,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+      is_active: true,
+      rotated_count: 0
+    });
+
+  return token;
+}
+
+// Validate a QR token against the qr_tokens table
+async function validateQrToken(token: string, sessionId: string): Promise<{ valid: boolean; reason?: string }> {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { session_id: string; type: string };
+    if (decoded.type !== 'ATTENDANCE_QR') return { valid: false, reason: 'Invalid token type.' };
+    if (decoded.session_id !== sessionId) return { valid: false, reason: 'Token does not match session.' };
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const { data } = await supabaseAdmin
+      .from('qr_tokens')
+      .select('is_active, expires_at')
+      .eq('token_hash', tokenHash)
+      .eq('session_id', sessionId)
+      .maybeSingle();
+
+    if (!data) return { valid: false, reason: 'Token not found in system.' };
+    if (!data.is_active) return { valid: false, reason: 'Token has been rotated and is no longer active.' };
+    if (new Date(data.expires_at) < new Date()) return { valid: false, reason: 'Token has expired.' };
+
+    return { valid: true };
+  } catch (err) {
+    return { valid: false, reason: 'Token verification failed.' };
+  }
 }
 
 // Helper to calculate Grade
@@ -163,29 +250,51 @@ export async function startSession(req: Request, res: Response) {
     const parse = startSessionSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     const { department_id, subject, time_slot } = parse.data;
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+
+    // Check if QR method is enabled
+    if (!(await isMethodEnabled(institutionId, 'qr'))) {
+      return res.status(403).json({ success: false, error: 'QR attendance is not enabled for your institution.' });
+    }
+
+    // Get QR config for this institution (geo-fence + rotate interval)
+    const qrConfig = await getMethodConfig(institutionId, 'qr');
+    const rotateInterval = qrConfig.rotate_interval_minutes || 5;
+    const geoLat = qrConfig.geo_lat || DEFAULT_CAMPUS_LAT;
+    const geoLng = qrConfig.geo_lng || DEFAULT_CAMPUS_LNG;
+    const geoRadius = qrConfig.geo_radius || DEFAULT_MAX_RADIUS_METERS;
 
     const { data: session, error } = await supabaseAdmin
       .from('attendance_sessions')
       .insert({
-        institution_id: req.user?.institution_id,
+        institution_id: institutionId,
         department_id,
         subject,
         date: new Date().toISOString().split('T')[0],
         time_slot,
-        marked_by: req.user?.id
+        marked_by: req.user?.id,
+        is_active: true,
+        qr_rotate_interval: rotateInterval,
+        geo_lat: geoLat,
+        geo_lng: geoLng,
+        geo_radius: geoRadius
       })
       .select()
       .single();
 
     if (error || !session) return res.status(500).json({ success: false, error: 'Database failed to start session.' });
 
-    const qrToken = jwt.sign(
-      { session_id: session.id, type: 'ATTENDANCE_QR' },
-      JWT_SECRET,
-      { expiresIn: '15m' }
-    );
+    // Generate first rotating QR token
+    const qrToken = await generateRotatingQrToken(session.id, institutionId, rotateInterval);
 
-    return res.status(200).json({ success: true, session_id: session.id, qrToken });
+    return res.status(200).json({
+      success: true,
+      session_id: session.id,
+      qrToken,
+      rotate_interval_minutes: rotateInterval,
+      geo: { lat: geoLat, lng: geoLng, radius: geoRadius }
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal server error.' });
   }
@@ -202,13 +311,19 @@ export async function getSessionQr(req: Request, res: Response) {
 
     if (error || !session) return res.status(404).json({ success: false, error: 'Session not found.' });
 
-    const qrToken = jwt.sign(
-      { session_id: session.id, type: 'ATTENDANCE_QR' },
-      JWT_SECRET,
-      { expiresIn: '15m' }
-    );
+    if (!session.is_active) {
+      return res.status(400).json({ success: false, error: 'This session has been closed.' });
+    }
 
-    return res.status(200).json({ success: true, qrToken });
+    const rotateInterval = session.qr_rotate_interval || 5;
+    const qrToken = await generateRotatingQrToken(session.id, session.institution_id, rotateInterval);
+
+    return res.status(200).json({
+      success: true,
+      qrToken,
+      rotate_interval_minutes: rotateInterval,
+      session_active: true
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal server error.' });
   }
@@ -219,14 +334,46 @@ export async function markAttendanceQr(req: Request, res: Response) {
     const parse = qrVerificationSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     const { token, latitude, longitude, device_id } = parse.data;
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { session_id: string; type: string };
+    // Check if QR method is enabled
+    if (!(await isMethodEnabled(institutionId, 'qr'))) {
+      return res.status(403).json({ success: false, error: 'QR attendance is not enabled for your institution.' });
+    }
+
+    // Decode JWT first to get session_id
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as { session_id: string; type: string };
+    } catch {
+      return res.status(401).json({ success: false, error: 'QR token expired or invalid.' });
+    }
     if (decoded.type !== 'ATTENDANCE_QR') return res.status(400).json({ success: false, error: 'Invalid QR token structure.' });
 
-    // Geo-fence verification
-    const distance = calculateDistance(latitude, longitude, CAMPUS_LAT, CAMPUS_LNG);
-    if (distance > MAX_RADIUS_METERS) {
-      return res.status(400).json({ success: false, error: `Not on campus. You are currently ${Math.round(distance)}m outside boundaries.` });
+    // Validate token against qr_tokens table
+    const tokenValidation = await validateQrToken(token, decoded.session_id);
+    if (!tokenValidation.valid) {
+      return res.status(401).json({ success: false, error: tokenValidation.reason });
+    }
+
+    // Fetch session for geo-fence config
+    const { data: session } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('geo_lat, geo_lng, geo_radius, is_active')
+      .eq('id', decoded.session_id)
+      .maybeSingle();
+
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found.' });
+    if (!session.is_active) return res.status(400).json({ success: false, error: 'This session has been closed.' });
+
+    // Geo-fence verification using per-session coordinates
+    const campLat = session.geo_lat || DEFAULT_CAMPUS_LAT;
+    const campLng = session.geo_lng || DEFAULT_CAMPUS_LNG;
+    const maxRadius = session.geo_radius || DEFAULT_MAX_RADIUS_METERS;
+    const distance = calculateDistance(latitude, longitude, campLat, campLng);
+    if (distance > maxRadius) {
+      return res.status(400).json({ success: false, error: `Not on campus. You are ${Math.round(distance)}m away (max ${maxRadius}m).` });
     }
 
     const { data: student, error: stdErr } = await supabaseAdmin
@@ -250,7 +397,7 @@ export async function markAttendanceQr(req: Request, res: Response) {
     const { data, error } = await supabaseAdmin
       .from('attendance')
       .insert({
-        institution_id: req.user?.institution_id,
+        institution_id: institutionId,
         student_id: student.id,
         session_id: decoded.session_id,
         date: new Date().toISOString().split('T')[0],
@@ -268,7 +415,7 @@ export async function markAttendanceQr(req: Request, res: Response) {
 
     return res.status(200).json({ success: true, message: 'Attendance marked present', data });
   } catch (err) {
-    return res.status(401).json({ success: false, error: 'QR verification token expired or invalid.' });
+    return res.status(500).json({ success: false, error: 'Attendance marking failed.' });
   }
 }
 
@@ -281,28 +428,56 @@ export async function markAttendanceBiometric(req: Request, res: Response) {
     // Find student by fingerprint
     const { data: student, error: stdErr } = await supabaseAdmin
       .from('students')
-      .select('id, institution_id')
+      .select('id, institution_id, department_id')
       .eq('fingerprint_id', fingerprint_id)
       .single();
 
     if (stdErr || !student) return res.status(404).json({ success: false, error: 'Fingerprint ID mapping not found.' });
 
-    // Look for active session today in the student's department or generic core session
-    const { data: session } = await supabaseAdmin
+    const institutionId = student.institution_id;
+
+    // Check if biometric method is enabled
+    if (!(await isMethodEnabled(institutionId, 'biometric'))) {
+      return res.status(403).json({ success: false, error: 'Biometric attendance is not enabled for your institution.' });
+    }
+
+    // Look for active session today in the student's department (prefer matching department, fallback to any)
+    let session = null;
+
+    // First: try to find a session for the student's department
+    const { data: deptSession } = await supabaseAdmin
       .from('attendance_sessions')
-      .select('id')
-      .eq('institution_id', student.institution_id)
+      .select('id, department_id')
+      .eq('institution_id', institutionId)
       .eq('date', new Date().toISOString().split('T')[0])
+      .eq('department_id', student.department_id)
+      .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (deptSession) {
+      session = deptSession;
+    } else {
+      // Fallback: find any active session today
+      const { data: anySession } = await supabaseAdmin
+        .from('attendance_sessions')
+        .select('id, department_id')
+        .eq('institution_id', institutionId)
+        .eq('date', new Date().toISOString().split('T')[0])
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      session = anySession;
+    }
 
     if (!session) return res.status(404).json({ success: false, error: 'No active attendance sessions scheduled for today.' });
 
     const { data, error } = await supabaseAdmin
       .from('attendance')
       .insert({
-        institution_id: student.institution_id,
+        institution_id: institutionId,
         student_id: student.id,
         session_id: session.id,
         date: new Date().toISOString().split('T')[0],
@@ -313,9 +488,12 @@ export async function markAttendanceBiometric(req: Request, res: Response) {
       .select()
       .single();
 
-    if (error) return res.status(409).json({ success: false, error: 'Log already exists.' });
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ success: false, error: 'Attendance already recorded for this session.' });
+      return res.status(500).json({ success: false, error: 'Failed to record biometric attendance.' });
+    }
 
-    return res.status(200).json({ success: true, message: 'Biometric log recorded.', data });
+    return res.status(200).json({ success: true, message: 'Biometric attendance recorded.', data });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Biometric registration failed.' });
   }
@@ -326,10 +504,26 @@ export async function markAttendanceBulk(req: Request, res: Response) {
     const parse = bulkAttendanceSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     const { session_id, records } = parse.data;
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
     const date = new Date().toISOString().split('T')[0];
 
+    // Check if manual method is enabled
+    if (!(await isMethodEnabled(institutionId, 'manual'))) {
+      return res.status(403).json({ success: false, error: 'Manual attendance is not enabled for your institution.' });
+    }
+
+    // Verify session exists and is active
+    const { data: session } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('id, is_active')
+      .eq('id', session_id)
+      .maybeSingle();
+
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found.' });
+
     const logs = records.map(rec => ({
-      institution_id: req.user?.institution_id,
+      institution_id: institutionId,
       student_id: rec.student_id,
       session_id,
       date,
@@ -348,6 +542,398 @@ export async function markAttendanceBulk(req: Request, res: Response) {
     return res.status(200).json({ success: true, count: data.length });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal bulk write failure.' });
+  }
+}
+
+// =========================================================================
+// ATTENDANCE SESSION MANAGEMENT
+// =========================================================================
+
+export async function closeSession(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const institutionId = req.user?.institution_id;
+
+    const { data: session, error: sessErr } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('*')
+      .eq('id', id)
+      .eq('institution_id', institutionId)
+      .single();
+
+    if (sessErr || !session) return res.status(404).json({ success: false, error: 'Session not found.' });
+    if (!session.is_active) return res.status(400).json({ success: false, error: 'Session already closed.' });
+
+    // Deactivate all QR tokens for this session
+    await supabaseAdmin
+      .from('qr_tokens')
+      .update({ is_active: false })
+      .eq('session_id', id)
+      .eq('is_active', true);
+
+    // Find all students in the department who did NOT get marked
+    const { data: markedStudents } = await supabaseAdmin
+      .from('attendance')
+      .select('student_id')
+      .eq('session_id', id);
+
+    const markedIds = new Set((markedStudents || []).map(m => m.student_id));
+
+    // Get students in this department
+    const { data: deptStudents } = await supabaseAdmin
+      .from('students')
+      .select('id, user_id')
+      .eq('department_id', session.department_id)
+      .eq('is_active', true);
+
+    // Auto-mark absent for students not yet marked
+    const absentRecords = (deptStudents || [])
+      .filter(s => !markedIds.has(s.id))
+      .map(s => ({
+        institution_id: institutionId,
+        student_id: s.id,
+        session_id: id,
+        date: session.date,
+        status: 'absent',
+        marked_by: req.user?.id,
+        method: 'auto'
+      }));
+
+    if (absentRecords.length > 0) {
+      await supabaseAdmin
+        .from('attendance')
+        .upsert(absentRecords, { onConflict: 'student_id,session_id' });
+    }
+
+    // Close the session
+    await supabaseAdmin
+      .from('attendance_sessions')
+      .update({ is_active: false, closed_at: new Date().toISOString() })
+      .eq('id', id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Session closed.',
+      auto_marked_absent: absentRecords.length,
+      total_students: deptStudents?.length || 0
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to close session.' });
+  }
+}
+
+// =========================================================================
+// BIOMETRIC / RFID DEVICE MANAGEMENT
+// =========================================================================
+
+export async function getAttendanceDevices(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    const { data, error } = await supabaseAdmin
+      .from('attendance_devices')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return res.json({ success: true, devices: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function registerAttendanceDevice(req: Request, res: Response) {
+  try {
+    const { device_name, device_type, device_serial, department_id, firmware_version } = req.body;
+    if (!device_name || !device_type || !device_serial) {
+      return res.status(400).json({ success: false, error: 'device_name, device_type, and device_serial are required.' });
+    }
+    if (!['biometric', 'rfid', 'hybrid'].includes(device_type)) {
+      return res.status(400).json({ success: false, error: 'device_type must be biometric, rfid, or hybrid.' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('attendance_devices')
+      .insert({
+        institution_id: req.user?.institution_id,
+        device_name,
+        device_type,
+        device_serial,
+        department_id: department_id || null,
+        firmware_version: firmware_version || null
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ success: false, error: 'Device serial already registered.' });
+      throw error;
+    }
+    return res.status(201).json({ success: true, device: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function updateAttendanceDevice(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { device_name, department_id, is_active, firmware_version } = req.body;
+
+    const { data, error } = await supabaseAdmin
+      .from('attendance_devices')
+      .update({
+        ...(device_name !== undefined && { device_name }),
+        ...(department_id !== undefined && { department_id }),
+        ...(is_active !== undefined && { is_active }),
+        ...(firmware_version !== undefined && { firmware_version })
+      })
+      .eq('id', id)
+      .eq('institution_id', req.user?.institution_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.json({ success: true, device: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getDeviceLogs(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    const { device_id, limit: lim } = req.query;
+
+    let query = supabaseAdmin
+      .from('device_attendance_logs')
+      .select('*, attendance_devices(device_name, device_type)')
+      .eq('institution_id', institutionId)
+      .order('logged_at', { ascending: false })
+      .limit(Number(lim) || 50);
+
+    if (device_id) query = query.eq('device_id', device_id);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return res.json({ success: true, logs: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// ATTENDANCE METHODS MANAGEMENT
+// =========================================================================
+
+export async function getAttendanceMethods(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    const { data, error } = await supabaseAdmin
+      .from('attendance_methods')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .order('method_key');
+
+    if (error) throw error;
+    return res.json({ success: true, methods: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function updateAttendanceMethod(req: Request, res: Response) {
+  try {
+    const { method_key, is_enabled, config } = req.body;
+    const institutionId = req.user?.institution_id;
+
+    if (!method_key) return res.status(400).json({ success: false, error: 'method_key is required.' });
+    if (!['qr', 'biometric', 'rfid', 'manual'].includes(method_key)) {
+      return res.status(400).json({ success: false, error: 'Invalid method_key.' });
+    }
+
+    const updateData: any = { updated_by: req.user?.id };
+    if (is_enabled !== undefined) updateData.is_enabled = is_enabled;
+    if (config !== undefined) updateData.config = config;
+
+    const { data, error } = await supabaseAdmin
+      .from('attendance_methods')
+      .update(updateData)
+      .eq('institution_id', institutionId)
+      .eq('method_key', method_key)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.json({ success: true, method: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function batchUpdateAttendanceMethods(req: Request, res: Response) {
+  try {
+    const { methods } = req.body;
+    // methods: Array<{ method_key, is_enabled, config? }>
+    const institutionId = req.user?.institution_id;
+
+    if (!Array.isArray(methods)) return res.status(400).json({ success: false, error: 'methods array required.' });
+
+    const rows = methods.map(m => ({
+      institution_id: institutionId,
+      method_key: m.method_key,
+      is_enabled: m.is_enabled,
+      ...(m.config && { config: m.config }),
+      updated_by: req.user?.id
+    }));
+
+    const { error } = await supabaseAdmin
+      .from('attendance_methods')
+      .upsert(rows, { onConflict: 'institution_id,method_key' });
+
+    if (error) throw error;
+    return res.json({ success: true, message: 'Attendance methods updated.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// Device heartbeat endpoint (called by biometric/RFID devices)
+export async function deviceHeartbeat(req: Request, res: Response) {
+  try {
+    const { device_serial, api_key } = req.body;
+    if (!device_serial || !api_key) {
+      return res.status(400).json({ success: false, error: 'device_serial and api_key required.' });
+    }
+
+    const { data: device, error } = await supabaseAdmin
+      .from('attendance_devices')
+      .select('id, is_active')
+      .eq('device_serial', device_serial)
+      .eq('api_key', api_key)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error || !device) return res.status(401).json({ success: false, error: 'Invalid or inactive device.' });
+
+    await supabaseAdmin
+      .from('attendance_devices')
+      .update({ last_heartbeat: new Date().toISOString() })
+      .eq('id', device.id);
+
+    return res.json({ success: true, message: 'Heartbeat recorded.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// Device-to-server attendance push endpoint (for biometric/RFID hardware)
+export async function deviceAttendancePush(req: Request, res: Response) {
+  try {
+    const { device_serial, api_key, identifier_type, identifier_value, confidence, timestamp } = req.body;
+    if (!device_serial || !api_key || !identifier_type || !identifier_value) {
+      return res.status(400).json({ success: false, error: 'Missing required fields.' });
+    }
+
+    // Verify device
+    const { data: device } = await supabaseAdmin
+      .from('attendance_devices')
+      .select('id, institution_id, department_id')
+      .eq('device_serial', device_serial)
+      .eq('api_key', api_key)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!device) return res.status(401).json({ success: false, error: 'Invalid or inactive device.' });
+
+    const institutionId = device.institution_id;
+
+    // Check if method is enabled
+    const method = identifier_type === 'rfid_card' ? 'rfid' : 'biometric';
+    if (!(await isMethodEnabled(institutionId, method))) {
+      return res.status(403).json({ success: false, error: `${method} attendance is not enabled.` });
+    }
+
+    // Try to match student
+    let studentId: string | null = null;
+    let matched = false;
+
+    if (identifier_type === 'fingerprint') {
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('id')
+        .eq('fingerprint_id', identifier_value)
+        .maybeSingle();
+      if (student) { studentId = student.id; matched = true; }
+    } else if (identifier_type === 'rfid_card') {
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('id')
+        .eq('rfid_card_id', identifier_value)
+        .maybeSingle();
+      if (student) { studentId = student.id; matched = true; }
+    }
+
+    // Log the raw attempt
+    const { data: logEntry } = await supabaseAdmin
+      .from('device_attendance_logs')
+      .insert({
+        device_id: device.id,
+        institution_id: institutionId,
+        identifier_type,
+        identifier_value,
+        student_id: studentId,
+        matched,
+        match_confidence: confidence || null,
+        raw_payload: { device_serial, timestamp }
+      })
+      .select()
+      .single();
+
+    // If matched, find active session and mark attendance
+    if (matched && studentId) {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Find active session
+      let sessionQuery = supabaseAdmin
+        .from('attendance_sessions')
+        .select('id')
+        .eq('institution_id', institutionId)
+        .eq('date', today)
+        .eq('is_active', true);
+
+      if (device.department_id) {
+        sessionQuery = sessionQuery.eq('department_id', device.department_id);
+      }
+
+      const { data: session } = await sessionQuery
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (session) {
+        const { error: attErr } = await supabaseAdmin
+          .from('attendance')
+          .insert({
+            institution_id: institutionId,
+            student_id: studentId,
+            session_id: session.id,
+            date: today,
+            status: 'present',
+            method: identifier_type === 'rfid_card' ? 'rfid' : 'biometric',
+            device_id: device.id
+          });
+
+        // Ignore duplicate errors (23505 = unique constraint)
+        if (attErr && attErr.code !== '23505') {
+          console.error('Device attendance push insert error:', attErr);
+        }
+      }
+    }
+
+    return res.json({ success: true, matched, log_id: logEntry?.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 }
 
@@ -2011,5 +2597,230 @@ export async function getEligibleScholarships(req: Request, res: Response) {
       }
     ];
     return res.status(200).json({ success: true, eligible: mockEligible });
+  }
+}
+
+// =========================================================================
+// DATA IMPORT CONTROLLERS
+// =========================================================================
+
+// Import attendance records from CSV/JSON (for new institutes migrating data)
+export async function importAttendanceRecords(req: Request, res: Response) {
+  try {
+    const { records } = req.body;
+    // records: Array<{ student_roll: string; subject: string; date: string; status: string; method?: string; time_slot?: string }>
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ success: false, error: 'records array is required.' });
+    }
+
+    const institutionId = req.user?.institution_id;
+    const imported: any[] = [];
+    const errors: { row: number; error: string }[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
+      try {
+        // Validate required fields
+        if (!rec.student_roll || !rec.subject || !rec.date || !rec.status) {
+          errors.push({ row: i + 1, error: 'Missing required fields (student_roll, subject, date, status)' });
+          continue;
+        }
+
+        // Validate status
+        const validStatuses = ['present', 'absent', 'late', 'excused'];
+        const status = rec.status.toLowerCase();
+        if (!validStatuses.includes(status)) {
+          errors.push({ row: i + 1, error: `Invalid status: ${rec.status}` });
+          continue;
+        }
+
+        // Find student by roll number
+        const { data: student } = await supabaseAdmin
+          .from('students')
+          .select('id, department_id')
+          .eq('institution_id', institutionId)
+          .eq('roll_number', rec.student_roll)
+          .maybeSingle();
+
+        if (!student) {
+          errors.push({ row: i + 1, error: `Student not found: ${rec.student_roll}` });
+          continue;
+        }
+
+        // Find or create session for this subject+date
+        let { data: session } = await supabaseAdmin
+          .from('attendance_sessions')
+          .select('id')
+          .eq('institution_id', institutionId)
+          .eq('subject', rec.subject)
+          .eq('date', rec.date)
+          .maybeSingle();
+
+        if (!session) {
+          // Create a session record for this imported data
+          const { data: newSession } = await supabaseAdmin
+            .from('attendance_sessions')
+            .insert({
+              institution_id: institutionId,
+              department_id: student.department_id,
+              subject: rec.subject,
+              date: rec.date,
+              time_slot: rec.time_slot || '00:00-00:00',
+              marked_by: req.user?.id
+            })
+            .select()
+            .single();
+          session = newSession;
+        }
+
+        if (!session) {
+          errors.push({ row: i + 1, error: `Failed to create/find session for ${rec.subject} on ${rec.date}` });
+          continue;
+        }
+
+        // Insert attendance record (upsert to handle duplicates)
+        const { data: attRecord, error: attErr } = await supabaseAdmin
+          .from('attendance')
+          .upsert({
+            institution_id: institutionId,
+            student_id: student.id,
+            session_id: session.id,
+            date: rec.date,
+            status,
+            method: rec.method || 'imported',
+            marked_by: req.user?.id
+          }, { onConflict: 'student_id,session_id' })
+          .select()
+          .single();
+
+        if (attErr) {
+          errors.push({ row: i + 1, error: attErr.message });
+          continue;
+        }
+
+        imported.push(attRecord);
+      } catch (err: any) {
+        errors.push({ row: i + 1, error: err.message });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      imported: imported.length,
+      errors: errors.length,
+      error_details: errors.slice(0, 20) // Return first 20 errors
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Attendance import failed.' });
+  }
+}
+
+// Bulk import student profiles from CSV/JSON (for directors/HODs)
+export async function importStudentProfiles(req: Request, res: Response) {
+  try {
+    const { records } = req.body;
+    // records: Array<{ name, email, roll_number, department_id?, semester?, batch_year?, dob?, gender?, phone?, guardian_name?, guardian_phone?, fingerprint_id? }>
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ success: false, error: 'records array is required.' });
+    }
+
+    const institutionId = req.user?.institution_id;
+    const imported: any[] = [];
+    const errors: { row: number; error: string }[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
+      try {
+        // Validate required fields
+        if (!rec.name || !rec.email || !rec.roll_number) {
+          errors.push({ row: i + 1, error: 'Missing required fields (name, email, roll_number)' });
+          continue;
+        }
+
+        // Check if email already exists
+        const { data: existingUser } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('email', rec.email)
+          .maybeSingle();
+
+        if (existingUser) {
+          errors.push({ row: i + 1, error: `Email already exists: ${rec.email}` });
+          continue;
+        }
+
+        // Check if roll number already exists in this institution
+        const { data: existingStudent } = await supabaseAdmin
+          .from('students')
+          .select('id')
+          .eq('institution_id', institutionId)
+          .eq('roll_number', rec.roll_number)
+          .maybeSingle();
+
+        if (existingStudent) {
+          errors.push({ row: i + 1, error: `Roll number already exists: ${rec.roll_number}` });
+          continue;
+        }
+
+        // Create user account
+        const { data: user, error: userErr } = await supabaseAdmin
+          .from('users')
+          .insert({
+            institution_id: institutionId,
+            name: rec.name,
+            email: rec.email,
+            phone: rec.phone || rec.guardian_phone || null,
+            role: 'Student',
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (userErr || !user) {
+          errors.push({ row: i + 1, error: `Failed to create user: ${userErr?.message}` });
+          continue;
+        }
+
+        // Create student record
+        const { data: student, error: studErr } = await supabaseAdmin
+          .from('students')
+          .insert({
+            user_id: user.id,
+            institution_id: institutionId,
+            roll_number: rec.roll_number,
+            department_id: rec.department_id || null,
+            semester: rec.semester || 1,
+            batch_year: rec.batch_year || new Date().getFullYear().toString(),
+            dob: rec.dob || null,
+            gender: rec.gender || null,
+            guardian_name: rec.guardian_name || null,
+            guardian_phone: rec.guardian_phone || null,
+            fingerprint_id: rec.fingerprint_id || null
+          })
+          .select()
+          .single();
+
+        if (studErr) {
+          // Rollback user creation
+          await supabaseAdmin.from('users').delete().eq('id', user.id);
+          errors.push({ row: i + 1, error: `Failed to create student: ${studErr.message}` });
+          continue;
+        }
+
+        imported.push({ user_id: user.id, student_id: student.id, roll_number: rec.roll_number, name: rec.name });
+      } catch (err: any) {
+        errors.push({ row: i + 1, error: err.message });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      imported: imported.length,
+      errors: errors.length,
+      error_details: errors.slice(0, 20),
+      imported_students: imported.slice(0, 50) // Return first 50 for preview
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Student profile import failed.' });
   }
 }

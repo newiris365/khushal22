@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Check, X, FileText, BarChart2, ShieldAlert } from 'lucide-react';
+import { Calendar, Check, X, FileText, BarChart2, ShieldAlert, Settings, Upload } from 'lucide-react';
 import { apiGet, apiPut } from '../../../lib/api';
+import Link from 'next/link';
 
 export default function AdminAttendancePage() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -76,6 +77,16 @@ export default function AdminAttendancePage() {
           >
             <option value="a0000000-0000-0000-0000-000000000001">Computer Science (CSE)</option>
           </select>
+
+          <Link href="/admin/attendance/methods"
+            className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-[#C4B5FD] text-xs font-bold flex items-center gap-1.5 transition-all">
+            <Settings className="w-4 h-4" /> Attendance Methods
+          </Link>
+
+          <Link href="/admin/import/attendance"
+            className="px-4 py-2.5 rounded-xl bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600/30 text-violet-300 text-xs font-bold flex items-center gap-1.5 transition-all">
+            <Upload className="w-4 h-4" /> Import Attendance
+          </Link>
         </div>
 
         {/* Regularization Approvals Queue */}

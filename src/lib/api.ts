@@ -144,3 +144,109 @@ export async function apiFetchBlob(endpoint: string, body?: any): Promise<Blob> 
   }
 }
 
+// =========================================================================
+// Permissions API
+// =========================================================================
+export interface FeatureToggle {
+  feature_key: string;
+  enabled: boolean;
+}
+
+export interface ModulePermission {
+  role: string;
+  module: string;
+  can_read: boolean;
+  can_write: boolean;
+  can_delete: boolean;
+}
+
+export async function getFeatureToggles(institutionId: string): Promise<ApiResponse<{ features: FeatureToggle[] }>> {
+  return apiGet(`/permissions/features/${institutionId}`);
+}
+
+export async function setFeatureToggles(institutionId: string, features: FeatureToggle[]): Promise<ApiResponse> {
+  return apiPost('/permissions/features', { institution_id: institutionId, features });
+}
+
+export async function getRolePermissions(institutionId: string): Promise<ApiResponse<{ permissions: ModulePermission[]; all_roles: string[]; all_modules: string[] }>> {
+  return apiGet(`/permissions/roles/${institutionId}`);
+}
+
+export async function setRolePermissions(institutionId: string, permissions: ModulePermission[]): Promise<ApiResponse> {
+  return apiPost('/permissions/roles', { institution_id: institutionId, permissions });
+}
+
+export async function getMyPermissions(): Promise<ApiResponse<{ features: FeatureToggle[]; permissions: ModulePermission[] }>> {
+  return apiGet('/permissions/my');
+}
+
+export async function seedPermissions(institutionId: string): Promise<ApiResponse> {
+  return apiPost('/permissions/seed', { institution_id: institutionId });
+}
+
+// =========================================================================
+// Attendance Methods & Devices API
+// =========================================================================
+export interface AttendanceMethod {
+  id: string;
+  method_key: string;
+  is_enabled: boolean;
+  config: Record<string, any>;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttendanceDevice {
+  id: string;
+  device_name: string;
+  device_type: string;
+  device_serial: string;
+  api_key: string;
+  department_id?: string;
+  is_active: boolean;
+  last_heartbeat?: string;
+  firmware_version?: string;
+  created_at: string;
+}
+
+export async function getAttendanceMethods(): Promise<ApiResponse<{ methods: AttendanceMethod[] }>> {
+  return apiGet('/core/attendance/methods');
+}
+
+export async function updateAttendanceMethod(methodKey: string, isEnabled: boolean, config?: Record<string, any>): Promise<ApiResponse> {
+  return apiPut('/core/attendance/method', { method_key: methodKey, is_enabled: isEnabled, config });
+}
+
+export async function batchUpdateAttendanceMethods(methods: { method_key: string; is_enabled: boolean; config?: Record<string, any> }[]): Promise<ApiResponse> {
+  return apiPost('/core/attendance/methods/batch', { methods });
+}
+
+export async function getAttendanceDevices(): Promise<ApiResponse<{ devices: AttendanceDevice[] }>> {
+  return apiGet('/core/attendance/devices');
+}
+
+export async function registerAttendanceDevice(device: { device_name: string; device_type: string; device_serial: string; department_id?: string }): Promise<ApiResponse<{ device: AttendanceDevice }>> {
+  return apiPost('/core/attendance/device', device);
+}
+
+export async function updateAttendanceDevice(id: string, updates: Partial<AttendanceDevice>): Promise<ApiResponse> {
+  return apiPut(`/core/attendance/device/${id}`, updates);
+}
+
+export async function getDeviceLogs(deviceId?: string): Promise<ApiResponse<{ logs: any[] }>> {
+  return apiGet('/core/attendance/device-logs', deviceId ? { device_id: deviceId } : undefined);
+}
+
+// =========================================================================
+// DATA IMPORT API
+// =========================================================================
+
+export async function importAttendanceRecords(records: { student_roll: string; subject: string; date: string; status: string; method?: string; time_slot?: string }[]): Promise<ApiResponse<{ imported: number; errors: number; error_details: { row: number; error: string }[] }>> {
+  return apiPost('/core/import/attendance', { records });
+}
+
+export async function importStudentProfiles(records: { name: string; email: string; roll_number: string; department_id?: string; semester?: number; batch_year?: string; dob?: string; gender?: string; phone?: string; guardian_name?: string; guardian_phone?: string; fingerprint_id?: string }[]): Promise<ApiResponse<{ imported: number; errors: number; error_details: { row: number; error: string }[]; imported_students: any[] }>> {
+  return apiPost('/core/import/students', { records });
+}
+

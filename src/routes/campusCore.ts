@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { 
   startSession,
   getSessionQr,
+  closeSession,
   markAttendanceQr,
   markAttendanceBiometric,
   markAttendanceBulk,
@@ -9,6 +10,17 @@ import {
   getAttendanceReport,
   submitRegularize,
   approveRegularize,
+  getAttendanceDevices,
+  registerAttendanceDevice,
+  updateAttendanceDevice,
+  getDeviceLogs,
+  deviceHeartbeat,
+  deviceAttendancePush,
+  getAttendanceMethods,
+  updateAttendanceMethod,
+  batchUpdateAttendanceMethods,
+  importAttendanceRecords,
+  importStudentProfiles,
   getStudents,
   createStudent,
   getStudentById,
@@ -69,14 +81,34 @@ router.use(authMiddleware);
 // =========================================================================
 router.post('/attendance/session/start', requireRole(['Staff', 'Admin', 'SuperAdmin']), startSession);
 router.get('/attendance/session/:id/qr', requireRole(['Staff', 'Admin', 'SuperAdmin']), getSessionQr);
+router.put('/attendance/session/:id/close', requireRole(['Staff', 'Admin', 'SuperAdmin']), closeSession);
 router.post('/attendance/mark/qr', requireRole(['Student']), markAttendanceQr);
-router.post('/attendance/mark/biometric', markAttendanceBiometric); // Biometric device endpoint (auth bypassed or header checked)
+router.post('/attendance/mark/biometric', markAttendanceBiometric);
 router.post('/attendance/mark/bulk', requireRole(['Staff', 'Admin', 'SuperAdmin']), markAttendanceBulk);
 router.get('/attendance/student/:id', getStudentAttendance);
 router.get('/attendance/report/:departmentId', requireRole(['Staff', 'Admin', 'SuperAdmin']), getAttendanceReport);
 router.post('/attendance/regularize', requireRole(['Student']), submitRegularize);
 router.put('/attendance/regularize/:id/approve', requireRole(['Staff', 'Admin', 'SuperAdmin']), approveRegularize);
 router.get('/attendance/fraud-logs', requireRole(['Staff', 'Admin', 'SuperAdmin']), getFraudLogs);
+
+// =========================================================================
+// 1b. ATTENDANCE METHODS (enable/disable per institution)
+// =========================================================================
+router.get('/attendance/methods', requireRole(['Admin', 'SuperAdmin', 'Director', 'HOD']), getAttendanceMethods);
+router.put('/attendance/method', requireRole(['Admin', 'SuperAdmin', 'Director']), updateAttendanceMethod);
+router.post('/attendance/methods/batch', requireRole(['Admin', 'SuperAdmin']), batchUpdateAttendanceMethods);
+
+// =========================================================================
+// 1c. BIOMETRIC / RFID DEVICE MANAGEMENT
+// =========================================================================
+router.get('/attendance/devices', requireRole(['Admin', 'SuperAdmin']), getAttendanceDevices);
+router.post('/attendance/device', requireRole(['Admin', 'SuperAdmin']), registerAttendanceDevice);
+router.put('/attendance/device/:id', requireRole(['Admin', 'SuperAdmin']), updateAttendanceDevice);
+router.get('/attendance/device-logs', requireRole(['Admin', 'SuperAdmin']), getDeviceLogs);
+
+// Device-to-server endpoints (authenticated by API key, not JWT)
+router.post('/attendance/device/heartbeat', deviceHeartbeat);
+router.post('/attendance/device/push', deviceAttendancePush);
 
 // =========================================================================
 // 2. STUDENTS CRUD ROUTERS
@@ -145,5 +177,11 @@ router.post('/idcards/template', requireRole(['Admin', 'SuperAdmin']), saveCardT
 router.get('/idcards/generate/:studentId', requireRole(['Admin', 'SuperAdmin', 'Student']), generateCard);
 router.post('/idcards/generate/:studentId', requireRole(['Admin', 'SuperAdmin']), generateCard);
 router.post('/idcards/generate/bulk', requireRole(['Admin', 'SuperAdmin']), generateBulkCards);
+
+// =========================================================================
+// 8. DATA IMPORT ROUTERS
+// =========================================================================
+router.post('/import/attendance', requireRole(['Admin', 'SuperAdmin', 'Director']), importAttendanceRecords);
+router.post('/import/students', requireRole(['Admin', 'SuperAdmin', 'Director', 'HOD']), importStudentProfiles);
 
 export default router;
