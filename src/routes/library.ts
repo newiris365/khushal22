@@ -63,6 +63,9 @@ router.put('/books/:id', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian
 router.post('/books/isbn-lookup', lookupIsbn);
 router.post('/books/import', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), importBooks);
 
+// Alias: /search -> books listing with ?search= query parameter
+router.get('/search', listBooks);
+
 // --- BOOK CHECKOUTS / ISSUES ---
 router.post('/issues', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), issueBook);
 router.post('/issues/:id/return', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), returnBook);

@@ -7,6 +7,9 @@
   NODE_VERSION = "20"
   NODE_ENV = "production"
 
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 [[redirects]]
   from = "/api/settings/*"
   to = "/.netlify/functions/settings/:splat"

@@ -26,6 +26,7 @@ const getRedirectPath = (role: string): string => {
     case 'Director': return '/director';
     case 'Parent': return '/parent/dashboard';
     case 'Teacher': return '/teacher/timetable';
+    case 'HOD': return '/hod/dashboard';
     case 'Vendor': return '/admin/canteen';
     default: return '/dashboard';
   }
@@ -113,6 +114,46 @@ const getMockProfile = (email: string, role: string) => {
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University'
       };
+    case 'Teacher':
+      return {
+        id: 'b0000000-0000-0000-0000-000000000016',
+        name: 'Prof. Neha Gupta (Sandbox)',
+        email: email,
+        role: 'Teacher',
+        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        plan_tier: 'University'
+      };
+    case 'HOD':
+      return {
+        id: 'b0000000-0000-0000-0000-000000000017',
+        name: 'Dr. Vikram Mehta (Sandbox)',
+        email: email,
+        role: 'HOD',
+        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        plan_tier: 'University'
+      };
+    case 'Librarian':
+      return {
+        id: 'b0000000-0000-0000-0000-000000000018',
+        name: 'Sunita Devi (Sandbox)',
+        email: email,
+        role: 'Librarian',
+        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        plan_tier: 'University'
+      };
+    case 'Director':
+      return {
+        id: 'b0000000-0000-0000-0000-000000000019',
+        name: 'Dr. K. R. Sharma (Sandbox)',
+        email: email,
+        role: 'Director',
+        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        plan_tier: 'University'
+      };
     case 'SuperAdmin':
       return {
         id: 'b0000000-0000-0000-0000-000000000001',
@@ -141,7 +182,7 @@ export default function LoginPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [useOfflineBypass, setUseOfflineBypass] = useState(false);
+  const [useOfflineBypass, setUseOfflineBypass] = useState(true);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -199,7 +240,10 @@ export default function LoginPage() {
         'rajesh.driver@siet.edu.in',
         'alok.vyas@siet.edu.in',
         'madanlal@gmail.com',
-        'canteen@siet.edu.in'
+        'canteen@siet.edu.in',
+        'hod@sin.education',
+        'teacher@sin.education',
+        'librarian@sin.education'
       ];
       if (sandboxEmails.includes(data.email)) {
         let role = 'Student';
@@ -211,6 +255,9 @@ export default function LoginPage() {
         else if (data.email === 'alok.vyas@siet.edu.in') role = 'Staff';
         else if (data.email === 'madanlal@gmail.com') role = 'Parent';
         else if (data.email === 'canteen@siet.edu.in') role = 'Vendor';
+        else if (data.email === 'hod@sin.education') role = 'HOD';
+        else if (data.email === 'teacher@sin.education') role = 'Teacher';
+        else if (data.email === 'librarian@sin.education') role = 'Librarian';
 
         const mockProfile = getMockProfile(data.email, role);
         const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
@@ -365,11 +412,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Sandbox Quick Access Login Option */}
-        <div className="mt-6 pt-6 border-t border-white/10 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+        {/* Instant Login - All Roles */}
+        <div className="mt-6 pt-6 border-t border-white/10">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-bold text-[#A78BFA] uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-[#A78BFA]" /> Sandbox Quick Logins
+              <Sparkles className="w-3.5 h-3.5 text-[#A78BFA]" /> Instant Login
             </span>
             <div className="flex items-center gap-1.5">
               <input 
@@ -380,86 +427,47 @@ export default function LoginPage() {
                 className="w-3.5 h-3.5 rounded bg-white/5 border-[#6C2BD9]/30 text-[#6C2BD9] focus:ring-[#8B5CF6] cursor-pointer"
               />
               <label htmlFor="offline-bypass" className="text-[9px] text-[#C4B5FD]/60 select-none cursor-pointer hover:text-[#C4B5FD] transition-colors">
-                Force Offline Bypass
+                Force Offline
               </label>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1 scrollbar-thin">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('siddharth@sin.education', 'SuperAdmin')}
-              className="p-2.5 rounded-xl bg-violet-600/10 border border-violet-500/25 hover:border-violet-500 hover:bg-violet-600/20 transition-all text-left flex flex-col col-span-2"
-            >
-              <span className="text-[10px] font-bold text-violet-400 flex items-center gap-1">
-                <Shield className="w-3.5 h-3.5 text-violet-400" /> System SuperAdmin Portal
-              </span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">siddharth@sin.education</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('khushal@gmail.com', 'Student')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Student Portal</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">khushal@gmail.com</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('director@siet.edu.in', 'Admin')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Director Console</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">director@siet.edu.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('warden@siet.edu.in', 'Warden')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Warden Desk</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">warden@siet.edu.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('alok.vyas@siet.edu.in', 'Staff')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Faculty Portal</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">alok.vyas@siet.edu.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('canteen@siet.edu.in', 'Vendor')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Canteen Vendor</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">canteen@siet.edu.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('security@siet.edu.in', 'Security')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Smart Gate Guard</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">security@siet.edu.in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('madanlal@gmail.com', 'Parent')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Parent Portal</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">madanlal@gmail.com</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('rajesh.driver@siet.edu.in', 'Driver')}
-              className="p-2 rounded-xl bg-white/5 border border-[#6C2BD9]/25 hover:border-[#8B5CF6]/60 hover:bg-[#6C2BD9]/10 transition-all text-left flex flex-col"
-            >
-              <span className="text-[10px] font-bold text-white">Transit Driver</span>
-              <span className="text-[8px] text-[#C4B5FD]/70 font-mono truncate w-full">rajesh.driver@siet.edu.in</span>
-            </button>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { email: 'siddharth@sin.education', role: 'SuperAdmin', label: 'SuperAdmin', bg: 'bg-violet-500/10', border: 'border-violet-500/25', hoverBorder: 'hover:border-violet-500', hoverBg: 'hover:bg-violet-500/20', text: 'text-violet-400', hoverText: 'hover:text-violet-300' },
+              { email: 'director@siet.edu.in', role: 'Admin', label: 'Admin', bg: 'bg-blue-500/10', border: 'border-blue-500/25', hoverBorder: 'hover:border-blue-500', hoverBg: 'hover:bg-blue-500/20', text: 'text-blue-400', hoverText: 'hover:text-blue-300' },
+              { email: 'khushal@gmail.com', role: 'Student', label: 'Student', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', hoverBorder: 'hover:border-emerald-500', hoverBg: 'hover:bg-emerald-500/20', text: 'text-emerald-400', hoverText: 'hover:text-emerald-300' },
+              { email: 'hod@sin.education', role: 'HOD', label: 'HOD', bg: 'bg-cyan-500/10', border: 'border-cyan-500/25', hoverBorder: 'hover:border-cyan-500', hoverBg: 'hover:bg-cyan-500/20', text: 'text-cyan-400', hoverText: 'hover:text-cyan-300' },
+              { email: 'teacher@sin.education', role: 'Teacher', label: 'Teacher', bg: 'bg-purple-500/10', border: 'border-purple-500/25', hoverBorder: 'hover:border-purple-500', hoverBg: 'hover:bg-purple-500/20', text: 'text-purple-400', hoverText: 'hover:text-purple-300' },
+              { email: 'warden@siet.edu.in', role: 'Warden', label: 'Warden', bg: 'bg-amber-500/10', border: 'border-amber-500/25', hoverBorder: 'hover:border-amber-500', hoverBg: 'hover:bg-amber-500/20', text: 'text-amber-400', hoverText: 'hover:text-amber-300' },
+              { email: 'security@siet.edu.in', role: 'Security', label: 'Security', bg: 'bg-red-500/10', border: 'border-red-500/25', hoverBorder: 'hover:border-red-500', hoverBg: 'hover:bg-red-500/20', text: 'text-red-400', hoverText: 'hover:text-red-300' },
+              { email: 'librarian@sin.education', role: 'Librarian', label: 'Librarian', bg: 'bg-teal-500/10', border: 'border-teal-500/25', hoverBorder: 'hover:border-teal-500', hoverBg: 'hover:bg-teal-500/20', text: 'text-teal-400', hoverText: 'hover:text-teal-300' },
+              { email: 'madanlal@gmail.com', role: 'Parent', label: 'Parent', bg: 'bg-pink-500/10', border: 'border-pink-500/25', hoverBorder: 'hover:border-pink-500', hoverBg: 'hover:bg-pink-500/20', text: 'text-pink-400', hoverText: 'hover:text-pink-300' },
+              { email: 'rajesh.driver@siet.edu.in', role: 'Driver', label: 'Driver', bg: 'bg-orange-500/10', border: 'border-orange-500/25', hoverBorder: 'hover:border-orange-500', hoverBg: 'hover:bg-orange-500/20', text: 'text-orange-400', hoverText: 'hover:text-orange-300' },
+              { email: 'canteen@siet.edu.in', role: 'Vendor', label: 'Vendor', bg: 'bg-lime-500/10', border: 'border-lime-500/25', hoverBorder: 'hover:border-lime-500', hoverBg: 'hover:bg-lime-500/20', text: 'text-lime-400', hoverText: 'hover:text-lime-300' },
+              { email: 'alok.vyas@siet.edu.in', role: 'Staff', label: 'Staff', bg: 'bg-indigo-500/10', border: 'border-indigo-500/25', hoverBorder: 'hover:border-indigo-500', hoverBg: 'hover:bg-indigo-500/20', text: 'text-indigo-400', hoverText: 'hover:text-indigo-300' },
+            ].map((item) => (
+              <button
+                key={item.role}
+                type="button"
+                onClick={() => {
+                  const mockProfile = getMockProfile(item.email, item.role);
+                  const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+                  const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
+                  localStorage.setItem('iris_jwt_token', mockToken);
+                  localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+                  window.location.href = getRedirectPath(mockProfile.role);
+                }}
+                className={`p-2 rounded-xl ${item.bg} border ${item.border} ${item.hoverBorder} ${item.hoverBg} transition-all text-left flex flex-col group`}
+              >
+                <span className={`text-[10px] font-bold ${item.text} ${item.hoverText} transition-colors`}>
+                  {item.label}
+                </span>
+                <span className="text-[7px] text-[#C4B5FD]/50 font-mono truncate w-full mt-0.5">
+                  {item.email}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 

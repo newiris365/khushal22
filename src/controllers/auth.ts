@@ -135,11 +135,38 @@ export async function login(req: Request, res: Response) {
 
 
     // 3. Generate stateless JWT with custom tenant claims + device fingerprint
+    // Normalize role to proper casing (e.g. "director" -> "Director") for consistent RBAC matching
+    const ROLE_CASING_MAP: Record<string, string> = {
+      'admin': 'Admin',
+      'superadmin': 'SuperAdmin',
+      'staff': 'Staff',
+      'teacher': 'Teacher',
+      'student': 'Student',
+      'parent': 'Parent',
+      'warden': 'Warden',
+      'security': 'Security',
+      'vendor': 'Vendor',
+      'driver': 'Driver',
+      'director': 'Director',
+      'tpo': 'TPO',
+      'hod': 'HOD',
+      'librarian': 'Librarian',
+      'gym trainer': 'Gym Trainer',
+      'iqac coordinator': 'IQAC Coordinator',
+      'admissions officer': 'Admissions Officer',
+      'principal': 'Principal',
+      'hr admin': 'HR Admin',
+      'applicant': 'Applicant',
+      'company hr': 'Company HR',
+      'alumni': 'Alumni'
+    };
+    const normalizedRole = ROLE_CASING_MAP[userProfile.role.toLowerCase()] || userProfile.role;
+
     const fingerprintHash = getFingerprintHash(req);
     const tokenClaims = {
       id: userProfile.id,
       institution_id: userProfile.institution_id,
-      role: userProfile.role,
+      role: normalizedRole,
       email: userProfile.email,
       fingerprint: fingerprintHash
     };
@@ -153,7 +180,7 @@ export async function login(req: Request, res: Response) {
         id: userProfile.id,
         name: userProfile.name,
         email: userProfile.email,
-        role: userProfile.role,
+        role: normalizedRole,
         institution_id: userProfile.institution_id,
         institution_name: userProfile.institutions?.name,
         plan_tier: userProfile.institutions?.plan_tier
@@ -183,13 +210,26 @@ export async function getMe(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'User profile not found.' });
     }
 
+    // Normalize role to proper casing
+    const ROLE_CASING_MAP: Record<string, string> = {
+      'admin': 'Admin', 'superadmin': 'SuperAdmin', 'staff': 'Staff',
+      'teacher': 'Teacher', 'student': 'Student', 'parent': 'Parent',
+      'warden': 'Warden', 'security': 'Security', 'vendor': 'Vendor',
+      'driver': 'Driver', 'director': 'Director', 'tpo': 'TPO',
+      'hod': 'HOD', 'librarian': 'Librarian', 'gym trainer': 'Gym Trainer',
+      'iqac coordinator': 'IQAC Coordinator', 'admissions officer': 'Admissions Officer',
+      'principal': 'Principal', 'hr admin': 'HR Admin', 'applicant': 'Applicant',
+      'company hr': 'Company HR', 'alumni': 'Alumni'
+    };
+    const normalizedRole = ROLE_CASING_MAP[userProfile.role?.toLowerCase()] || userProfile.role;
+
     return res.status(200).json({
       success: true,
       profile: {
         id: userProfile.id,
         name: userProfile.name,
         email: userProfile.email,
-        role: userProfile.role,
+        role: normalizedRole,
         institution_id: userProfile.institution_id,
         institution_name: userProfile.institutions?.name,
         plan_tier: userProfile.institutions?.plan_tier

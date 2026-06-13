@@ -76,14 +76,17 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   });
 }
 
-// Role-based claim gateway
+// Role-based claim gateway (case-insensitive comparison to tolerate DB casing variations)
 export function requireRole(allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Authentication required.' });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const normalizedUserRole = req.user.role.toLowerCase();
+    const normalizedAllowedRoles = allowedRoles.map(r => r.toLowerCase());
+
+    if (!normalizedAllowedRoles.includes(normalizedUserRole)) {
       return res.status(403).json({
         success: false, 
         error: `Access denied. Role '${req.user.role}' is not authorized for this operation.` 

@@ -230,6 +230,9 @@ router.delete('/timetable/:id', requireRole(['Admin', 'SuperAdmin']), deleteTime
 router.get('/timetable/student/:studentId', getStudentTimetable);
 router.post('/timetable/substitute', requireRole(['Admin', 'SuperAdmin']), assignSubstitute);
 
+// Alias: /classes -> timetable lookup by department (supports ?department= query)
+router.get('/classes', getTimetable);
+
 // =========================================================================
 // 4. FEES ROUTERS
 // =========================================================================

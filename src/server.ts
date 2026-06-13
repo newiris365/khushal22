@@ -7,6 +7,7 @@ import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import logger from './config/logger';
 import { globalLimiter, authLimiter } from './middleware/rateLimit';
+import { requireSupabaseOnline } from './config/supabase';
 import authRouter from './routes/auth';
 import coreRouter from './routes/campusCore';
 import canteenRouter from './routes/canteen';
@@ -259,6 +260,39 @@ app.use((req, res, next) => {
 
 // Routes mapping (auth gets stricter rate limiter)
 app.use('/api/v1/auth', authLimiter, authRouter);
+
+// When Supabase is offline, return 503 for data-dependent routes (skip auth/login which has sandbox fallback)
+app.use('/api/v1/core', requireSupabaseOnline);
+app.use('/api/v1/campusCore', requireSupabaseOnline);
+app.use('/api/canteen', requireSupabaseOnline);
+app.use('/api/v1/canteen', requireSupabaseOnline);
+app.use('/api/v1/hostel-gate', requireSupabaseOnline);
+app.use('/api/v1/lib-events', requireSupabaseOnline);
+app.use('/api/v1/fitzone', requireSupabaseOnline);
+app.use('/api/gym', requireSupabaseOnline);
+app.use('/api/fitzone', requireSupabaseOnline);
+app.use('/api/v1/events', requireSupabaseOnline);
+app.use('/api/v1/hostel', requireSupabaseOnline);
+app.use('/api/v1/transit', requireSupabaseOnline);
+app.use('/api/v1/director', requireSupabaseOnline);
+app.use('/api/v1/ai', requireSupabaseOnline);
+app.use('/api/library', requireSupabaseOnline);
+app.use('/api/gate', requireSupabaseOnline);
+app.use('/api/v1/gate', requireSupabaseOnline);
+app.use('/api/parent', requireSupabaseOnline);
+app.use('/api/v1/parent', requireSupabaseOnline);
+app.use('/api/admissions', requireSupabaseOnline);
+app.use('/api/v1/admissions', requireSupabaseOnline);
+app.use('/api/placements', requireSupabaseOnline);
+app.use('/api/v1/placements', requireSupabaseOnline);
+app.use('/api/obe', requireSupabaseOnline);
+app.use('/api/v1/obe', requireSupabaseOnline);
+app.use('/api/naac', requireSupabaseOnline);
+app.use('/api/v1/naac', requireSupabaseOnline);
+app.use('/api/hr', requireSupabaseOnline);
+app.use('/api/v1/hr', requireSupabaseOnline);
+app.use('/api/v1/permissions', requireSupabaseOnline);
+
 app.use('/api/v1/core', coreRouter);
 app.use('/api/v1/campusCore', coreRouter);
 app.use('/api/canteen', canteenRouter);
@@ -293,6 +327,21 @@ app.use('/api/v1/permissions', permissionsRouter);
 // Health Check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date(), uptime: process.uptime() });
+});
+
+// 404 catch-all for unmatched routes
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Global Express error handler
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error(`Unhandled error: ${err.message}`, { url: req.originalUrl, method: req.method, stack: err.stack });
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  });
 });
 
 // Main Server listener (use httpServer for Socket.io support)

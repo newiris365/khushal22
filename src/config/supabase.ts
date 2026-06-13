@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { AsyncLocalStorage } from 'async_hooks';
+import { Request, Response, NextFunction } from 'express';
 
 dotenv.config();
 
@@ -84,8 +85,6 @@ export const supabaseAdmin = new Proxy(_supabaseAdminInternal, {
 // Export a raw, un-proxied client for explicit administrative actions
 export const supabaseServiceRole = _supabaseAdminInternal;
 
-import { Request } from 'express';
-
 export function getSupabaseClient(req?: Request) {
   const authHeader = req?.headers?.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
@@ -105,4 +104,33 @@ export function getSupabaseClient(req?: Request) {
     });
   }
   return _supabaseAdminInternal;
+}
+
+// Middleware: block requests when Supabase is offline (returns 503)
+export function requireSupabaseOnline(req: Request, res: Response, next: NextFunction) {
+  if (isSupabaseOffline) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service is currently unavailable. The system is running in offline sandbox mode. Please try again later or contact your administrator.'
+    });
+  }
+  next();
+}
+
+// Helper: check if Supabase is available, return true if online
+export async function checkSupabaseOnline(): Promise<boolean> {
+  if (!supabaseUrl || !supabaseServiceKey) return false;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+      method: 'GET',
+      headers: { apikey: supabaseServiceKey },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return res.ok || res.status === 404 || res.status === 401;
+  } catch {
+    return false;
+  }
 }
