@@ -33,7 +33,7 @@ async function checkConnectivity() {
   }
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(`${supabaseUrl}/rest/v1/`, {
       method: 'GET',
       headers: { apikey: supabaseServiceKey },
@@ -636,7 +636,7 @@ export async function checkSupabaseOnline(): Promise<boolean> {
   if (!supabaseUrl || !supabaseServiceKey) return false;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(`${supabaseUrl}/rest/v1/`, {
       method: 'GET',
       headers: { apikey: supabaseServiceKey },
