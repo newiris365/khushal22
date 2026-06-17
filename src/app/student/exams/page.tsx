@@ -23,6 +23,7 @@ interface Enrollment {
 
 interface HallTicket {
   id: string;
+  exam_id: string;
   ticket_number: string;
   room_number: string;
   seat_number: string;
