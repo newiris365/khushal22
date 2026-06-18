@@ -20,3 +20,9 @@
   from = "/api/settings/*"
   to = "/.netlify/functions/settings/:splat"
   status = 200
+
+[[redirects]]
+  from = "/api/v1/*"
+  to = "https://iris-backend-hkjv.onrender.com/api/v1/:splat"
+  status = 200
+  force = true
