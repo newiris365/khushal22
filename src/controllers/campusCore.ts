@@ -66,7 +66,7 @@ async function getMethodConfig(institutionId: string, method: string): Promise<R
 }
 
 // Generate a rotating QR token and store in qr_tokens table
-async function generateRotatingQrToken(sessionId: string, institutionId: string, rotateIntervalMinutes: number): Promise<string> {
+export async function generateRotatingQrToken(sessionId: string, institutionId: string, rotateIntervalMinutes: number): Promise<string> {
   const expiresAt = new Date(Date.now() + rotateIntervalMinutes * 60 * 1000).toISOString();
   const token = jwt.sign(
     { session_id: sessionId, type: 'ATTENDANCE_QR', iat: Math.floor(Date.now() / 1000) },
@@ -1660,6 +1660,7 @@ export async function initiatePayment(req: Request, res: Response) {
       currency: 'INR',
       receipt: `fee_${Date.now()}`,
       notes: {
+        type: 'fee_payment',
         student_id,
         fee_structure_id,
         institution_id: req.user?.institution_id || ''
@@ -5621,62 +5622,224 @@ export async function razorpayWebhook(req: Request, res: Response) {
         : req.body.payload.order.entity;
 
       const notes = entity.notes || {};
-      const { student_id, fee_structure_id, institution_id } = notes;
-      
-      if (!student_id || !fee_structure_id) {
-        logger.warn('Webhook payment captured but missing notes metadata:', notes);
-        return res.status(200).json({ success: true, message: 'Ignored: missing metadata notes.' });
-      }
-
+      const type = notes.type || (notes.fee_structure_id ? 'fee_payment' : '');
       const transaction_id = event === 'payment.captured' ? entity.id : (entity.payment_id || entity.id);
-      
-      // Check if payment already exists
-      const { data: existing } = await supabaseAdmin
-        .from('fee_payments')
-        .select('id')
-        .eq('transaction_id', transaction_id)
-        .maybeSingle();
-
-      if (existing) {
-        return res.status(200).json({ success: true, message: 'Payment already processed.' });
-      }
-
       const amount_paid = entity.amount / 100; // in INR
+      const institution_id = notes.institution_id || null;
 
-      const { data: paymentRecord, error: insertError } = await supabaseAdmin
-        .from('fee_payments')
-        .insert({
-          institution_id: institution_id || null,
-          student_id,
-          fee_structure_id,
-          amount_paid,
-          method: entity.method || 'UPI/Card',
-          transaction_id,
-          status: 'Completed',
-          receipt_url: `https://invoices.iris365.in/receipts/${transaction_id}.pdf`
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        logger.error('Failed to insert fee payment from webhook:', insertError);
-        return res.status(500).json({ success: false, error: 'Database error recording payment.' });
-      }
-
-      // Asynchronously compile receipt PDF and upload it
-      (async () => {
-        try {
-          const pdfBuffer = await generateFeeReceiptPDF(paymentRecord);
-          const fileName = `receipts/${transaction_id}.pdf`;
-          const receiptUrl = await uploadReportToSupabase(pdfBuffer, fileName);
-          await supabaseAdmin
-            .from('fee_payments')
-            .update({ receipt_url: receiptUrl })
-            .eq('id', paymentRecord.id);
-        } catch (pdfErr) {
-          logger.error('Failed generating webhook payment receipt:', pdfErr);
+      if (type === 'fee_payment') {
+        const { student_id, fee_structure_id } = notes;
+        if (!student_id || !fee_structure_id) {
+          logger.warn('Webhook fee_payment captured but missing notes metadata:', notes);
+          return res.status(200).json({ success: true, message: 'Ignored: missing metadata notes.' });
         }
-      })();
+
+        // Check if payment already exists
+        const { data: existing } = await supabaseAdmin
+          .from('fee_payments')
+          .select('id')
+          .eq('transaction_id', transaction_id)
+          .maybeSingle();
+
+        if (existing) {
+          return res.status(200).json({ success: true, message: 'Payment already processed.' });
+        }
+
+        const { data: paymentRecord, error: insertError } = await supabaseAdmin
+          .from('fee_payments')
+          .insert({
+            institution_id,
+            student_id,
+            fee_structure_id,
+            amount_paid,
+            method: entity.method || 'UPI/Card',
+            transaction_id,
+            status: 'Completed',
+            receipt_url: `https://invoices.iris365.in/receipts/${transaction_id}.pdf`
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          logger.error('Failed to insert fee payment from webhook:', insertError);
+          return res.status(500).json({ success: false, error: 'Database error recording payment.' });
+        }
+
+        // Asynchronously compile receipt PDF and upload it
+        (async () => {
+          try {
+            const pdfBuffer = await generateFeeReceiptPDF(paymentRecord);
+            const fileName = `receipts/${transaction_id}.pdf`;
+            const receiptUrl = await uploadReportToSupabase(pdfBuffer, fileName);
+            await supabaseAdmin
+              .from('fee_payments')
+              .update({ receipt_url: receiptUrl })
+              .eq('id', paymentRecord.id);
+          } catch (pdfErr) {
+            logger.error('Failed generating webhook payment receipt:', pdfErr);
+          }
+        })();
+      } 
+      else if (type === 'canteen_topup') {
+        const { student_id, amount } = notes;
+        if (!student_id) {
+          logger.warn('Webhook canteen_topup captured but missing student_id:', notes);
+          return res.status(200).json({ success: true, message: 'Ignored: missing student_id.' });
+        }
+
+        // Check if transaction already processed
+        const { data: existingTx } = await supabaseAdmin
+          .from('wallet_transactions')
+          .select('id')
+          .eq('reference_type', 'topup')
+          .ilike('description', `%${transaction_id}%`)
+          .maybeSingle();
+
+        if (existingTx) {
+          return res.status(200).json({ success: true, message: 'Canteen topup already processed.' });
+        }
+
+        // Fetch student's canteen wallet
+        let { data: wallet } = await supabaseAdmin
+          .from('canteen_wallets')
+          .select('id, balance')
+          .eq('student_id', student_id)
+          .maybeSingle();
+
+        const topupAmount = Number(amount || amount_paid);
+        let newBalance = topupAmount;
+        if (wallet) {
+          newBalance += Number(wallet.balance);
+        }
+
+        const { data: updatedWallet, error: walletErr } = await supabaseAdmin
+          .from('canteen_wallets')
+          .upsert({
+            institution_id,
+            student_id,
+            balance: newBalance,
+            last_updated: new Date()
+          })
+          .select()
+          .single();
+
+        if (walletErr) {
+          logger.error('Failed to update canteen wallet from webhook:', walletErr);
+          return res.status(500).json({ success: false, error: 'Database error updating wallet.' });
+        }
+
+        await supabaseAdmin
+          .from('wallet_transactions')
+          .insert({
+            institution_id,
+            wallet_id: updatedWallet.id,
+            student_id,
+            type: 'credit',
+            amount: topupAmount,
+            reference_type: 'topup',
+            description: `Wallet top-up (Razorpay ID: ${transaction_id})`,
+            balance_after: newBalance
+          });
+      } 
+      else if (type === 'gym_membership') {
+        const { student_id, plan_id } = notes;
+        if (!student_id || !plan_id) {
+          logger.warn('Webhook gym_membership captured but missing notes metadata:', notes);
+          return res.status(200).json({ success: true, message: 'Ignored: missing metadata notes.' });
+        }
+
+        // Check if membership already exists
+        const { data: existingMember } = await supabaseAdmin
+          .from('gym_memberships')
+          .select('id')
+          .eq('transaction_id', transaction_id)
+          .maybeSingle();
+
+        if (existingMember) {
+          return res.status(200).json({ success: true, message: 'Gym membership already processed.' });
+        }
+
+        // Fetch plan details
+        const { data: plan, error: planErr } = await supabaseAdmin
+          .from('gym_membership_plans')
+          .select('*')
+          .eq('id', plan_id)
+          .single();
+
+        if (planErr || !plan) {
+          logger.error('Gym plan details not found for webhook:', planErr);
+          return res.status(404).json({ success: false, error: 'Plan details not found.' });
+        }
+
+        // Deactivate existing memberships
+        await supabaseAdmin
+          .from('gym_memberships')
+          .update({ status: 'expired' })
+          .eq('student_id', student_id)
+          .eq('status', 'active');
+
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setMonth(startDate.getMonth() + plan.duration_months);
+
+        const { error: insertErr } = await supabaseAdmin
+          .from('gym_memberships')
+          .insert({
+            institution_id,
+            student_id,
+            plan_id,
+            plan: plan.name,
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0],
+            amount_paid: plan.price,
+            transaction_id,
+            status: 'active',
+            is_frozen: false
+          });
+
+        if (insertErr) {
+          logger.error('Failed to record gym membership from webhook:', insertErr);
+          return res.status(500).json({ success: false, error: 'Database error recording membership.' });
+        }
+      } 
+      else if (type === 'event_registration') {
+        const { student_id, event_id, registration_id } = notes;
+
+        let regId = registration_id;
+        if (!regId && student_id && event_id) {
+          const { data: foundReg } = await supabaseAdmin
+            .from('event_registrations')
+            .select('id')
+            .eq('event_id', event_id)
+            .eq('student_id', student_id)
+            .eq('payment_status', 'Pending')
+            .maybeSingle();
+          regId = foundReg?.id;
+        }
+
+        if (!regId) {
+          logger.warn('Webhook event_registration captured but cannot identify registration:', notes);
+          return res.status(200).json({ success: true, message: 'Ignored: registration context not found.' });
+        }
+
+        const { error: regErr } = await supabaseAdmin
+          .from('event_registrations')
+          .update({
+            payment_status: 'Completed',
+            razorpay_order_id: entity.order_id || '',
+            razorpay_payment_id: transaction_id,
+            amount_paid
+          })
+          .eq('id', regId);
+
+        if (regErr) {
+          logger.error('Failed to update event registration from webhook:', regErr);
+          return res.status(500).json({ success: false, error: 'Database error updating event registration.' });
+        }
+      } else {
+        logger.warn('Webhook payment captured but did not match any known payment type:', notes);
+        return res.status(200).json({ success: true, message: 'Ignored: unknown or missing payment type.' });
+      }
     }
 
     return res.status(200).json({ success: true });

@@ -7,7 +7,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
-import { getFingerprintHash } from '../lib/auth-helpers';
+import { getFingerprintHash, normalizeRole } from '../lib/auth-helpers';
 
 export interface AuthenticatedUser {
   id: string;
@@ -47,6 +47,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
         const payloadBase64 = parts[1];
         const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
         const decoded = JSON.parse(payloadJson) as AuthenticatedUser;
+        if (decoded.role) {
+          decoded.role = normalizeRole(decoded.role);
+        }
         req.user = decoded;
         return next();
       } catch (err) {
@@ -56,6 +59,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+      if (decoded.role) {
+        decoded.role = normalizeRole(decoded.role);
+      }
       
       // Verify device fingerprint claim if present
       if (decoded.fingerprint) {

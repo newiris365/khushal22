@@ -96,15 +96,22 @@ export function getDynamicSupabaseClient(): SupabaseClient {
     if (!jwtSecret) {
       throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required!');
     }
+    let decodedClaims: any = null;
     let isBackendToken = false;
     if (token.startsWith('mock-sandbox')) {
       if (process.env.NODE_ENV === 'production') {
         throw new Error('CRITICAL SECURITY VIOLATION: Sandbox mock tokens are disabled in production.');
       }
       isBackendToken = true;
+      try {
+        const parts = token.split('.');
+        const payloadBase64 = parts[1];
+        const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+        decodedClaims = JSON.parse(payloadJson);
+      } catch (e) {}
     } else {
       try {
-        jwt.verify(token, jwtSecret);
+        decodedClaims = jwt.verify(token, jwtSecret);
         isBackendToken = true;
       } catch (e) {
         // Not a valid backend token
@@ -112,6 +119,20 @@ export function getDynamicSupabaseClient(): SupabaseClient {
     }
 
     if (isBackendToken) {
+      if (decodedClaims && decodedClaims.supabase_token) {
+        const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseServiceKey;
+        return createClient(supabaseUrl, anonKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false
+          },
+          global: {
+            headers: {
+              Authorization: `Bearer ${decodedClaims.supabase_token}`
+            }
+          }
+        });
+      }
       return _supabaseAdminInternal;
     }
 

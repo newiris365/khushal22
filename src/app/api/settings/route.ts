@@ -1,9 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+function getScopedSupabase(req: NextRequest): any {
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.replace('Bearer ', '');
+  const jwtSecret = process.env.JWT_SECRET;
+  
+  if (token && jwtSecret && token !== 'mock-sandbox-jwt-token-value') {
+    try {
+      const decodedClaims = jwt.verify(token, jwtSecret) as any;
+      if (decodedClaims && decodedClaims.supabase_token) {
+        return createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '', {
+          auth: { persistSession: false, autoRefreshToken: false },
+          global: { headers: { Authorization: `Bearer ${decodedClaims.supabase_token}` } }
+        });
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+  }
+  return createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
+}
 
 const ALL_FEATURES = [
   'dashboard', 'admissions', 'students', 'attendance', 'timetable',
@@ -43,7 +63,7 @@ function decodeJWT(token: string): Record<string, any> | null {
   return null;
 }
 
-async function resolveUserContext(userPayload: Record<string, any>): Promise<{ institutionId: string; role: string }> {
+async function resolveUserContext(userPayload: Record<string, any>, supabase: any): Promise<{ institutionId: string; role: string }> {
   if (userPayload.institution_id) {
     return { institutionId: userPayload.institution_id, role: userPayload.role || 'Student' };
   }
@@ -98,7 +118,8 @@ async function handleSettings(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
     }
 
-    const ctx = await resolveUserContext(userPayload);
+    const supabase = getScopedSupabase(req);
+    const ctx = await resolveUserContext(userPayload, supabase);
     if (!ctx.institutionId) {
       return NextResponse.json({ success: false, error: 'Missing institution context' }, { status: 400 });
     }

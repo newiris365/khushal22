@@ -1126,8 +1126,12 @@ try {
 
 export async function initiateWalletTopup(req: Request, res: Response) {
   try {
-    const { amount } = req.body;
+    const { amount, student_id } = req.body;
     if (!amount) return res.status(400).json({ success: false, error: 'Amount required.' });
+
+    const targetStudentId = student_id || req.user?.id;
+    if (!targetStudentId) return res.status(400).json({ success: false, error: 'student_id is required' });
+    const resolvedStudentId = await resolveStudentId(targetStudentId);
 
     const receipt = `topup_${Date.now()}`;
 
@@ -1135,7 +1139,13 @@ export async function initiateWalletTopup(req: Request, res: Response) {
       const order = await rzp.orders.create({
         amount: Math.round(Number(amount) * 100),
         currency: 'INR',
-        receipt
+        receipt,
+        notes: {
+          type: 'canteen_topup',
+          student_id: resolvedStudentId,
+          amount: String(amount),
+          institution_id: req.user?.institution_id || req.body.institution_id || ''
+        }
       });
       return res.status(200).json({
         success: true,

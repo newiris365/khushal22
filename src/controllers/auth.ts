@@ -97,7 +97,9 @@ export async function login(req: Request, res: Response) {
       institution_id: userProfile.institution_id,
       role: normalizedRole,
       email: userProfile.email,
-      fingerprint: fingerprintHash
+      fingerprint: fingerprintHash,
+      supabase_token: authData.session.access_token,
+      supabase_refresh_token: authData.session.refresh_token
     };
 
     // Generate stateless JWT valid for 15 minutes
@@ -211,7 +213,9 @@ export async function refresh(req: Request, res: Response) {
       institution_id: userProfile.institution_id,
       role: normalizedRole,
       email: userProfile.email,
-      fingerprint: fingerprintHash
+      fingerprint: fingerprintHash,
+      supabase_token: authData.session.access_token,
+      supabase_refresh_token: authData.session.refresh_token
     };
 
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });

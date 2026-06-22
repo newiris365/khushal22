@@ -508,7 +508,14 @@ export async function initiateMembershipPurchase(req: Request, res: Response) {
         const order = await rzp.orders.create({
           amount: Math.round(plan.price * 100), // in paise
           currency: 'INR',
-          receipt: `gym_membership_${plan_id}_${Date.now()}`
+          receipt: `gym_membership_${plan_id}_${Date.now()}`,
+          notes: {
+            type: 'gym_membership',
+            student_id,
+            plan_id,
+            amount: String(plan.price),
+            institution_id: req.user?.institution_id || ''
+          }
         });
         return res.status(200).json({
           success: true,

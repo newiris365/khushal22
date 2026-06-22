@@ -10,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 import logger from './logger';
 import { generatePDFKitFallback, uploadReportToSupabase } from '../services/pdfGenerator';
+import { generateRotatingQrToken } from '../controllers/campusCore';
 
 // Safeguard background tasks: skip database-dependent cron runs when Supabase is offline
 const originalSchedule = cron.schedule;
@@ -1153,6 +1154,20 @@ cron.schedule('* * * * *', async () => {
             .eq('id', session.id);
 
           logger.info(`Session ${session.id} auto-closed. ${absentRecords.length} students auto-marked absent.`);
+        } else {
+          // Verify if session has an active QR token
+          const { data: activeToken } = await supabaseAdmin
+            .from('qr_tokens')
+            .select('id')
+            .eq('session_id', session.id)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (!activeToken) {
+            logger.info(`QR Rotation: Generating new rotating QR token for active session ${session.id}`);
+            const rotateInterval = session.qr_rotate_interval || 5;
+            await generateRotatingQrToken(session.id, session.institution_id, rotateInterval);
+          }
         }
       }
     }

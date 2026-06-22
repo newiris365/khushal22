@@ -30,6 +30,7 @@ import hrRouter from './routes/hr';
 import permissionsRouter from './routes/permissions';
 import grievancesRouter from './routes/grievances';
 import attendanceEngineRouter from './services/attendanceEngine/routes';
+import notificationsRouter from './routes/notifications';
 import { initGateHardware } from './services/gateHardware';
 import { authMiddleware } from './middleware/auth';
 import { requireFeature } from './middleware/permissions';
@@ -338,6 +339,7 @@ app.use('/api/v1/permissions', permissionsRouter);
 app.use('/api/grievances', grievancesRouter);
 app.use('/api/v1/grievances', grievancesRouter);
 app.use('/api/v1/attendance-engine', attendanceEngineRouter);
+app.use('/api/v1/notifications', requireSupabaseOnline, notificationsRouter);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {

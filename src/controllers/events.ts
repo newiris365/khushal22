@@ -420,13 +420,28 @@ export async function initiateTicketPayment(req: Request, res: Response) {
 
     const amount = Math.round(event.ticket_price * 100); // paise
 
+    const { data: registration } = await supabaseAdmin
+      .from('event_registrations')
+      .select('id')
+      .eq('event_id', event_id)
+      .eq('student_id', student_id)
+      .eq('payment_status', 'Pending')
+      .maybeSingle();
+
     const razorpay = getRazorpay();
     if (razorpay) {
       const order = await razorpay.orders.create({
         amount,
         currency: 'INR',
         receipt: `evt_${event_id}_${student_id}`.slice(0, 40),
-        notes: { event_id, student_id, event_title: event.title }
+        notes: {
+          type: 'event_registration',
+          event_id,
+          student_id,
+          registration_id: registration?.id || '',
+          event_title: event.title,
+          institution_id: req.user?.institution_id || ''
+        }
       });
 
       return res.status(200).json({
