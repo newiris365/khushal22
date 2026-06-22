@@ -24,10 +24,10 @@ export default function WardenComplaintsPage() {
 
   // Mock staff list for assignment
   const staffMembers = [
-    { id: 'st1', name: 'Ramesh Kumar (Plumber)', role: 'plumbing' },
-    { id: 'st2', name: 'Sohan Lal (Electrician)', role: 'electrical' },
-    { id: 'st3', name: 'Vijay Singh (Carpenter)', role: 'maintenance' },
-    { id: 'st4', name: 'Mahesh Sen (Wi-Fi Admin)', role: 'internet' }
+    { id: 'b0000000-0000-0000-0000-000000000012', name: 'Jaswant Singh (Maintenance Supervisor)', role: 'maintenance' },
+    { id: 'b0000000-0000-0000-0000-000000000003', name: 'Alok Vyas (IT Support)', role: 'internet' },
+    { id: 'b0000000-0000-0000-0000-000000000004', name: 'Preeti Choudhary (Facilities)', role: 'plumbing' },
+    { id: 'b0000000-0000-0000-0000-000000000005', name: 'Amit Rathi (Electrical)', role: 'electrical' }
   ];
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function WardenComplaintsPage() {
 
   const loadComplaints = async () => {
     try {
-      const res = await apiGet('/hostel/complaints');
+      const res = await apiGet(`/hostel/complaints?t=${Date.now()}`);
       if (res.success) {
         setComplaints(res.complaints || []);
       } else {
@@ -46,7 +46,7 @@ export default function WardenComplaintsPage() {
       // Mock data fallbacks
       setComplaints([
         {
-          id: 'c1',
+          id: 'c0000000-0000-0000-0000-000000000001',
           title: 'Wi-Fi connection drops repeatedly',
           category: 'internet',
           description: 'The Wi-Fi router in the lobby keeps turning off. The signal inside B-304 is extremely weak.',
@@ -59,7 +59,7 @@ export default function WardenComplaintsPage() {
           hostel_rooms: { room_number: 'B-304' }
         },
         {
-          id: 'c2',
+          id: 'c0000000-0000-0000-0000-000000000002',
           title: 'Bathroom tap leakage',
           category: 'plumbing',
           description: 'The bathroom basin tap is dripping constantly, causing water wastage.',
@@ -170,7 +170,7 @@ export default function WardenComplaintsPage() {
   const filteredComplaints = complaints.filter(c => {
     if (filter === 'all') return true;
     if (filter === 'open') return c.status === 'open';
-    if (filter === 'assigned') return c.status === 'assigned';
+    if (filter === 'in_progress') return c.status === 'in_progress' || c.status === 'assigned';
     if (filter === 'resolved') return c.status === 'resolved';
     return true;
   });
@@ -208,17 +208,22 @@ export default function WardenComplaintsPage() {
 
         {/* Filters */}
         <div className="flex gap-2 mb-6">
-          {['all', 'open', 'assigned', 'resolved'].map(f => (
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'open', label: 'Open' },
+            { key: 'in_progress', label: 'In Progress' },
+            { key: 'resolved', label: 'Resolved' }
+          ].map(f => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-full text-xs font-bold capitalize transition-all ${
-                filter === f
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                filter === f.key
                   ? 'bg-[#6C2BD9] text-white shadow-md'
                   : 'bg-white/5 text-[#C4B5FD]/60 hover:bg-white/10'
               }`}
             >
-              {f}
+              {f.label}
             </button>
           ))}
         </div>
@@ -354,7 +359,7 @@ export default function WardenComplaintsPage() {
                   {comp.description}
                 </p>
 
-                {comp.status === 'open' && (
+                {(comp.status === 'open' || (comp.status === 'in_progress' && !comp.assigned_to)) && (
                   <div className="pt-3 border-t border-white/5 flex gap-2 justify-end">
                     <button
                       onClick={() => setAssigningComp(comp)}
@@ -365,13 +370,21 @@ export default function WardenComplaintsPage() {
                   </div>
                 )}
 
-                {comp.status === 'assigned' && (
+                {(comp.status === 'assigned' || comp.status === 'in_progress') && (
                   <div className="pt-3 border-t border-white/5 flex gap-2 justify-end">
+                    {!comp.assigned_to && (
+                      <button
+                        onClick={() => setAssigningComp(comp)}
+                        className="px-4 py-2 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold text-white transition-all shadow-md flex items-center gap-1.5"
+                      >
+                        <Wrench className="w-3.5 h-3.5" /> Assign Staff
+                      </button>
+                    )}
                     <button
                       onClick={() => setResolvingComp(comp)}
                       className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all shadow-md flex items-center gap-1.5"
                     >
-                      <CheckCircle className="w-3.5 h-3.5" /> Resolve Issue
+                      <CheckCircle className="w-3.5 h-3.5" /> Mark as Resolved
                     </button>
                   </div>
                 )}

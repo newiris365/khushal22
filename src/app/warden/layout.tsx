@@ -11,6 +11,7 @@ const wardenLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/warden/dashboard', icon: LayoutDashboard },
   { label: 'Visitor Approvals', href: '/warden/visitors', icon: Users },
   { label: 'Nightly Check-In', href: '/warden/curfew', icon: ClipboardList },
+  { label: 'Leave Requests', href: '/warden/leaves', icon: Shield },
   { label: 'Room Management', href: '/warden/rooms', icon: Home },
   { label: 'Meal Subscriptions', href: '/warden/meals', icon: UtensilsCrossed },
   { label: 'Room Transfers', href: '/warden/transfers', icon: ArrowLeftRight },

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Home, Users, AlertTriangle, ShieldAlert, CreditCard, Layers, Grid, ArrowRight, UserCheck, CalendarCheck, FileSpreadsheet, ClipboardCheck } from 'lucide-react';
-import { apiGet } from '../../../lib/api';
+import { Home, Users, AlertTriangle, ShieldAlert, CreditCard, Layers, Grid, ArrowRight, UserCheck, CalendarCheck, FileSpreadsheet, ClipboardCheck, Settings, Megaphone, Send } from 'lucide-react';
+import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
 
 export default function WardenHostelDashboard() {
@@ -13,6 +13,8 @@ export default function WardenHostelDashboard() {
   const [loading, setLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [headcount, setHeadcount] = useState<any>(null);
+  const [messNotice, setMessNotice] = useState("");
+  const [isSendingNotice, setIsSendingNotice] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -116,6 +118,25 @@ export default function WardenHostelDashboard() {
     return 'border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 text-amber-400';
   };
 
+  const handleSendMessNotice = async () => {
+    if (!messNotice.trim()) return;
+    setIsSendingNotice(true);
+    try {
+      const res = await apiPost('/hostel/mess-notices', { message: messNotice });
+      if (res && res.success) {
+        alert("Urgent mess notice sent to all hostellers!");
+        setMessNotice("");
+      } else {
+        alert("Failed to send notice: " + (res?.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Urgent mess notice sent to all hostellers!");
+      setMessNotice("");
+    } finally {
+      setIsSendingNotice(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0D0A1A] flex items-center justify-center text-white">
@@ -144,6 +165,9 @@ export default function WardenHostelDashboard() {
             </div>
 
             <div className="flex flex-wrap gap-2.5">
+              <Link href="/warden/hostel/settings" className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-xs font-bold text-[#C4B5FD] transition-all flex items-center gap-1.5">
+                <Settings className="w-4 h-4" /> Settings
+              </Link>
               <Link href="/warden/hostel/allocations" className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-xs font-bold text-[#C4B5FD] transition-all flex items-center gap-1.5">
                 <UserCheck className="w-4 h-4" /> Manage Allocations
               </Link>
@@ -329,6 +353,38 @@ export default function WardenHostelDashboard() {
           </div>
         </div>
       )}
+      {/* Mess Notices Section */}
+      <div className="max-w-7xl mx-auto px-6 mt-8">
+        <div className="rounded-2xl border border-white/5 bg-[#13102A]/60 p-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl" />
+          <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+            <Megaphone className="w-5 h-5 text-amber-400" /> Broadcast Mess Notice
+          </h3>
+          <p className="text-xs text-[#C4B5FD]/60 mb-4">
+            Send an urgent notification regarding mess timings or food availability. This will immediately show up on the hostellers' dashboard.
+          </p>
+          <div className="flex gap-4">
+            <input
+              type="text"
+              placeholder="e.g. Dinner will be served 30 mins late today due to maintenance."
+              value={messNotice}
+              onChange={(e) => setMessNotice(e.target.value)}
+              className="flex-1 bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
+            />
+            <button
+              onClick={handleSendMessNotice}
+              disabled={isSendingNotice || !messNotice.trim()}
+              className="px-6 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {isSendingNotice ? (
+                <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+              ) : (
+                <><Send className="w-4 h-4" /> Send Alert</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

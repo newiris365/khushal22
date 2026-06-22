@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Users, Phone, CheckCircle, ShieldCheck, Clock, FileText, Send, UserCheck, LogOut } from 'lucide-react';
+import { ArrowLeft, Users, Phone, CheckCircle, ShieldCheck, Clock, FileText, Send, UserCheck, LogOut, Check, X, ShieldAlert } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
 
@@ -133,6 +133,46 @@ export default function WardenVisitorsPage() {
     }
   };
 
+  const handleApprove = async (visitorId: string, approve: boolean) => {
+    try {
+      const res = await apiPost(`/hostel/visitors/${visitorId}/approve`, { approve });
+      if (res.success) {
+        setSuccessMsg(approve ? 'Visitor pass approved successfully.' : 'Visitor pass rejected.');
+        loadVisitors();
+      } else {
+        setErrorMsg(res.error || 'Failed to update pass.');
+      }
+    } catch {
+      setVisitors(
+        visitors.map(v =>
+          v.id === visitorId ? { ...v, is_approved: approve, status: approve ? 'approved' : 'rejected' } : v
+        )
+      );
+      setSuccessMsg(approve ? 'Visitor pass approved! (Mock)' : 'Visitor pass rejected! (Mock)');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
+
+  const handleCheckin = async (visitorId: string) => {
+    try {
+      const res = await apiPost(`/hostel/visitors/${visitorId}/checkin`, {});
+      if (res.success) {
+        setSuccessMsg('Visitor checked in successfully.');
+        loadVisitors();
+      } else {
+        setErrorMsg(res.error || 'Failed to check in.');
+      }
+    } catch {
+      setVisitors(
+        visitors.map(v =>
+          v.id === visitorId ? { ...v, status: 'inside', in_time: new Date().toISOString() } : v
+        )
+      );
+      setSuccessMsg('Visitor checked in successfully! (Mock)');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
+
   const handleCheckout = async (visitorId: string) => {
     try {
       const res = await apiPost(`/hostel/visitors/${visitorId}/checkout`, {});
@@ -148,6 +188,46 @@ export default function WardenVisitorsPage() {
       );
       setSuccessMsg('Visitor checked out successfully! (Mock)');
       setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'inside':
+        return <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'checked_out':
+        return <CheckCircle className="w-3.5 h-3.5 text-slate-400" />;
+      case 'approved':
+        return <CheckCircle className="w-3.5 h-3.5 text-[#A78BFA]" />;
+      case 'rejected':
+        return <X className="w-3.5 h-3.5 text-red-400" />;
+      default:
+        return <Clock className="w-3.5 h-3.5 text-amber-400" />;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'inside': return 'Inside Campus';
+      case 'checked_out': return 'Checked Out';
+      case 'approved': return 'Pre-Approved';
+      case 'rejected': return 'Rejected';
+      default: return 'Awaiting Warden Approval';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'inside':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'checked_out':
+        return 'bg-white/5 text-[#C4B5FD]/40 border-white/5';
+      case 'approved':
+        return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
+      case 'rejected':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      default:
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     }
   };
 
@@ -327,18 +407,13 @@ export default function WardenVisitorsPage() {
                     <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] text-[#C4B5FD]/50 font-mono">
                       {vis.relation || 'Guest'}
                     </span>
-                    {vis.status === 'inside' ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider">
-                        Inside Campus
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-white/5 text-[#C4B5FD]/40 border border-white/5 text-[9px] font-bold uppercase tracking-wider">
-                        Checked Out
-                      </span>
-                    )}
+                    <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${getStatusColor(vis.status)}`}>
+                      {getStatusIcon(vis.status)}
+                      {getStatusLabel(vis.status)}
+                    </span>
                   </div>
                   <p className="text-[10px] text-[#C4B5FD]/50">
-                    Host Student: <span className="font-semibold text-[#A78BFA]">{vis.students?.name} ({vis.students?.roll_number})</span>
+                    Host Student: <span className="font-semibold text-[#A78BFA]">{vis.students?.name || 'Sandbox Student'} ({vis.students?.roll_number || 'Sandbox Roll'})</span>
                   </p>
                   <p className="text-[10px] text-[#C4B5FD]/50">
                     Purpose: {vis.purpose} • ID: {vis.visitor_id_type} ({vis.visitor_id_number})
@@ -353,21 +428,53 @@ export default function WardenVisitorsPage() {
 
                   <div className="text-xs">
                     <p className="text-[#C4B5FD]/40 uppercase tracking-wider text-[9px] font-bold">In / Out Time</p>
-                    <p className="text-[10px] text-white mt-0.5 font-mono">In: {new Date(vis.in_time).toLocaleTimeString()}</p>
+                    {vis.in_time ? (
+                      <p className="text-[10px] text-white mt-0.5 font-mono">In: {new Date(vis.in_time).toLocaleTimeString()}</p>
+                    ) : (
+                      <p className="text-[10px] text-[#C4B5FD]/40 mt-0.5 font-mono italic">Not Checked In</p>
+                    )}
                     {vis.out_time && (
                       <p className="text-[10px] text-[#C4B5FD]/60 font-mono">Out: {new Date(vis.out_time).toLocaleTimeString()}</p>
                     )}
                   </div>
 
                   <div className="flex gap-2">
-                    <a
-                      href={`/api/v1/hostel/visitors/${vis.id}/gatepass`}
-                      target="_blank"
-                      className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-[#C4B5FD]/80 hover:text-white transition-all text-xs font-bold flex items-center gap-1"
-                      title="Download PDF Pass"
-                    >
-                      <FileText className="w-4 h-4" /> PDF Pass
-                    </a>
+                    {(vis.status === 'approved' || vis.status === 'inside' || vis.status === 'checked_out') && (
+                      <a
+                        href={`/api/v1/hostel/visitors/${vis.id}/gatepass`}
+                        target="_blank"
+                        className="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-[#C4B5FD]/80 hover:text-white transition-all text-xs font-bold flex items-center gap-1"
+                        title="Download PDF Pass"
+                      >
+                        <FileText className="w-4 h-4" /> PDF Pass
+                      </a>
+                    )}
+
+                    {vis.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprove(vis.id, false)}
+                          className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-xs font-bold text-red-400 transition-all flex items-center gap-1"
+                        >
+                          <X className="w-3.5 h-3.5" /> Reject
+                        </button>
+                        <button
+                          onClick={() => handleApprove(vis.id, true)}
+                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all flex items-center gap-1 shadow-md shadow-emerald-600/20"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Approve
+                        </button>
+                      </div>
+                    )}
+
+                    {vis.status === 'approved' && (
+                      <button
+                        onClick={() => handleCheckin(vis.id)}
+                        className="px-3 py-2 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold text-white transition-all flex items-center gap-1 shadow-md shadow-[#6C2BD9]/20"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" /> Check In
+                      </button>
+                    )}
 
                     {vis.status === 'inside' && (
                       <button

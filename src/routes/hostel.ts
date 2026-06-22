@@ -11,6 +11,7 @@ import {
   registerVisitor,
   approveVisitor,
   checkoutVisitor,
+  checkinVisitor,
   listVisitors,
   listInsideVisitors,
   listComplaints,
@@ -45,7 +46,14 @@ import {
   getWellnessTrends,
   getWellnessAlerts,
   getNightlyHeadcount,
-  getNightlyHeadcountAlerts
+  getNightlyHeadcountAlerts,
+  getHostelSettings,
+  saveHostelSettings,
+  markHostelAttendance,
+  getDailyHostelAttendance,
+  getLatestMessNotice,
+  broadcastMessNotice,
+  getOverview
 } from '../controllers/hostel';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -53,6 +61,9 @@ const router = Router();
 
 // Protect all routes
 router.use(authMiddleware);
+
+// ========== 0. OVERVIEW ==========
+router.get('/overview', requireRole(['Warden']), getOverview);
 
 // ========== 1. ROOMS & BLOCKS ==========
 router.get('/blocks', listBlocks);
@@ -67,9 +78,10 @@ router.put('/allocations/:id/vacate', requireRole(['Admin', 'SuperAdmin', 'Warde
 router.post('/allocations/:id/swap-request', requireRole(['Student', 'Warden', 'Staff', 'Admin']), requestRoomSwap);
 
 // ========== 3. VISITOR MANAGEMENT ==========
-router.post('/visitors', requireRole(['Security', 'Staff', 'Warden', 'Admin']), registerVisitor);
+router.post('/visitors', requireRole(['Student', 'Security', 'Staff', 'Warden', 'Admin']), registerVisitor);
 router.post('/visitors/:id/approve', requireRole(['Student', 'Warden', 'Staff', 'Admin']), approveVisitor);
 router.post('/visitors/:id/checkout', requireRole(['Security', 'Staff', 'Warden', 'Admin']), checkoutVisitor);
+router.post('/visitors/:id/checkin', requireRole(['Security', 'Staff', 'Warden', 'Admin']), checkinVisitor);
 router.get('/visitors', listVisitors);
 router.get('/visitors/inside', listInsideVisitors);
 
@@ -81,10 +93,10 @@ router.put('/complaints/:id/status', requireRole(['Warden', 'Staff', 'Admin', 'S
 router.post('/complaints/:id/rate', requireRole(['Student']), rateComplaintResolution);
 
 // ========== 5. LEAVE REQUESTS ==========
-router.post('/leave-requests', requireRole(['Student']), applyLeave);
-router.get('/leave-requests/student/:studentId', listStudentLeaves);
-router.get('/leave-requests', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), listAllLeaves);
-router.put('/leave-requests/:id/approve', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), approveLeave);
+router.post('/leaves', requireRole(['Student']), applyLeave);
+router.get('/leaves/student/:studentId', listStudentLeaves);
+router.get('/leaves', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), listAllLeaves);
+router.put('/leaves/:id/approve', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), approveLeave);
 
 // ========== 6. HOSTEL FEES ==========
 router.get('/fees', listFees);
@@ -127,5 +139,13 @@ router.get('/wellness/alerts', requireRole(['Warden', 'Staff', 'Admin', 'SuperAd
 // ========== 14. NIGHTLY HEADCOUNT ==========
 router.get('/headcount', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), getNightlyHeadcount);
 router.get('/headcount/alerts', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), getNightlyHeadcountAlerts);
+
+// ========== 15. SETTINGS, ATTENDANCE & MESS NOTICES ==========
+router.get('/settings', getHostelSettings);
+router.post('/settings', requireRole(['Warden', 'Admin', 'SuperAdmin']), saveHostelSettings);
+router.post('/attendance/mark', requireRole(['Student']), markHostelAttendance);
+router.get('/attendance/today', requireRole(['Warden', 'Admin', 'SuperAdmin']), getDailyHostelAttendance);
+router.get('/mess-notices/latest', getLatestMessNotice);
+router.post('/mess-notices', requireRole(['Warden', 'Admin', 'SuperAdmin']), broadcastMessNotice);
 
 export default router;

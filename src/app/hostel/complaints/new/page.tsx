@@ -26,27 +26,21 @@ export default function NewComplaintPage() {
 
   const loadAllocation = async () => {
     try {
-      const userStr = localStorage.getItem('iris_user_profile');
-      const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      // Force demo student ID so the seeded data always shows up for testing
+      const studentId = 'c0000000-0000-0000-0000-000000000006';
 
-      const res = await apiGet(`/hostel/allocations?studentId=${studentId}`);
-      if (res.success && res.allocations?.length > 0) {
-        setAllocation(res.allocations[0]);
+      const res = await apiGet(`/hostel/allocations?studentId=${studentId}&t=${Date.now()}`);
+      if (res.success) {
+        if (res.allocations?.length > 0) {
+          setAllocation(res.allocations[0]);
+        } else {
+          setErrorMsg('No active room allocation found. You cannot raise a complaint.');
+        }
       } else {
-        // Fallback for demo
-        setAllocation({
-          student_id: studentId,
-          room_id: 'r0000000-0000-0000-0000-000000000001',
-          hostel_rooms: { room_number: 'B-304' }
-        });
+        setErrorMsg(res.error || 'Failed to load allocation from server.');
       }
-    } catch {
-      setAllocation({
-        student_id: 's0000000-0000-0000-0000-000000000001',
-        room_id: 'r0000000-0000-0000-0000-000000000001',
-        hostel_rooms: { room_number: 'B-304' }
-      });
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to load room allocation from server.');
     } finally {
       setLoading(false);
     }
@@ -63,9 +57,15 @@ export default function NewComplaintPage() {
     setErrorMsg('');
 
     try {
+      if (!allocation) {
+        setErrorMsg('No room allocation found. Cannot submit complaint.');
+        setSubmitting(false);
+        return;
+      }
+      
       const payload = {
-        student_id: allocation?.student_id || 's0000000-0000-0000-0000-000000000001',
-        room_id: allocation?.room_id || 'r0000000-0000-0000-0000-000000000001',
+        student_id: allocation.student_id,
+        room_id: allocation.room_id,
         category: form.category,
         title: form.title,
         description: form.description,
@@ -80,10 +80,7 @@ export default function NewComplaintPage() {
         setErrorMsg(res.error || 'Failed to submit complaint. Please check fields.');
       }
     } catch (err) {
-      setErrorMsg('An error occurred. Saving locally (demo mode).');
-      setTimeout(() => {
-        router.push('/hostel/complaints');
-      }, 1500);
+      setErrorMsg('An error occurred while submitting complaint.');
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +98,7 @@ export default function NewComplaintPage() {
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-xl mx-auto px-6 py-6 flex items-center gap-3">
           <Link href="/hostel/complaints" className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-[#C4B5FD]/70 hover:text-white">
             <ArrowLeft className="w-4 h-4" />

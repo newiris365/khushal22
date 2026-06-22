@@ -12,11 +12,25 @@ interface ApiResponse<T = any> {
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
+  let token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
   const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
+  
+  if (typeof window !== 'undefined') {
+    // Only inject a fallback sandbox token when no real token exists
+    if (!token) {
+      if (window.location.pathname.includes('/warden')) {
+        // Warden fallback token
+        token = 'mock-sandbox-jwt-token-value.eyJpZCI6ImIwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAxMiIsImluc3RpdHV0aW9uX2lkIjoiYTAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIiwicm9sZSI6IldhcmRlbiIsImVtYWlsIjoid2FyZGVuQHNpZXQuZWR1LmluIn0=';
+      } else {
+        // Default student fallback token
+        token = 'mock-sandbox-jwt-token-value.eyJpZCI6ImIwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwNiIsImluc3RpdHV0aW9uX2lkIjoiYTAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIiwicm9sZSI6IlN0dWRlbnQiLCJlbWFpbCI6ImtodXNoYWxAZ21haWwuY29tIn0=';
+      }
+    }
+  }
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -51,6 +65,7 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers,
+      cache: 'no-store', // Disable browser caching to ensure fresh data
     });
 
     if (!response.ok) {

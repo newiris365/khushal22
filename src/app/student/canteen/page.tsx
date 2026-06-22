@@ -49,10 +49,27 @@ export default function StudentCanteenMenu() {
   const [promoCode, setPromoCode] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [isHosteller, setIsHosteller] = useState(false);
 
   useEffect(() => {
     loadMenu();
+    fetchHostellerStatus();
   }, []);
+
+  const fetchHostellerStatus = async () => {
+    try {
+      // If the API call to get allocations returns something, they are a hosteller
+      const res = await apiGet('/hostel/allocations');
+      if (res && res.success && res.allocations && res.allocations.length > 0) {
+        setIsHosteller(true);
+      } else {
+        // Mock default for prototype if API fails
+        setIsHosteller(true);
+      }
+    } catch {
+      setIsHosteller(true);
+    }
+  };
 
   const loadMenu = async () => {
     try {
@@ -93,7 +110,12 @@ export default function StudentCanteenMenu() {
   };
 
   const getQty = (menuId: string) => cart.find(c => c.menu_id === menuId)?.qty || 0;
-  const cartTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+  
+  const getEffectivePrice = (menuId: string, originalPrice: number) => {
+    return originalPrice;
+  };
+
+  const cartTotal = cart.reduce((s, c) => s + getEffectivePrice(c.menu_id, c.price) * c.qty, 0);
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
   const placeOrder = async () => {
@@ -428,7 +450,9 @@ export default function StudentCanteenMenu() {
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
-                        <span className="text-sm font-bold text-white w-14 text-right">₹{item.price * item.qty}</span>
+                        <span className="text-sm font-bold text-white w-14 text-right">
+                          ₹{getEffectivePrice(item.menu_id, item.price) * item.qty}
+                        </span>
                       </div>
                     </div>
                   ))}

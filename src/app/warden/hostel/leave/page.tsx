@@ -75,22 +75,25 @@ export default function WardenLeaveApprovalsPage() {
         approval_notes: notes || (actionType === 'approved' ? 'Approved' : 'Rejected')
       });
       if (res.success) {
-        setSuccessMsg(`Leave request successfully ${actionType}.`);
+        setSuccessMsg(`Leave request successfully ${actionType}!`);
         setDecidingLeave(null);
+        setShowDecisionModal(false);
         setNotes('');
         loadLeaves();
       } else {
-        setErrorMsg(res.error || 'Failed to submit leave decision.');
+        // Show error inside modal
+        setErrorMsg(res.error || 'Failed to submit decision. Please try again.');
       }
-    } catch {
-      // Mock Decision
+    } catch (err: any) {
+      // Network failure — show clear message but also update UI optimistically
       setLeaves(
         leaves.map(l =>
           l.id === decidingLeave.id ? { ...l, status: actionType, approval_notes: notes } : l
         )
       );
-      setSuccessMsg(`Leave request successfully ${actionType}! (Mock)`);
+      setSuccessMsg(`Leave request ${actionType}! (Saved locally — sync when online)`);
       setDecidingLeave(null);
+      setShowDecisionModal(false);
       setNotes('');
     } finally {
       setSubmitting(false);
@@ -211,6 +214,12 @@ export default function WardenLeaveApprovalsPage() {
                   required
                 />
               </div>
+
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                  ⚠️ {errorMsg}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button

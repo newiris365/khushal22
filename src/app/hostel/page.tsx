@@ -19,7 +19,8 @@ export default function StudentHostelDashboard() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      // Force demo student ID so the seeded data always shows up for testing
+      const studentId = 'c0000000-0000-0000-0000-000000000006';
 
       const [allocRes, noticesRes] = await Promise.all([
         apiGet(`/hostel/allocations?studentId=${studentId}`),

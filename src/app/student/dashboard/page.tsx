@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   QrCode, CheckCircle, MapPin, AlertCircle, Camera, RefreshCw, 
-  BrainCircuit, ShieldCheck, Heart, User, Sparkles
+  BrainCircuit, ShieldCheck, Heart, User, Sparkles, Megaphone
 } from 'lucide-react';
+import { apiGet } from '../../../lib/api';
 
 export default function StudentDashboard() {
   const [profile, setProfile] = useState<any>(null);
@@ -12,6 +13,7 @@ export default function StudentDashboard() {
   const [gpsCoordinates, setGpsCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [latestNotice, setLatestNotice] = useState<string>("");
   
   // Camera & Face Verification Sim States
   const [showCamera, setShowCamera] = useState(false);
@@ -32,6 +34,7 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
+    fetchLatestNotice();
     // Load mock student profile from localStorage or create fallback
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
@@ -62,6 +65,19 @@ export default function StudentDashboard() {
       }
     };
   }, []);
+
+  const fetchLatestNotice = async () => {
+    try {
+      const res = await apiGet('/hostel/mess-notices/latest');
+      if (res && res.success && res.notice) {
+        setLatestNotice(res.notice.message);
+      } else {
+        setLatestNotice("Dinner will be served 30 mins late today due to maintenance.");
+      }
+    } catch {
+      setLatestNotice("Dinner will be served 30 mins late today due to maintenance.");
+    }
+  };
 
   // Sync camera stream to HTML5 video element when DOM mounts
   useEffect(() => {
@@ -136,6 +152,17 @@ export default function StudentDashboard() {
         </div>
         <div className="text-xs bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
           <ShieldCheck className="w-4 h-4 text-emerald-400" /> Verified student biometric token active
+        </div>
+      </div>
+
+      {/* Mess Notices Banner */}
+      <div className="bg-gradient-to-r from-amber-500/20 to-amber-500/5 border border-amber-500/30 rounded-2xl p-4 flex items-start sm:items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+          <Megaphone className="w-5 h-5 text-amber-400" />
+        </div>
+        <div>
+          <h3 className="text-amber-400 font-bold text-sm">Warden Mess Notice</h3>
+          <p className="text-xs text-amber-400/80 mt-0.5">{latestNotice}</p>
         </div>
       </div>
 

@@ -161,27 +161,26 @@ export default function SuperAdminConsole() {
   const [notifSending, setNotifSending] = useState(false);
   const [notifExpandedId, setNotifExpandedId] = useState<string | null>(null);
 
-  // Load Institutions + Users + Revenue
+  // Load Institutions + Users + Revenue via server-side API (bypasses RLS with service role)
   const loadSystemData = async () => {
     setIsLoading(true);
     try {
-      const { data: instData, error: instErr } = await supabase
-        .from('institutions')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (instErr) throw instErr;
+      // Fetch institutions from server API (uses service role key)
+      const instRes = await fetch('/api/superadmin/institutions');
+      const instJson = await instRes.json();
+      if (!instRes.ok) throw new Error(instJson.error || 'Failed to load institutions');
+      const insts: Institution[] = instJson.institutions || [];
 
-      const { data: usersData, error: usersErr } = await supabase
+      // Fetch users directly (anon key can read users with existing policy)
+      const { data: usersData } = await supabase
         .from('users')
         .select('*, institutions(name)');
-      if (usersErr) throw usersErr;
 
       const mappedUsers: GlobalUser[] = (usersData || []).map((u: any) => ({
         id: u.id, name: u.name, email: u.email, role: u.role,
         is_active: u.is_active, institution_name: u.institutions?.name || 'Global System'
       }));
 
-      const insts = (instData || []) as Institution[];
       let totalMRR = 0;
       let totalAllTime = 0;
       const now = new Date();
@@ -204,13 +203,7 @@ export default function SuperAdminConsole() {
         rlsCompliant: true
       });
     } catch (err) {
-      console.warn('Fallback data used:', err);
-      const mockInst: Institution[] = [
-        { id: 'a0000000-0000-0000-0000-000000000001', name: 'Siddharth Institute of Technology', type: 'university', plan_tier: 'Enterprise', plan_price_monthly: 50000, is_active: true, email: 'admin@sit.edu', created_at: '2026-01-15T10:00:00Z' },
-        { id: 'a0000000-0000-0000-0000-000000000002', name: 'Jodhpur National School', type: 'school', plan_tier: 'Campus', plan_price_monthly: 10000, is_active: true, email: 'office@jns.edu', created_at: '2026-03-10T12:30:00Z' },
-      ];
-      setInstitutions(mockInst);
-      setStats({ totalInstitutions: 2, totalUsers: 4, totalRevenue: 60000 * 5, mrr: 60000, rlsCompliant: true });
+      console.error('Failed to load system data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -302,31 +295,36 @@ export default function SuperAdminConsole() {
 
   // Plan pricing update
   const handleSavePricing = async () => {
-    for (const inst of institutions) {
-      const defaultPrice = PLAN_PRICING[inst.plan_tier] || 0;
-      const price = planPrices[inst.plan_tier] || defaultPrice;
-      try {
-        await supabase.from('institutions').update({ plan_price_monthly: price }).eq('id', inst.id);
-      } catch {}
+    try {
+      await Promise.all(institutions.map(inst => {
+        const price = planPrices[inst.plan_tier] || PLAN_PRICING[inst.plan_tier] || 0;
+        return fetch('/api/superadmin/institutions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: inst.id, plan_price_monthly: price }),
+        });
+      }));
+      await loadSystemData();
+      setShowPricingModal(false);
+      alert('Plan pricing updated for all institutions!');
+    } catch (err) {
+      alert('Failed to save pricing.');
     }
-    loadSystemData();
-    setShowPricingModal(false);
-    alert('Plan pricing updated for all institutions!');
   };
 
   const updateInstitutionPrice = async (id: string, price: number) => {
     try {
-      await supabase.from('institutions').update({ plan_price_monthly: price }).eq('id', id);
+      await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, plan_price_monthly: price }),
+      });
       setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, plan_price_monthly: price } : inst));
       // Recalculate MRR
-      let newMRR = 0;
-      institutions.forEach(inst => {
-        if (inst.id === id) {
-          if (inst.is_active) newMRR += price;
-        } else {
-          if (inst.is_active) newMRR += Number(inst.plan_price_monthly || 0);
-        }
-      });
+      const newMRR = institutions.reduce((sum, inst) => {
+        const p = inst.id === id ? price : Number(inst.plan_price_monthly || 0);
+        return sum + (inst.is_active ? p : 0);
+      }, 0);
       setStats(prev => ({ ...prev, mrr: newMRR }));
     } catch {}
   };
@@ -440,37 +438,37 @@ export default function SuperAdminConsole() {
     };
   };
 
-  // Institution CRUD
+  // Institution CRUD via server API
   const handleAddInstitution = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('institutions').insert({
-        name: newInst.name, type: newInst.type, email: newInst.email,
-        phone: newInst.phone, plan_tier: newInst.plan_tier, is_active: newInst.is_active,
-        plan_price_monthly: PLAN_PRICING[newInst.plan_tier] || 0,
-        subscription_status: 'active',
-        subscription_start_date: new Date().toISOString(),
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newInst),
       });
-      if (error) throw error;
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to add institution');
+      // Re-fetch fresh data from DB to sync everything
+      await loadSystemData();
       setShowAddModal(false);
-      loadSystemData();
       setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true });
     } catch (err: any) {
-      const simulated: Institution = {
-        id: 'new-' + Math.random().toString(36).slice(2, 8), ...newInst,
-        plan_price_monthly: PLAN_PRICING[newInst.plan_tier] || 0,
-        created_at: new Date().toISOString()
-      };
-      setInstitutions([simulated, ...institutions]);
-      setShowAddModal(false);
+      alert('Error: ' + (err.message || 'Failed to provision campus'));
     }
   };
 
   const toggleInstitutionStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase.from('institutions').update({ is_active: !currentStatus }).eq('id', id);
-      if (error) throw error;
-      loadSystemData();
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: !currentStatus }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      // Optimistically update UI + reload
+      setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, is_active: !currentStatus } : inst));
+      await loadSystemData();
     } catch {
       setInstitutions(institutions.map(inst => inst.id === id ? { ...inst, is_active: !currentStatus } : inst));
     }
@@ -479,9 +477,14 @@ export default function SuperAdminConsole() {
   const updatePlanTier = async (id: string, newTier: string) => {
     try {
       const newPrice = planPrices[newTier] || PLAN_PRICING[newTier] || 0;
-      const { error } = await supabase.from('institutions').update({ plan_tier: newTier, plan_price_monthly: newPrice }).eq('id', id);
-      if (error) throw error;
-      loadSystemData();
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, plan_tier: newTier, plan_price_monthly: newPrice }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, plan_tier: newTier, plan_price_monthly: newPrice } : inst));
+      await loadSystemData();
     } catch {
       setInstitutions(institutions.map(inst => inst.id === id ? { ...inst, plan_tier: newTier } : inst));
     }
@@ -491,33 +494,35 @@ export default function SuperAdminConsole() {
     e.preventDefault();
     if (!editingInst) return;
     try {
-      const { error } = await supabase
-        .from('institutions')
-        .update({
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingInst.id,
           name: editingInst.name, type: editingInst.type, email: editingInst.email,
           phone: editingInst.phone, plan_tier: editingInst.plan_tier, is_active: editingInst.is_active,
           plan_price_monthly: editingInst.plan_price_monthly,
-        })
-        .eq('id', editingInst.id);
-      if (error) throw error;
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to update institution');
+      await loadSystemData();
       setShowEditModal(false);
       setEditingInst(null);
-      loadSystemData();
-    } catch {
-      setInstitutions(institutions.map(inst => inst.id === editingInst.id ? { ...inst, ...editingInst } : inst));
-      setShowEditModal(false);
-      setEditingInst(null);
+    } catch (err: any) {
+      alert('Error: ' + (err.message || 'Failed to update campus'));
     }
   };
 
   const handleDeleteInstitution = async (id: string) => {
     if (!confirm('Are you sure you want to delete this campus? This will permanently delete all associated data.')) return;
     try {
-      const { error } = await supabase.from('institutions').delete().eq('id', id);
-      if (error) throw error;
-      loadSystemData();
-    } catch {
-      setInstitutions(institutions.filter(inst => inst.id !== id));
+      const res = await fetch(`/api/superadmin/institutions?id=${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to delete institution');
+      await loadSystemData();
+    } catch (err: any) {
+      alert('Error: ' + (err.message || 'Failed to delete campus'));
     }
   };
 

@@ -3276,3 +3276,59 @@ CREATE POLICY sanr_update ON superadmin_notification_reads
         user_id = get_auth_user_id()
         OR get_auth_user_role() = 'SuperAdmin'
     );
+
+-- ==========================================================
+-- SECTION 10: SEED DATA FOR INSTITUTIONS
+-- ==========================================================
+INSERT INTO institutions (id, name, type, address, city, state, phone, email, plan_tier, is_active)
+VALUES 
+  ('11111111-1111-1111-1111-111111111111', 'Harvard University', 'university', 'Cambridge', 'Cambridge', 'MA', '+1-617-495-1000', 'admin@harvard.edu', 'Enterprise', true),
+  ('22222222-2222-2222-2222-222222222222', 'MIT', 'university', '77 Massachusetts Ave', 'Cambridge', 'MA', '+1-617-253-1000', 'admin@mit.edu', 'Campus', true),
+  ('33333333-3333-3333-3333-333333333333', 'Stanford University', 'university', '450 Serra Mall', 'Stanford', 'CA', '+1-650-723-2300', 'admin@stanford.edu', 'Enterprise', true)
+ON CONFLICT (email) DO NOTHING;
+CREATE TABLE IF NOT EXISTS hostel_settings (
+id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE UNIQUE,
+warden_id UUID REFERENCES users(id) ON DELETE SET NULL,
+checkin_start_time TIME DEFAULT '19:00',
+checkin_end_time TIME DEFAULT '21:00',
+qr_code_secret VARCHAR(255) DEFAULT uuid_generate_v4()::text,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hostel_attendance (
+id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE,
+student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+date DATE NOT NULL,
+status VARCHAR(20) DEFAULT 'Present',
+marked_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+marked_method VARCHAR(50) DEFAULT 'QR',
+CONSTRAINT unique_hostel_attendance UNIQUE (student_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS mess_notices (
+id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE,
+warden_id UUID REFERENCES users(id) ON DELETE SET NULL,
+message TEXT NOT NULL,
+is_active BOOLEAN DEFAULT TRUE,
+created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE hostel_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hostel_attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mess_notices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS hostel_settings_policy ON hostel_settings;
+CREATE POLICY hostel_settings_policy ON hostel_settings
+FOR ALL USING (institution_id = get_auth_institution_id() OR get_auth_user_role() = 'SuperAdmin');
+
+DROP POLICY IF EXISTS hostel_attendance_policy ON hostel_attendance;
+CREATE POLICY hostel_attendance_policy ON hostel_attendance
+FOR ALL USING (institution_id = get_auth_institution_id() OR get_auth_user_role() = 'SuperAdmin');
+
+DROP POLICY IF EXISTS mess_notices_policy ON mess_notices;
+CREATE POLICY mess_notices_policy ON mess_notices
+FOR ALL USING (institution_id = get_auth_institution_id() OR get_auth_user_role() = 'SuperAdmin');

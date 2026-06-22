@@ -17,45 +17,18 @@ export default function StudentComplaintsPage() {
 
   const loadComplaints = async () => {
     try {
-      const userStr = localStorage.getItem('iris_user_profile');
-      const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      // Force demo student ID so the seeded data always shows up for testing
+      const studentId = 'c0000000-0000-0000-0000-000000000006';
 
-      const res = await apiGet(`/hostel/complaints?studentId=${studentId}`);
+      const res = await apiGet(`/hostel/complaints?studentId=${studentId}&t=${Date.now()}`);
       if (res.success) {
         setComplaints(res.complaints || []);
       } else {
         throw new Error('API Error');
       }
-    } catch {
-      // Mock data fallbacks
-      setComplaints([
-        {
-          id: 'c1',
-          title: 'Wi-Fi connection drops repeatedly',
-          category: 'internet',
-          description: 'The Wi-Fi router in the lobby keeps turning off. The signal inside B-304 is extremely weak.',
-          priority: 'high',
-          status: 'assigned',
-          created_at: '2026-06-08T09:30:00Z',
-          resolution_notes: null,
-          student_rating: null,
-          hostel_rooms: { room_number: 'B-304' }
-        },
-        {
-          id: 'c2',
-          title: 'Bathroom tap leakage',
-          category: 'plumbing',
-          description: 'The bathroom basin tap is dripping constantly, causing water wastage.',
-          priority: 'medium',
-          status: 'resolved',
-          created_at: '2026-06-05T14:20:00Z',
-          resolved_at: '2026-06-07T11:00:00Z',
-          resolution_notes: 'Replaced washers in tap valve assembly.',
-          student_rating: 4,
-          hostel_rooms: { room_number: 'B-304' }
-        }
-      ]);
+    } catch (err: any) {
+      console.error(err);
+      showToast('Failed to load complaints from server');
     } finally {
       setLoading(false);
     }
@@ -69,9 +42,7 @@ export default function StudentComplaintsPage() {
         showToast('Rating submitted successfully!');
       }
     } catch {
-      // Mock rating
-      setComplaints(complaints.map(c => c.id === complaintId ? { ...c, student_rating: rating } : c));
-      showToast('Rating submitted! (Mock)');
+      showToast('Failed to submit rating to server');
     }
   };
 
@@ -123,7 +94,7 @@ export default function StudentComplaintsPage() {
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-4xl mx-auto px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/hostel" className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-[#C4B5FD]/70 hover:text-white">
@@ -203,6 +174,36 @@ export default function StudentComplaintsPage() {
                 <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">
                   {comp.description}
                 </p>
+
+                {/* Status Progress Tracker for active complaints */}
+                {(comp.status === 'assigned' || comp.status === 'in_progress') && (
+                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/15 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-400" />
+                      <p className="text-[10px] text-amber-400 font-bold uppercase">
+                        {comp.status === 'assigned' ? 'Staff Assigned — Work Pending' : 'Work In Progress'}
+                      </p>
+                    </div>
+                    {/* Progress Steps */}
+                    <div className="flex items-center gap-1 ml-1">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
+                      <div className="flex-1 h-0.5 bg-emerald-400" />
+                      <div className={`w-2.5 h-2.5 rounded-full ring-2 ${comp.status === 'in_progress' ? 'bg-amber-400 ring-amber-400/30' : 'bg-white/10 ring-white/5'}`} />
+                      <div className={`flex-1 h-0.5 ${comp.status === 'in_progress' ? 'bg-amber-400' : 'bg-white/10'}`} />
+                      <div className="w-2.5 h-2.5 rounded-full bg-white/10 ring-2 ring-white/5" />
+                    </div>
+                    <div className="flex justify-between text-[8px] text-[#C4B5FD]/40 font-semibold uppercase">
+                      <span className="text-emerald-400">Reported</span>
+                      <span className={comp.status === 'in_progress' ? 'text-amber-400' : ''}>
+                        {comp.status === 'assigned' ? 'Assigned' : 'In Progress'}
+                      </span>
+                      <span>Resolved</span>
+                    </div>
+                    <p className="text-[10px] text-[#C4B5FD]/60 mt-1">
+                      Your complaint is being handled by the hostel maintenance team. You&apos;ll be notified when it&apos;s resolved.
+                    </p>
+                  </div>
+                )}
 
                 {comp.status === 'resolved' && (
                   <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-3">

@@ -1,9 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, Send, ShieldAlert, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Send, CheckCircle, Clock, XCircle, Stethoscope, Home, BookOpen, Users, AlertCircle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
+
+const LEAVE_TYPES = [
+  { value: 'personal', label: 'Personal', icon: Home, color: 'text-blue-400' },
+  { value: 'medical', label: 'Medical', icon: Stethoscope, color: 'text-red-400' },
+  { value: 'family_emergency', label: 'Family Emergency', icon: Users, color: 'text-orange-400' },
+  { value: 'academic', label: 'Academic', icon: BookOpen, color: 'text-purple-400' },
+  { value: 'other', label: 'Other', icon: AlertCircle, color: 'text-slate-400' },
+];
 
 export default function StudentLeavePage() {
   const [leaves, setLeaves] = useState<any[]>([]);
@@ -13,6 +21,7 @@ export default function StudentLeavePage() {
   const [successMsg, setSuccessMsg] = useState('');
 
   const [form, setForm] = useState({
+    leave_type: 'personal',
     leave_from: '',
     leave_to: '',
     reason: '',
@@ -28,7 +37,7 @@ export default function StudentLeavePage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || 'c0000000-0000-0000-0000-000000000006';
 
       const res = await apiGet(`/hostel/leaves/student/${studentId}`);
       if (res.success) {
@@ -41,9 +50,10 @@ export default function StudentLeavePage() {
       setLeaves([
         {
           id: 'l1',
+          leave_type: 'family_emergency',
           leave_from: '2026-06-12',
           leave_to: '2026-06-15',
-          reason: 'Sister\'s marriage ceremony in hometown',
+          reason: "Sister's marriage ceremony in hometown",
           destination: 'Jaipur, Rajasthan',
           parent_consent: true,
           status: 'pending',
@@ -52,6 +62,7 @@ export default function StudentLeavePage() {
         },
         {
           id: 'l2',
+          leave_type: 'medical',
           leave_from: '2026-05-20',
           leave_to: '2026-05-24',
           reason: 'Severe illness and home recovery recommended by doctor',
@@ -73,6 +84,10 @@ export default function StudentLeavePage() {
       setErrorMsg('Please enter outbound/inbound dates and a valid reason.');
       return;
     }
+    if (new Date(form.leave_to) < new Date(form.leave_from)) {
+      setErrorMsg('Return date cannot be before departure date.');
+      return;
+    }
 
     setSubmitting(true);
     setErrorMsg('');
@@ -81,7 +96,7 @@ export default function StudentLeavePage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || 'c0000000-0000-0000-0000-000000000006';
 
       const payload = {
         student_id: studentId,
@@ -90,8 +105,8 @@ export default function StudentLeavePage() {
 
       const res = await apiPost('/hostel/leaves', payload);
       if (res.success) {
-        setSuccessMsg('Leave request submitted successfully!');
-        setForm({ leave_from: '', leave_to: '', reason: '', destination: '', parent_consent: false });
+        setSuccessMsg('Leave request submitted successfully! The warden will review your application.');
+        setForm({ leave_type: 'personal', leave_from: '', leave_to: '', reason: '', destination: '', parent_consent: false });
         loadLeaves();
       } else {
         setErrorMsg(res.error || 'Failed to submit leave request.');
@@ -100,6 +115,7 @@ export default function StudentLeavePage() {
       // Mock submission
       const newLeave = {
         id: 'mock-' + Math.random(),
+        leave_type: form.leave_type,
         leave_from: form.leave_from,
         leave_to: form.leave_to,
         reason: form.reason,
@@ -110,8 +126,8 @@ export default function StudentLeavePage() {
         created_at: new Date().toISOString()
       };
       setLeaves([newLeave, ...leaves]);
-      setSuccessMsg('Leave request submitted successfully! (Mock Mode)');
-      setForm({ leave_from: '', leave_to: '', reason: '', destination: '', parent_consent: false });
+      setSuccessMsg('Leave request submitted! (Demo Mode — Will sync when backend is online)');
+      setForm({ leave_type: 'personal', leave_from: '', leave_to: '', reason: '', destination: '', parent_consent: false });
     } finally {
       setSubmitting(false);
     }
@@ -139,6 +155,10 @@ export default function StudentLeavePage() {
     }
   };
 
+  const getLeaveTypeConfig = (type: string) => {
+    return LEAVE_TYPES.find(t => t.value === type) || LEAVE_TYPES[4];
+  };
+
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24">
       {/* Header */}
@@ -163,7 +183,8 @@ export default function StudentLeavePage() {
           </h2>
 
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 mb-4">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 mb-4 flex items-center gap-2">
+              <XCircle className="w-4 h-4 flex-shrink-0" />
               {errorMsg}
             </div>
           )}
@@ -175,6 +196,31 @@ export default function StudentLeavePage() {
           )}
 
           <form onSubmit={handleSubmit} className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-6 space-y-5 shadow-xl">
+            {/* Leave Type Selector */}
+            <div>
+              <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Leave Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {LEAVE_TYPES.map(type => {
+                  const Icon = type.icon;
+                  return (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, leave_type: type.value })}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                        form.leave_type === type.value
+                          ? 'bg-[#6C2BD9]/20 border-[#6C2BD9]/50 text-white'
+                          : 'bg-[#0D0A1A] border-white/10 text-[#C4B5FD]/60 hover:border-white/20'
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 ${form.leave_type === type.value ? type.color : ''}`} />
+                      {type.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">From Date</label>
@@ -209,10 +255,16 @@ export default function StudentLeavePage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Reason for Leave</label>
+              <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">
+                Reason for Leave {form.leave_type === 'medical' && <span className="text-red-400 ml-1">(Attach medical docs at hostel office)</span>}
+              </label>
               <textarea
                 rows={3}
-                placeholder="Detailed reason for requesting hostel departure..."
+                placeholder={
+                  form.leave_type === 'medical'
+                    ? 'Describe your medical condition and doctor\'s recommendation...'
+                    : 'Detailed reason for requesting hostel departure...'
+                }
                 value={form.reason}
                 onChange={e => setForm({ ...form, reason: e.target.value })}
                 className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/20 focus:border-[#6C2BD9]/50 focus:outline-none transition-all resize-none"
@@ -262,47 +314,57 @@ export default function StudentLeavePage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {leaves.map((lv) => (
-                <div key={lv.id} className="rounded-2xl border border-white/5 bg-[#13102A]/60 p-5 space-y-4 shadow-lg">
-                  <div className="flex flex-wrap justify-between items-start gap-3 border-b border-white/5 pb-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                        <span>{new Date(lv.leave_from).toLocaleDateString()}</span>
-                        <span className="text-[#C4B5FD]/40">to</span>
-                        <span>{new Date(lv.leave_to).toLocaleDateString()}</span>
-                      </h4>
-                      <p className="text-[10px] text-[#C4B5FD]/50 mt-1">
-                        Applied on {new Date(lv.created_at || new Date()).toLocaleDateString()}
+              {leaves.map((lv) => {
+                const typeConfig = getLeaveTypeConfig(lv.leave_type);
+                const TypeIcon = typeConfig.icon;
+                return (
+                  <div key={lv.id} className="rounded-2xl border border-white/5 bg-[#13102A]/60 p-5 space-y-4 shadow-lg">
+                    <div className="flex flex-wrap justify-between items-start gap-3 border-b border-white/5 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 ${typeConfig.color}`}>
+                            <TypeIcon className="w-3 h-3" />
+                            {typeConfig.label}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                          <span>{new Date(lv.leave_from).toLocaleDateString('en-IN')}</span>
+                          <span className="text-[#C4B5FD]/40">to</span>
+                          <span>{new Date(lv.leave_to).toLocaleDateString('en-IN')}</span>
+                        </h4>
+                        <p className="text-[10px] text-[#C4B5FD]/50 mt-1">
+                          Applied on {new Date(lv.created_at || new Date()).toLocaleDateString('en-IN')}
+                        </p>
+                      </div>
+
+                      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold capitalize ${getStatusClass(lv.status)}`}>
+                        {getStatusIcon(lv.status)}
+                        {lv.status}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <p className="text-[#C4B5FD]/90"><span className="text-[#C4B5FD]/40 font-semibold">Reason:</span> {lv.reason}</p>
+                      {lv.destination && (
+                        <p className="text-[#C4B5FD]/90"><span className="text-[#C4B5FD]/40 font-semibold">Destination:</span> {lv.destination}</p>
+                      )}
+                      <p className="text-[#C4B5FD]/90 flex items-center gap-2">
+                        <span className="text-[#C4B5FD]/40 font-semibold">Parent Consent:</span> 
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${lv.parent_consent ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                          {lv.parent_consent ? 'Verified' : 'No Consent'}
+                        </span>
                       </p>
                     </div>
 
-                    <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold capitalize ${getStatusClass(lv.status)}`}>
-                      {getStatusIcon(lv.status)}
-                      {lv.status}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    <p className="text-[#C4B5FD]/90"><span className="text-[#C4B5FD]/40 font-semibold">Reason:</span> {lv.reason}</p>
-                    {lv.destination && (
-                      <p className="text-[#C4B5FD]/90"><span className="text-[#C4B5FD]/40 font-semibold">Destination:</span> {lv.destination}</p>
+                    {lv.approval_notes && (
+                      <div className="p-3.5 rounded-xl bg-white/5 border border-white/5">
+                        <p className="text-[10px] text-[#C4B5FD]/40 font-bold uppercase">Warden Comments</p>
+                        <p className="text-xs text-[#C4B5FD]/80 mt-1 italic">"{lv.approval_notes}"</p>
+                      </div>
                     )}
-                    <p className="text-[#C4B5FD]/90 flex items-center gap-2">
-                      <span className="text-[#C4B5FD]/40 font-semibold">Parent Consent:</span> 
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${lv.parent_consent ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {lv.parent_consent ? 'Verified' : 'No Consent'}
-                      </span>
-                    </p>
                   </div>
-
-                  {lv.approval_notes && (
-                    <div className="p-3.5 rounded-xl bg-white/5 border border-white/5">
-                      <p className="text-[10px] text-[#C4B5FD]/40 font-bold uppercase">Warden Comments</p>
-                      <p className="text-xs text-[#C4B5FD]/80 mt-1 italic">"{lv.approval_notes}"</p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

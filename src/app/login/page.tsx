@@ -37,6 +37,8 @@ const getMockProfile = (email: string, role: string) => {
     case 'Student':
       return {
         id: 'b0000000-0000-0000-0000-000000000006',
+        student_id: 'c0000000-0000-0000-0000-000000000006',
+        room_id: 'e4000000-0000-0000-0000-000000000001',
         name: 'Khushal Gehlot (Sandbox)',
         email: email,
         role: 'Student',
