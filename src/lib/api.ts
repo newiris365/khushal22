@@ -120,6 +120,12 @@ async function request(url: string, options: RequestInit): Promise<Response> {
   return response;
 }
 
+function dispatchFallbackEvent(endpoint: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('iris-api-fallback', { detail: { endpoint, isNetworkError: true } }));
+  }
+}
+
 export async function apiGet<T = any>(endpoint: string, params?: Record<string, string>, cacheSeconds = 0): Promise<ApiResponse<T>> {
   try {
     const url = new URL(`${API_BASE}${endpoint}`, typeof window !== 'undefined' ? window.location.origin : undefined);
@@ -141,6 +147,7 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
     return await response.json();
   } catch (err: any) {
     console.error(`apiGet failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
@@ -156,6 +163,7 @@ export async function apiPost<T = any>(endpoint: string, body: any): Promise<Api
     return await response.json();
   } catch (err: any) {
     console.error(`apiPost failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
@@ -171,6 +179,7 @@ export async function apiPut<T = any>(endpoint: string, body: any): Promise<ApiR
     return await response.json();
   } catch (err: any) {
     console.error(`apiPut failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
@@ -185,6 +194,7 @@ export async function apiDelete<T = any>(endpoint: string): Promise<ApiResponse<
     return await response.json();
   } catch (err: any) {
     console.error(`apiDelete failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
@@ -203,6 +213,7 @@ export async function apiFetchBlob(endpoint: string, body?: any): Promise<Blob> 
     return await response.blob();
   } catch (err: any) {
     console.error(`apiFetchBlob failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     throw new Error('Connection failed. Please check if backend is running.');
   }
 }
