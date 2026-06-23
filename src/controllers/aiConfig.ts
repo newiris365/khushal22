@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin } from '../config/supabase';
 
+// Local memory fallback state if DB columns do not exist
+let localAiConfigFallback: Record<string, any> = {};
+
 /** GET /api/v1/core/ai/config - Get current AI API configurations */
 export async function getAiConfig(req: Request, res: Response) {
   try {
@@ -15,7 +18,22 @@ export async function getAiConfig(req: Request, res: Response) {
       .eq('id', institutionId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Check if the error is due to missing columns in DB schema
+      const errMsg = error.message || '';
+      if (errMsg.includes('column') || errMsg.includes('exist') || errMsg.includes('cache')) {
+        console.warn('AI API key columns do not exist in institutions table. Falling back to session memory config.');
+        return res.json({
+          success: true,
+          config: localAiConfigFallback[institutionId] || {
+            gemini_api_key: '',
+            openai_api_key: '',
+            claude_api_key: '',
+          }
+        });
+      }
+      throw error;
+    }
 
     return res.json({
       success: true,
@@ -26,6 +44,7 @@ export async function getAiConfig(req: Request, res: Response) {
       }
     });
   } catch (err: any) {
+    console.error('ERROR in getAiConfig:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -48,10 +67,23 @@ export async function saveAiConfig(req: Request, res: Response) {
       })
       .eq('id', institution_id);
 
-    if (error) throw error;
+    if (error) {
+      const errMsg = error.message || '';
+      if (errMsg.includes('column') || errMsg.includes('exist') || errMsg.includes('cache')) {
+        console.warn('AI API key columns do not exist in institutions table. Emulating successful save in local session memory.');
+        localAiConfigFallback[institution_id] = {
+          gemini_api_key: gemini_api_key || '',
+          openai_api_key: openai_api_key || '',
+          claude_api_key: claude_api_key || '',
+        };
+        return res.json({ success: true, warning: 'Columns missing. Saved in local session memory.' });
+      }
+      throw error;
+    }
 
     return res.json({ success: true });
   } catch (err: any) {
+    console.error('ERROR in saveAiConfig:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }

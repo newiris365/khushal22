@@ -35,6 +35,10 @@ export default function AdminAIDashboard() {
   const [institutionId, setInstitutionId] = useState('');
 
   useEffect(() => {
+    console.log('IRIS_DEBUG: AdminAIDashboard rendered. showConfigModal =', showConfigModal, 'institutionId =', institutionId);
+  }, [showConfigModal, institutionId]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const profileStr = localStorage.getItem('iris_user_profile');
       if (profileStr) {
@@ -138,7 +142,7 @@ export default function AdminAIDashboard() {
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="font-extrabold text-2xl lg:text-3xl text-white flex items-center gap-2">
@@ -149,7 +153,10 @@ export default function AdminAIDashboard() {
 
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => setShowConfigModal(true)}
+              onClick={() => {
+                console.log('IRIS_DEBUG: AI Settings button clicked! Current showConfigModal =', showConfigModal);
+                setShowConfigModal(true);
+              }}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-[#8B5CF6] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-violet-600/25 transition-all"
             >
               <Sliders className="w-4 h-4" /> AI Settings

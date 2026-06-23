@@ -263,6 +263,20 @@ export let mockGymEquipment: any[] = [
 export let mockBookReservations: any[] = [];
 export let mockStudentTransitLogs: any[] = [];
 export let mockEventCertificates: any[] = [];
+export let mockInstitutions: any[] = [
+  {
+    id: 'a0000000-0000-0000-0000-000000000001',
+    name: 'SIN Institute of Engineering & Technology (SIET)',
+    type: 'university',
+    plan_tier: 'University',
+    plan_price_monthly: 25000,
+    is_active: true,
+    subscription_period: 'monthly',
+    gemini_api_key: '',
+    openai_api_key: '',
+    claude_api_key: '',
+  }
+];
 
 // Define Mock client details for offline simulation mode
 const mockAuth = {
@@ -901,6 +915,12 @@ function createMockBuilder(tableName: string) {
               if (r.id === targetId) return { ...r, ...this.updatedData };
               return r;
             });
+          } else if (tableName === 'institutions') {
+            const targetId = this.eqFilters.id;
+            mockInstitutions = mockInstitutions.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
           }
         }
 
@@ -930,6 +950,8 @@ function createMockBuilder(tableName: string) {
           resolvedData = mockStudentTransitLogs;
         } else if (tableName === 'event_certificates') {
           resolvedData = mockEventCertificates;
+        } else if (tableName === 'institutions') {
+          resolvedData = mockInstitutions;
         } else {
           resolvedData = getMockDataForTable(this.tableName);
         }
