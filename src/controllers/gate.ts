@@ -1336,7 +1336,6 @@ export async function getDailyReport(req: Request, res: Response) {
     doc.fontSize(10).fillColor('#9CA3AF').text('Generated automatically by IRIS 365 Smart Gate Module. All logs signed by tenant security credentials.', { align: 'center' });
 
     doc.end();
-    doc.end();
   } catch (err: any) {
     logger.error('Failed compiling Daily PDF Gate Report: ' + err.message);
     return res.status(500).json({ success: false, error: 'Internal server error compiling PDF report.' });

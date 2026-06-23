@@ -29,8 +29,12 @@ declare global {
 
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
+  let authHeader = req.headers.authorization;
   
+  if (!authHeader && req.query && req.query.token) {
+    authHeader = `Bearer ${req.query.token}`;
+  }
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, error: 'Authorization token required. Access Denied.' });
   }

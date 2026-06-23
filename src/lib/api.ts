@@ -126,9 +126,14 @@ function dispatchFallbackEvent(endpoint: string) {
   }
 }
 
+function getFormattedUrl(endpoint: string): string {
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_BASE}${formattedEndpoint}`;
+}
+
 export async function apiGet<T = any>(endpoint: string, params?: Record<string, string>, cacheSeconds = 0): Promise<ApiResponse<T>> {
   try {
-    const url = new URL(`${API_BASE}${endpoint}`, typeof window !== 'undefined' ? window.location.origin : undefined);
+    const url = new URL(getFormattedUrl(endpoint), typeof window !== 'undefined' ? window.location.origin : undefined);
     if (params) {
       Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
     }
@@ -154,7 +159,7 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
 
 export async function apiPost<T = any>(endpoint: string, body: any): Promise<ApiResponse<T>> {
   try {
-    const response = await request(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -170,7 +175,7 @@ export async function apiPost<T = any>(endpoint: string, body: any): Promise<Api
 
 export async function apiPut<T = any>(endpoint: string, body: any): Promise<ApiResponse<T>> {
   try {
-    const response = await request(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -186,7 +191,7 @@ export async function apiPut<T = any>(endpoint: string, body: any): Promise<ApiR
 
 export async function apiDelete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
   try {
-    const response = await request(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -204,7 +209,7 @@ export async function apiDelete<T = any>(endpoint: string): Promise<ApiResponse<
  */
 export async function apiFetchBlob(endpoint: string, body?: any): Promise<Blob> {
   try {
-    const response = await request(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: body ? 'POST' : 'GET',
       headers: getAuthHeaders(),
       body: body ? JSON.stringify(body) : undefined,

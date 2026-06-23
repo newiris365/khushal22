@@ -64,6 +64,7 @@ export default function AdminDashboard() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [modules, setModules] = useState<ModuleUsage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
@@ -177,17 +178,24 @@ export default function AdminDashboard() {
   };
 
   const handleDownloadReport = async () => {
+    setDownloading(true);
     try {
       const response = await fetch('/api/v1/director/report/pdf', {
         method: 'POST',
         headers: getAuthHeaders()
       });
       const result = await response.json();
-      if (result.success) {
-        alert(`Report Generated:\n\n${result.report.title}\nInstitution: ${result.report.institution}\nGenerated: ${result.report.generated_at}\n\nStudents: ${result.report.summary.total_students}\nStaff: ${result.report.summary.total_staff}\nFees Collected: ${result.report.summary.fee_collected}\nPending Complaints: ${result.report.summary.pending_complaints}`);
+      if (result.success && result.report.pdf_url) {
+        const token = localStorage.getItem('iris_jwt_token');
+        const downloadUrl = `${result.report.pdf_url}?token=${encodeURIComponent(token || '')}`;
+        window.location.href = downloadUrl;
+      } else {
+        alert('Failed to generate report.');
       }
     } catch (err) {
-      alert('Failed to generate report.');
+      alert('Failed to download report.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -225,9 +233,10 @@ export default function AdminDashboard() {
 
         <button
           onClick={handleDownloadReport}
-          className="ml-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-sm shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+          disabled={downloading}
+          className="ml-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-sm shadow-lg hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
         >
-          <FileText className="w-4 h-4" /> Download Report
+          <FileText className="w-4 h-4" /> {downloading ? 'Downloading...' : 'Download Report'}
         </button>
       </div>
 

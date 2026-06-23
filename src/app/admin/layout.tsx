@@ -77,6 +77,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [links, setLinks] = useState<SidebarLink[]>(adminLinks);
   const [userRole, setUserRole] = useState<string>('');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
@@ -110,9 +115,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  if (authorized === null || authorized === false) {
+  if (!hasMounted || authorized !== true) {
     return (
-      <div className="min-h-screen bg-[#0D0A1A] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <p className="text-slate-400 text-sm">Checking access...</p>
       </div>
     );
