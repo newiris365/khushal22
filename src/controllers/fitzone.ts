@@ -493,7 +493,7 @@ export async function initiateMembershipPurchase(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
     }
 
-    const { plan_id } = parseResult.data;
+    const { student_id, plan_id } = parseResult.data;
     const { data: plan, error: planErr } = await supabaseAdmin
       .from('gym_membership_plans')
       .select('*')

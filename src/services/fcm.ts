@@ -1,12 +1,13 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, cert, App } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import { supabaseAdmin } from '../config/supabase';
 
-let firebaseApp: admin.app.App | null = null;
+let firebaseApp: App | null = null;
 
 try {
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-    firebaseApp = admin.initializeApp({
-      credential: admin.credential.cert({
+    firebaseApp = initializeApp({
+      credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
@@ -44,7 +45,7 @@ export async function sendPushNotification(
     const deviceTokens = tokens.map(t => t.device_token);
 
     if (firebaseApp) {
-      const messaging = firebaseApp.messaging();
+      const messaging = getMessaging(firebaseApp);
       const response = await messaging.sendEachForMulticast({
         tokens: deviceTokens,
         notification: { title, body },

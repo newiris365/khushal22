@@ -200,6 +200,7 @@ import {
 } from '../controllers/campusCore';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/permissions';
+import { getAiConfig, saveAiConfig } from '../controllers/aiConfig';
 
 const router = Router();
 
@@ -604,5 +605,11 @@ router.put('/exams/supplementary/applications/:id/status', requireRole(['Admin',
 router.post('/exams/re-evaluation/apply', requireRole(['Student']), applyReEvaluation);
 router.get('/exams/re-evaluation/applications', requireRole(['Admin', 'SuperAdmin', 'Director', 'Staff', 'Teacher', 'HOD']), getReEvaluationApplications);
 router.put('/exams/re-evaluation/applications/:id/status', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), updateReEvaluationStatus);
+
+// =========================================================================
+// 37. AI API CONFIGURATION (Admin only)
+// =========================================================================
+router.get('/ai/config', requireRole(['Admin', 'SuperAdmin']), getAiConfig);
+router.post('/ai/config', requireRole(['Admin', 'SuperAdmin']), saveAiConfig);
 
 export default router;

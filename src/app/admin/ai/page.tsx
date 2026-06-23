@@ -53,7 +53,7 @@ export default function AdminAIDashboard() {
     setConfigLoading(true);
     try {
       const token = localStorage.getItem('iris_jwt_token') || 'mock-sandbox-jwt-token-value';
-      const res = await fetch(`/api/core/ai-config?institution_id=${institutionId}`, {
+      const res = await fetch(`/api/v1/core/ai/config?institution_id=${institutionId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -83,7 +83,7 @@ export default function AdminAIDashboard() {
     setConfigSaving(true);
     try {
       const token = localStorage.getItem('iris_jwt_token') || 'mock-sandbox-jwt-token-value';
-      const res = await fetch('/api/core/ai-config', {
+      const res = await fetch('/api/v1/core/ai/config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
