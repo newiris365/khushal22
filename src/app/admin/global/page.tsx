@@ -28,6 +28,10 @@ interface Institution {
   phone?: string;
   created_at: string;
   subscription_status?: string;
+  subscription_period?: string;
+  gemini_api_key?: string;
+  openai_api_key?: string;
+  claude_api_key?: string;
 }
 
 interface GlobalUser {
@@ -122,7 +126,7 @@ export default function SuperAdminConsole() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInst, setNewInst] = useState({
-    name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true
+    name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: ''
   });
 
   const [showEditModal, setShowEditModal] = useState(false);
@@ -452,7 +456,7 @@ export default function SuperAdminConsole() {
       // Re-fetch fresh data from DB to sync everything
       await loadSystemData();
       setShowAddModal(false);
-      setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true });
+      setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: '' });
     } catch (err: any) {
       alert('Error: ' + (err.message || 'Failed to provision campus'));
     }
@@ -502,6 +506,10 @@ export default function SuperAdminConsole() {
           name: editingInst.name, type: editingInst.type, email: editingInst.email,
           phone: editingInst.phone, plan_tier: editingInst.plan_tier, is_active: editingInst.is_active,
           plan_price_monthly: editingInst.plan_price_monthly,
+          subscription_period: editingInst.subscription_period || 'monthly',
+          gemini_api_key: editingInst.gemini_api_key || null,
+          openai_api_key: editingInst.openai_api_key || null,
+          claude_api_key: editingInst.claude_api_key || null,
         }),
       });
       const json = await res.json();
@@ -684,6 +692,7 @@ export default function SuperAdminConsole() {
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Type</th>
                       <th className="py-3 px-4">Plan</th>
+                      <th className="py-3 px-4">Subscription</th>
                       <th className="py-3 px-4">Plan Revenue</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4 text-right">Actions</th>
@@ -691,9 +700,9 @@ export default function SuperAdminConsole() {
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={7} className="py-10 text-center text-[#C4B5FD]/40 italic">Loading...</td></tr>
+                      <tr><td colSpan={8} className="py-10 text-center text-[#C4B5FD]/40 italic">Loading...</td></tr>
                     ) : institutions.length === 0 ? (
-                      <tr><td colSpan={7} className="py-10 text-center text-[#C4B5FD]/40 italic">No institutions found.</td></tr>
+                      <tr><td colSpan={8} className="py-10 text-center text-[#C4B5FD]/40 italic">No institutions found.</td></tr>
                     ) : institutions.map(inst => (
                       <tr key={inst.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
                         <td className="py-3.5 px-4 font-semibold text-white">
@@ -717,6 +726,9 @@ export default function SuperAdminConsole() {
                             <option value="University">University</option>
                             <option value="Enterprise">Enterprise</option>
                           </select>
+                        </td>
+                        <td className="py-3.5 px-4 capitalize text-[#C4B5FD]/80 font-medium">
+                          {inst.subscription_period || 'monthly'}
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1">
@@ -1188,6 +1200,7 @@ export default function SuperAdminConsole() {
         <CampusDetailPanel
           institutionId={selectedCampus.id}
           institutionName={selectedCampus.name}
+          institutionDetails={institutions.find(inst => inst.id === selectedCampus.id)}
           onClose={() => setSelectedCampus(null)}
         />
       )}
@@ -1262,10 +1275,27 @@ export default function SuperAdminConsole() {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[#C4B5FD] font-semibold">Email</label>
+                <label className="text-[#C4B5FD] font-semibold">Registering Admin Email</label>
                 <input type="email" required placeholder="contact@sit.edu"
                   value={newInst.email} onChange={(e) => setNewInst({ ...newInst, email: e.target.value })}
                   className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription Billing</label>
+                  <select value={newInst.subscription_period} onChange={(e) => setNewInst({ ...newInst, subscription_period: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Admin Password</label>
+                  <input type="password" required placeholder="••••••••"
+                    value={newInst.password} onChange={(e) => setNewInst({ ...newInst, password: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <button type="button" onClick={() => setShowAddModal(false)}
@@ -1321,11 +1351,45 @@ export default function SuperAdminConsole() {
                   onChange={(e) => setEditingInst({ ...editingInst, plan_price_monthly: Number(e.target.value) })}
                   className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[#C4B5FD] font-semibold">Email</label>
-                <input type="email" required placeholder="contact@sit.edu"
-                  value={editingInst.email || ''} onChange={(e) => setEditingInst({ ...editingInst, email: e.target.value })}
-                  className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Email</label>
+                  <input type="email" required placeholder="contact@sit.edu"
+                    value={editingInst.email || ''} onChange={(e) => setEditingInst({ ...editingInst, email: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription Billing</label>
+                  <select value={editingInst.subscription_period || 'monthly'} onChange={(e) => setEditingInst({ ...editingInst, subscription_period: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+              </div>
+              <div className="border-t border-white/5 pt-4">
+                <h4 className="text-[#A78BFA] font-bold mb-2">AI Concierge API Keys</h4>
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[#C4B5FD] font-semibold">Gemini API Key</label>
+                    <input type="text" placeholder="AIzaSy... (leave blank or null to remove)"
+                      value={editingInst.gemini_api_key || ''} onChange={(e) => setEditingInst({ ...editingInst, gemini_api_key: e.target.value })}
+                      className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white font-mono outline-none focus:border-violet-500" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[#C4B5FD] font-semibold">OpenAI API Key</label>
+                    <input type="text" placeholder="sk-proj-... (leave blank or null to remove)"
+                      value={editingInst.openai_api_key || ''} onChange={(e) => setEditingInst({ ...editingInst, openai_api_key: e.target.value })}
+                      className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white font-mono outline-none focus:border-violet-500" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[#C4B5FD] font-semibold">Claude API Key</label>
+                    <input type="text" placeholder="sk-ant-... (leave blank or null to remove)"
+                      value={editingInst.claude_api_key || ''} onChange={(e) => setEditingInst({ ...editingInst, claude_api_key: e.target.value })}
+                      className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white font-mono outline-none focus:border-violet-500" />
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <button type="button" onClick={() => { setShowEditModal(false); setEditingInst(null); }}

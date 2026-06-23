@@ -1857,3 +1857,116 @@ cron.schedule('0 2 * * *', async () => {
   }
 });
 
+// Helper function to calculate fallback end date if subscription_end_date is null
+function getFallbackEndDate(startDateStr: string | null, period: string | null, createdAtStr: string): Date {
+  const startDate = startDateStr ? new Date(startDateStr) : new Date(createdAtStr);
+  const endDate = new Date(startDate);
+  const p = period || 'monthly';
+  if (p === 'yearly') {
+    endDate.setFullYear(startDate.getFullYear() + 1);
+  } else if (p === 'quarterly') {
+    endDate.setMonth(startDate.getMonth() + 3);
+  } else {
+    endDate.setMonth(startDate.getMonth() + 1);
+  }
+  return endDate;
+}
+
+// 23. Plan Expiry Notification Cron Job (Runs daily at 9:00 AM: '0 9 * * *')
+cron.schedule('0 9 * * *', async () => {
+  logger.info('Running Daily Plan Expiry Notification Auditor cron job...');
+  try {
+    // Fetch all active institutions
+    const { data: activeInsts, error: instError } = await supabaseAdmin
+      .from('institutions')
+      .select('id, name, plan_tier, subscription_start_date, subscription_end_date, subscription_period, created_at')
+      .eq('is_active', true);
+
+    if (instError) throw instError;
+    if (!activeInsts || activeInsts.length === 0) return;
+
+    const today = new Date();
+    // Normalize today to start of day for accurate comparison
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    for (const inst of activeInsts) {
+      let expiryDate: Date;
+      if (inst.subscription_end_date) {
+        expiryDate = new Date(inst.subscription_end_date);
+      } else {
+        expiryDate = getFallbackEndDate(inst.subscription_start_date, inst.subscription_period, inst.created_at);
+      }
+
+      // Normalize expiryDate to start of day
+      const expiryStart = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate());
+      
+      const diffTime = expiryStart.getTime() - todayStart.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      logger.debug(`Institution ${inst.name} plan tier ${inst.plan_tier} expires on ${expiryStart.toDateString()} (${diffDays} days remaining)`);
+
+      if (diffDays === 14 || diffDays === 7) {
+        logger.info(`Institution ${inst.name} plan expires in ${diffDays} days. Querying admin users...`);
+        
+        // Fetch active Admin users for this institution
+        const { data: admins, error: adminError } = await supabaseAdmin
+          .from('users')
+          .select('id, name, email')
+          .eq('institution_id', inst.id)
+          .eq('role', 'Admin')
+          .eq('is_active', true);
+
+        if (adminError) {
+          logger.error(`Error fetching Admins for institution ${inst.name}: ${adminError.message}`);
+          continue;
+        }
+
+        if (!admins || admins.length === 0) {
+          logger.warn(`No active Admin users found for institution ${inst.name}. Cannot send notifications.`);
+          continue;
+        }
+
+        const dateStr = expiryStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        for (const admin of admins) {
+          // 1. Insert in-app notification
+          const { error: notifError } = await supabaseAdmin
+            .from('notifications')
+            .insert({
+              institution_id: inst.id,
+              user_id: admin.id,
+              title: `Plan Expiry Notice - ${diffDays} Days Remaining`,
+              body: `Dear ${admin.name}, your campus's subscription plan (${inst.plan_tier}) is set to expire in ${diffDays} days on ${dateStr}. Please renew or contact SuperAdmin to avoid service interruption.`,
+              type: 'Billing',
+              is_read: false
+            });
+
+          if (notifError) {
+            logger.error(`Failed to insert in-app notification for admin ${admin.name}: ${notifError.message}`);
+          } else {
+            logger.info(`Successfully logged in-app expiry warning notification for Admin: ${admin.name} (${inst.name})`);
+          }
+
+          // 2. Trigger push notification
+          try {
+            const { sendPushNotification } = await import('../services/fcm');
+            const pushSuccess = await sendPushNotification(
+              admin.id,
+              `Plan Expiry Notice - ${diffDays} Days Remaining`,
+              `Your subscription plan (${inst.plan_tier}) is set to expire on ${dateStr}.`
+            );
+            if (pushSuccess) {
+              logger.info(`Successfully sent FCM push notification warning for Admin: ${admin.name}`);
+            }
+          } catch (fcmErr: any) {
+            logger.error(`Error sending push notification to admin ${admin.name}: ${fcmErr.message}`);
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error running plan expiry notification cron: ' + err.message);
+  }
+});
+
+
