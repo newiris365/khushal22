@@ -85,19 +85,31 @@ export async function getOverview(req: Request, res: Response) {
       logger.error('Error fetching campus occupancy:', e);
     }
 
-    // Open Complaints
+    // Open Complaints (Grievances across the whole institution)
     let openComplaints = 6;
     try {
       const { count } = await supabaseAdmin
-        .from('hostel_complaints')
+        .from('grievances')
         .select('*', { count: 'exact', head: true })
         .eq('institution_id', institutionId)
-        .in('status', ['open', 'Open', 'In Progress', 'investigating']);
+        .in('status', ['submitted', 'acknowledged', 'under_investigation', 'appealed']);
       if (count !== null) {
         openComplaints = count;
       }
     } catch (e) {
-      logger.error('Error counting hostel complaints:', e);
+      // Fallback: if grievances table does not exist in DB yet, query hostel_complaints as a backward-compatible fallback
+      try {
+        const { count: hCount } = await supabaseAdmin
+          .from('hostel_complaints')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', institutionId)
+          .in('status', ['open', 'Open', 'assigned', 'in_progress', 'investigating']);
+        if (hCount !== null) {
+          openComplaints = hCount;
+        }
+      } catch (hErr) {
+        logger.error('Error counting hostel complaints fallback:', hErr);
+      }
     }
 
     // Active Bus Trips

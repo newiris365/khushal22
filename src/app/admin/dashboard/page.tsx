@@ -82,6 +82,13 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    let fetchedOverview = null;
+    let fetchedAttendanceTrend = [];
+    let fetchedFeeByMonth = [];
+    let fetchedCanteenRevenue = 0;
+    let fetchedAlerts = [];
+    let fetchedModules = null;
+
     try {
       // Fetch all dashboard data in parallel
       const [overviewRes, analyticsRes, alertsRes, modulesRes] = await Promise.all([
@@ -96,19 +103,32 @@ export default function AdminDashboard() {
       const alertsData = await alertsRes.json();
       const modulesData = await modulesRes.json();
 
-      if (overviewData.success) setOverview(overviewData.overview);
+      if (overviewData.success) {
+        fetchedOverview = overviewData.overview;
+        setOverview(overviewData.overview);
+      }
       if (analyticsData.success) {
+        fetchedAttendanceTrend = analyticsData.analytics.attendance_trend;
+        fetchedFeeByMonth = analyticsData.analytics.fee_collection_by_month;
+        fetchedCanteenRevenue = analyticsData.analytics.canteen_revenue_this_month;
+
         setAttendanceTrend(analyticsData.analytics.attendance_trend);
         setFeeByMonth(analyticsData.analytics.fee_collection_by_month);
         setCanteenRevenue(analyticsData.analytics.canteen_revenue_this_month);
       }
-      if (alertsData.success) setAlerts(alertsData.alerts);
-      if (modulesData.success) setModules(modulesData.modules);
+      if (alertsData.success) {
+        fetchedAlerts = alertsData.alerts;
+        setAlerts(alertsData.alerts);
+      }
+      if (modulesData.success) {
+        fetchedModules = modulesData.modules;
+        setModules(modulesData.modules);
+      }
     } catch (err) {
       console.warn('Backend not reachable, loading sandbox demo data:', err);
     } finally {
       // Always load sandbox fallback data for empty states
-      if (!overview) {
+      if (!fetchedOverview) {
         setOverview({
           total_students: 1247,
           total_staff: 89,
@@ -124,7 +144,7 @@ export default function AdminDashboard() {
           gate_entries_today: 342,
         });
       }
-      if (attendanceTrend.length === 0) {
+      if (fetchedAttendanceTrend.length === 0) {
         const trend: AttendanceTrend[] = [];
         for (let i = 29; i >= 0; i--) {
           const d = new Date(Date.now() - i * 86400000);
@@ -139,7 +159,7 @@ export default function AdminDashboard() {
         }
         setAttendanceTrend(trend);
       }
-      if (feeByMonth.length === 0) {
+      if (fetchedFeeByMonth.length === 0) {
         setFeeByMonth([
           { month: 'Jan', amount: 3200000 },
           { month: 'Feb', amount: 2800000 },
@@ -155,8 +175,8 @@ export default function AdminDashboard() {
           { month: 'Dec', amount: 0 },
         ]);
       }
-      if (canteenRevenue === 0) setCanteenRevenue(485000);
-      if (alerts.length === 0) {
+      if (fetchedCanteenRevenue === 0) setCanteenRevenue(485000);
+      if (fetchedAlerts.length === 0) {
         setAlerts([
           { type: 'attendance', severity: 'high', title: 'Low Attendance — CS Sem 6', detail: '18 students below 60% attendance in Computer Science Semester 6. Immediate action required.', created_at: new Date().toISOString() },
           { type: 'fee', severity: 'high', title: 'Fee Defaulters — ₹12.5L Pending', detail: '47 students have overdue fee payments totaling ₹12,50,000. Escalation stage 3 reached.', created_at: new Date().toISOString() },
@@ -164,7 +184,7 @@ export default function AdminDashboard() {
           { type: 'library', severity: 'low', title: '12 Books Overdue > 30 Days', detail: 'Library has 12 books overdue by more than 30 days. Total fine accrued: ₹4,800.', created_at: new Date().toISOString() },
         ]);
       }
-      if (!modules) {
+      if (!fetchedModules) {
         setModules({
           canteen: { orders_today: 312 },
           fitzone: { bookings_this_week: 87 },
@@ -258,7 +278,7 @@ export default function AdminDashboard() {
               { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6', href: '/admin/hr' },
               { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444', href: '/admin/attendance' },
               { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B', href: '/admin/fees' },
-              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/hostel/complaints' },
+              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/complaints' },
               { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6', href: '/admin/events' },
               { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4', href: '/admin/hostel' },
               { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' }

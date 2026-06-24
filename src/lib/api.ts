@@ -53,7 +53,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 function handleAuthError(status: number): void {
-  if ((status === 401 || status === 403) && typeof window !== 'undefined') {
+  if (status === 401 && typeof window !== 'undefined') {
     localStorage.removeItem('iris_jwt_token');
     localStorage.removeItem('iris_user_profile');
     localStorage.removeItem('iris_refresh_token');
@@ -112,8 +112,6 @@ async function request(url: string, options: RequestInit): Promise<Response> {
     }
 
     // Refresh failed or no refresh token
-    handleAuthError(response.status);
-  } else if (response.status === 403) {
     handleAuthError(response.status);
   }
 
