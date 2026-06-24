@@ -128,22 +128,50 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Institution ID is required.' }, { status: 400 });
     }
 
-    // Recalculate end date if subscription period is being updated
-    if (updates.subscription_period) {
+    // 1. Fetch one row to inspect the columns actually present in the institutions table
+    const { data: schemaRecord } = await supabaseAdmin
+      .from('institutions')
+      .select('*')
+      .limit(1);
+
+    const allowedColumns = schemaRecord && schemaRecord.length > 0 ? Object.keys(schemaRecord[0]) : [];
+
+    // 2. Recalculate end date if subscription period is being updated, but only if end date is not explicitly specified in payload and columns exist
+    if (
+      updates.subscription_period && 
+      allowedColumns.includes('subscription_period') && 
+      allowedColumns.includes('subscription_end_date') && 
+      !('subscription_end_date' in updates)
+    ) {
       // Fetch the existing start date first
+      const selectFields = [];
+      if (allowedColumns.includes('subscription_start_date')) selectFields.push('subscription_start_date');
+      if (allowedColumns.includes('created_at')) selectFields.push('created_at');
+
       const { data: currentInst } = await supabaseAdmin
         .from('institutions')
-        .select('subscription_start_date, created_at')
+        .select(selectFields.join(','))
         .eq('id', id)
         .single();
       
-      const startDate = currentInst?.subscription_start_date || currentInst?.created_at || new Date().toISOString();
+      const instData = currentInst as any;
+      const startDate = instData?.subscription_start_date || instData?.created_at || new Date().toISOString();
       updates.subscription_end_date = calculateSubscriptionEndDate(startDate, updates.subscription_period);
+    }
+
+    // 3. Filter updates to only include columns that exist in the database table
+    const sanitizedUpdates: Record<string, any> = {};
+    for (const key of Object.keys(updates)) {
+      if (allowedColumns.includes(key)) {
+        sanitizedUpdates[key] = updates[key];
+      } else {
+        console.warn(`Column '${key}' does not exist in 'institutions' table. Skipping.`);
+      }
     }
 
     const { data, error } = await supabaseAdmin
       .from('institutions')
-      .update(updates)
+      .update(sanitizedUpdates)
       .eq('id', id)
       .select()
       .single();

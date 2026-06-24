@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   getOverview,
   getLiveKPIs,
+  getAnalytics,
+  getModules,
   getActivityFeed,
   getAnalyticsAttendance,
   getAnalyticsFees,
@@ -53,6 +55,8 @@ router.use(requireRole(['Director', 'SuperAdmin', 'Admin']));
 
 // --- LIVE KPIs & OVERVIEWS ---
 router.get('/overview', getOverview);
+router.get('/analytics', getAnalytics);
+router.get('/modules', getModules);
 router.get('/kpis/live', getLiveKPIs);
 router.get('/activity-feed', getActivityFeed);
 

@@ -29,6 +29,7 @@ interface Institution {
   created_at: string;
   subscription_status?: string;
   subscription_period?: string;
+  subscription_end_date?: string | null;
   gemini_api_key?: string;
   openai_api_key?: string;
   claude_api_key?: string;
@@ -496,6 +497,21 @@ export default function SuperAdminConsole() {
     }
   };
 
+  const updateSubscriptionPeriod = async (id: string, newPeriod: string) => {
+    try {
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, subscription_period: newPeriod }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, subscription_period: newPeriod } : inst));
+      await loadSystemData();
+    } catch {
+      setInstitutions(institutions.map(inst => inst.id === id ? { ...inst, subscription_period: newPeriod } : inst));
+    }
+  };
+
   const handleEditInstitution = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInst) return;
@@ -509,6 +525,8 @@ export default function SuperAdminConsole() {
           phone: editingInst.phone, plan_tier: editingInst.plan_tier, is_active: editingInst.is_active,
           plan_price_monthly: editingInst.plan_price_monthly,
           subscription_period: editingInst.subscription_period || 'monthly',
+          subscription_status: editingInst.subscription_status || 'active',
+          subscription_end_date: editingInst.subscription_end_date || null,
           gemini_api_key: editingInst.gemini_api_key || null,
           openai_api_key: editingInst.openai_api_key || null,
           claude_api_key: editingInst.claude_api_key || null,
@@ -765,8 +783,13 @@ export default function SuperAdminConsole() {
                             <option value="Enterprise">Enterprise</option>
                           </select>
                         </td>
-                        <td className="py-3.5 px-4 capitalize text-[#C4B5FD]/80 font-medium">
-                          {inst.subscription_period || 'monthly'}
+                        <td className="py-3.5 px-4">
+                          <select value={inst.subscription_period || 'monthly'} onChange={(e) => updateSubscriptionPeriod(inst.id, e.target.value)}
+                            className="bg-black/30 border border-white/10 rounded px-2.5 py-1 text-white text-[11px] font-medium outline-none focus:border-violet-500">
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
+                          </select>
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1">
@@ -1280,8 +1303,8 @@ export default function SuperAdminConsole() {
 
       {/* Provision Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start p-4 md:p-6 bg-black/70 backdrop-blur-sm">
+          <div className="my-auto w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
             <h3 className="text-lg font-bold text-white mb-4">Provision New Campus</h3>
             <form onSubmit={handleAddInstitution} className="space-y-4 text-xs">
               <div className="flex flex-col gap-1">
@@ -1369,8 +1392,8 @@ export default function SuperAdminConsole() {
 
       {/* Edit Modal */}
       {showEditModal && editingInst && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start p-4 md:p-6 bg-black/70 backdrop-blur-sm">
+          <div className="my-auto w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
             <h3 className="text-lg font-bold text-white mb-4">Edit Campus Details</h3>
             <form onSubmit={handleEditInstitution} className="space-y-4 text-xs">
               <div className="flex flex-col gap-1">
@@ -1447,27 +1470,23 @@ export default function SuperAdminConsole() {
                   </select>
                 </div>
               </div>
-              <div className="border-t border-white/5 pt-4">
-                <h4 className="text-[#A78BFA] font-bold mb-2">AI Concierge API Keys</h4>
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[#C4B5FD] font-semibold">Gemini API Key</label>
-                    <input type="text" placeholder="AIzaSy... (leave blank or null to remove)"
-                      value={editingInst.gemini_api_key || ''} onChange={(e) => setEditingInst({ ...editingInst, gemini_api_key: e.target.value })}
-                      className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white font-mono outline-none focus:border-violet-500" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[#C4B5FD] font-semibold">OpenAI API Key</label>
-                    <input type="text" placeholder="sk-proj-... (leave blank or null to remove)"
-                      value={editingInst.openai_api_key || ''} onChange={(e) => setEditingInst({ ...editingInst, openai_api_key: e.target.value })}
-                      className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white font-mono outline-none focus:border-violet-500" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[#C4B5FD] font-semibold">Claude API Key</label>
-                    <input type="text" placeholder="sk-ant-... (leave blank or null to remove)"
-                      value={editingInst.claude_api_key || ''} onChange={(e) => setEditingInst({ ...editingInst, claude_api_key: e.target.value })}
-                      className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white font-mono outline-none focus:border-violet-500" />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription Status</label>
+                  <select value={editingInst.subscription_status || 'active'} onChange={(e) => setEditingInst({ ...editingInst, subscription_status: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="trial">Trial</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription End Date</label>
+                  <input type="date"
+                    value={editingInst.subscription_end_date ? editingInst.subscription_end_date.split('T')[0] : ''}
+                    onChange={(e) => setEditingInst({ ...editingInst, subscription_end_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">

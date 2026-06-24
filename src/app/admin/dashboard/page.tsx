@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Users, GraduationCap, Building2, CheckCircle, IndianRupee, AlertTriangle,
   CalendarDays, DoorOpen, Activity, TrendingUp, FileText, LogOut,
@@ -253,16 +254,16 @@ export default function AdminDashboard() {
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: 'Total Students', value: overview.total_students, icon: GraduationCap, color: '#6C2BD9' },
-              { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6' },
-              { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444' },
-              { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B' },
-              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981' },
-              { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6' },
-              { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4' },
-              { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA' }
+              { label: 'Total Students', value: overview.total_students, icon: GraduationCap, color: '#6C2BD9', href: '/admin/students' },
+              { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6', href: '/admin/hr' },
+              { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444', href: '/admin/attendance' },
+              { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B', href: '/admin/fees' },
+              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/hostel' },
+              { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6', href: '/admin/events' },
+              { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4', href: '/admin/hostel' },
+              { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' }
             ].map((kpi, idx) => (
-              <div key={idx} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all">
+              <Link key={idx} href={kpi.href} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all cursor-pointer">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">{kpi.label}</span>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${kpi.color}15`, border: `1px solid ${kpi.color}30` }}>
@@ -270,7 +271,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <h3 className="font-extrabold text-2xl text-white">{kpi.value}</h3>
-              </div>
+              </Link>
             ))}
           </div>
 
@@ -423,14 +424,14 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { label: 'Canteen Orders', sublabel: 'Today', value: modules.canteen.orders_today, icon: ShoppingBag, color: '#F59E0B' },
-              { label: 'FitZone Bookings', sublabel: 'This Week', value: modules.fitzone.bookings_this_week, icon: Dumbbell, color: '#EF4444' },
-              { label: 'Gate Entries', sublabel: 'Today', value: modules.gate.entries_today, icon: Shield, color: '#6C2BD9' },
-              { label: 'Library Issues', sublabel: 'This Week', value: modules.library.issues_this_week, icon: BookOpen, color: '#8B5CF6' },
-              { label: 'Event Registrations', sublabel: 'This Week', value: modules.events.registrations_this_week, icon: CalendarDays, color: '#06B6D4' },
-              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981' }
+              { label: 'Canteen Orders', sublabel: 'Today', value: modules.canteen.orders_today, icon: ShoppingBag, color: '#F59E0B', href: '/admin/canteen' },
+              { label: 'FitZone Bookings', sublabel: 'This Week', value: modules.fitzone.bookings_this_week, icon: Dumbbell, color: '#EF4444', href: '/admin/gym' },
+              { label: 'Gate Entries', sublabel: 'Today', value: modules.gate.entries_today, icon: Shield, color: '#6C2BD9', href: '/admin/gate' },
+              { label: 'Library Issues', sublabel: 'This Week', value: modules.library.issues_this_week, icon: BookOpen, color: '#8B5CF6', href: '/admin/library/bookclubs' },
+              { label: 'Event Registrations', sublabel: 'This Week', value: modules.events.registrations_this_week, icon: CalendarDays, color: '#06B6D4', href: '/admin/events' },
+              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981', href: '/admin/transit' }
             ].map((mod, idx) => (
-              <div key={idx} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all">
+              <Link key={idx} href={mod.href} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all cursor-pointer">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${mod.color}15`, border: `1px solid ${mod.color}30` }}>
                     <mod.icon className="w-5 h-5" style={{ color: mod.color }} />
@@ -441,7 +442,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <h3 className="font-extrabold text-3xl text-white">{mod.value}</h3>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
