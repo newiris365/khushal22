@@ -30,6 +30,7 @@ const adminLinks: SidebarLink[] = [
   { label: 'Defaulter Report', href: '/admin/reports/defaulters', icon: BarChart3 },
   { label: 'Canteen', href: '/admin/canteen', icon: ShoppingBag },
   { label: 'Hostel', href: '/admin/hostel', icon: Home },
+  { label: 'Pending Complaints', href: '/admin/hostel/complaints', icon: AlertTriangle },
   { label: 'Library', href: '/admin/library/bookclubs', icon: BookOpen },
   { label: 'Placements', href: '/admin/placements', icon: Briefcase },
   { label: 'HR Management', href: '/admin/hr', icon: HeartPulse },

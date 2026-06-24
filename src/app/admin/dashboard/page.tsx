@@ -258,7 +258,7 @@ export default function AdminDashboard() {
               { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6', href: '/admin/hr' },
               { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444', href: '/admin/attendance' },
               { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B', href: '/admin/fees' },
-              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/hostel' },
+              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/hostel/complaints' },
               { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6', href: '/admin/events' },
               { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4', href: '/admin/hostel' },
               { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' }
