@@ -88,6 +88,26 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     setHasMounted(true);
   }, []);
 
+  const applySidebar = (role: string, instType: string) => {
+    if (role === 'SuperAdmin') {
+      setLinks([
+        { label: 'Global Console', href: '/admin/global', icon: Shield },
+        { label: 'Profile', href: '/profile', icon: UserCircle },
+      ]);
+    } else {
+      let filteredLinks = adminLinks.filter(l => l.href !== '/admin/settings');
+      if (instType === 'school') {
+        filteredLinks = filteredLinks.filter(l => 
+          l.label !== 'OBE Maps' && 
+          l.label !== 'NAAC Scorecard' && 
+          l.label !== 'Placements' && 
+          l.label !== 'Faculty Dev'
+        );
+      }
+      setLinks(filteredLinks);
+    }
+  };
+
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
@@ -105,22 +125,24 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         }
 
         setAuthorized(true);
-        if (role === 'SuperAdmin') {
-          setLinks([
-            { label: 'Global Console', href: '/admin/global', icon: Shield },
-            { label: 'Profile', href: '/profile', icon: UserCircle },
-          ]);
-        } else {
-          let filteredLinks = adminLinks.filter(l => l.href !== '/admin/settings');
-          if (instType === 'school') {
-            filteredLinks = filteredLinks.filter(l => 
-              l.label !== 'OBE Maps' && 
-              l.label !== 'NAAC Scorecard' && 
-              l.label !== 'Placements' && 
-              l.label !== 'Faculty Dev'
-            );
-          }
-          setLinks(filteredLinks);
+        applySidebar(role, instType);
+
+        const token = localStorage.getItem('iris_jwt_token');
+        if (token) {
+          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.profile) {
+                const freshType = data.profile.institute_type || 'college';
+                if (freshType !== instType) {
+                  parsed.institute_type = freshType;
+                  localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+                  setInstituteType(freshType);
+                  applySidebar(role, freshType);
+                }
+              }
+            })
+            .catch(() => {});
         }
       } catch (e) {
         console.error('Failed parsing profile for admin auth check:', e);

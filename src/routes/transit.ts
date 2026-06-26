@@ -40,7 +40,9 @@ import {
   occupyParkingSlot,
   getParkingAlerts,
   ingestGpsTelemetry,
-  recordStudentTransitTap
+  recordStudentTransitTap,
+  getLiveBuses,
+  getMyBuses
 } from '../controllers/transit';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -118,6 +120,10 @@ router.post('/parking/register', registerVehicle);
 router.get('/parking/slots', getParkingSlots);
 router.post('/parking/occupy', occupyParkingSlot);
 router.get('/parking/alerts', requireRole(['Admin', 'SuperAdmin']), getParkingAlerts);
+
+// --- LIVE BUS TRACKING (NEW) ---
+router.get('/live', getLiveBuses);
+router.get('/my-buses', requireRole(['Driver', 'Admin', 'SuperAdmin']), getMyBuses);
 
 export default router;
 

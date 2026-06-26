@@ -32,30 +32,50 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(savedProfile);
         const role = parsed.role || '';
-        const instType = parsed.institute_type || 'college';
+        let instType = parsed.institute_type || 'college';
 
         if (role !== 'Parent') {
           window.location.href = '/login';
           return;
         }
 
-        setAuthorized(true);
+        const applyLinks = (type: string) => {
+          if (type === 'school') {
+            setLinks([
+              { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
+              { label: 'Attendance', href: '/parent/attendance', icon: CalendarDays },
+              { label: 'Assignments', href: '/parent/assignments', icon: Upload },
+              { label: 'Timetable', href: '/parent/timetable', icon: CalendarDays },
+              { label: 'Transit GPS', href: '/parent/transit', icon: Bus },
+              { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
+              { label: 'Exam Results', href: '/parent/results', icon: FileText },
+              { label: 'Notices', href: '/parent/notices', icon: Bell },
+              { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
+              { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },
+              { label: 'Link Child', href: '/parent/link', icon: Link2 },
+              { label: 'Profile', href: '/profile', icon: UserCircle },
+            ]);
+          }
+        };
 
-        if (instType === 'school') {
-          setLinks([
-            { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
-            { label: 'Attendance', href: '/parent/attendance', icon: CalendarDays },
-            { label: 'Assignments', href: '/parent/assignments', icon: Upload },
-            { label: 'Timetable', href: '/parent/timetable', icon: CalendarDays },
-            { label: 'Transit GPS', href: '/parent/transit', icon: Bus },
-            { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
-            { label: 'Exam Results', href: '/parent/results', icon: FileText },
-            { label: 'Notices', href: '/parent/notices', icon: Bell },
-            { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
-            { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },
-            { label: 'Link Child', href: '/parent/link', icon: Link2 },
-            { label: 'Profile', href: '/profile', icon: UserCircle },
-          ]);
+        setAuthorized(true);
+        applyLinks(instType);
+
+        const token = localStorage.getItem('iris_jwt_token');
+        if (token) {
+          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.profile) {
+                const freshType = data.profile.institute_type || 'college';
+                if (freshType !== instType) {
+                  parsed.institute_type = freshType;
+                  localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+                  applyLinks(freshType);
+                }
+              }
+            })
+            .catch(() => {});
         }
       } catch (e) {
         console.error('Failed parsing profile for parent auth check:', e);

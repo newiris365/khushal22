@@ -161,12 +161,18 @@ export async function PATCH(req: NextRequest) {
 
     // 3. Filter updates to only include columns that exist in the database table
     const sanitizedUpdates: Record<string, any> = {};
+    const skippedColumns: string[] = [];
     for (const key of Object.keys(updates)) {
       if (allowedColumns.includes(key)) {
         sanitizedUpdates[key] = updates[key];
       } else {
+        skippedColumns.push(key);
         console.warn(`Column '${key}' does not exist in 'institutions' table. Skipping.`);
       }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update. Institution table may be missing columns.' }, { status: 400 });
     }
 
     const { data, error } = await supabaseAdmin
@@ -177,7 +183,12 @@ export async function PATCH(req: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ institution: data });
+
+    const response: any = { institution: data };
+    if (skippedColumns.length > 0) {
+      response.warnings = [`Columns not saved (missing from DB): ${skippedColumns.join(', ')}`];
+    }
+    return NextResponse.json(response);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

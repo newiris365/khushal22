@@ -536,6 +536,20 @@ export default function SuperAdminConsole() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to update institution');
       await loadSystemData();
+
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          if (parsed.institution_id === editingInst.id) {
+            parsed.institute_type = editingInst.institute_type || 'college';
+            localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+            window.location.reload();
+            return;
+          }
+        } catch {}
+      }
+
       setShowEditModal(false);
       setEditingInst(null);
     } catch (err: any) {
@@ -1443,7 +1457,7 @@ export default function SuperAdminConsole() {
                   </label>
                 </div>
                 <p className="text-[10px] text-yellow-500 mt-0.5 italic">
-                  * Warning: Changing the institute type modifies role displays, portal routing, and attendance engines downstream.
+                  * Changing type updates your session automatically. Other users of this institute must re-login for changes to take effect.
                 </p>
               </div>
               <div className="flex flex-col gap-1">

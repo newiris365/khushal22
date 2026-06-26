@@ -77,33 +77,9 @@ io.use((socket, next) => {
   }
 });
 
-// Socket.io namespace: Transit GPS telemetry
-const transitNs = io.of('/transit');
-transitNs.on('connection', (socket) => {
-  logger.info('Transit client connected', { socketId: socket.id });
-
-  socket.on('subscribe_bus', (busId: string) => {
-    socket.join(`bus_${busId}`);
-    logger.debug(`Socket ${socket.id} subscribed to bus_${busId}`);
-  });
-
-  socket.on('unsubscribe_bus', (busId: string) => {
-    socket.leave(`bus_${busId}`);
-  });
-
-  socket.on('subscribe_admin', () => {
-    socket.join('admin:transit');
-    logger.debug(`Socket ${socket.id} subscribed to admin:transit`);
-  });
-
-  socket.on('unsubscribe_admin', () => {
-    socket.leave('admin:transit');
-  });
-
-  socket.on('disconnect', () => {
-    logger.debug('Transit client disconnected', { socketId: socket.id });
-  });
-});
+// Socket.io namespace: Transit GPS telemetry (real driver GPS via modular handler)
+import { registerTransitSocket } from './sockets/transitSocket';
+const transitNs = registerTransitSocket(io);
 
 // Socket.io namespace: Live notifications
 const notificationsNs = io.of('/notifications');

@@ -2,7 +2,8 @@
 -- IRIS 365 Consolidated Database Setup Script
 -- Platform: Multi-tenant Campus Management System
 -- Target: Supabase (PostgreSQL) SQL Editor
--- Generated at: 2026-06-24T17:52:55.084Z
+-- Generated at: 2026-06-25T00:00:00.000Z
+-- Last updated: 2026-06-25 — Added transit_location_history (live bus tracking)
 -- ==========================================================
 
 -- ==========================================================
@@ -14848,6 +14849,51 @@ CREATE POLICY "Everyone authenticated can view gate lockdown"
   );
 
 CREATE INDEX IF NOT EXISTS idx_gate_lockdown_institution ON gate_lockdown(institution_id);
+
+
+-- ==========================================================
+-- MIGRATION: 20260625000000_live_bus_tracking.sql
+-- ==========================================================
+
+-- Migration: Live Bus Tracking — Real GPS Telemetry
+-- Adds GPS coordinate columns to buses table and creates
+-- transit_location_history for historical tracking data.
+
+-- 1. Add live tracking columns to existing buses table
+ALTER TABLE buses ADD COLUMN IF NOT EXISTS current_lat DECIMAL(10, 8);
+ALTER TABLE buses ADD COLUMN IF NOT EXISTS current_lng DECIMAL(11, 8);
+ALTER TABLE buses ADD COLUMN IF NOT EXISTS last_location_at TIMESTAMPTZ;
+ALTER TABLE buses ADD COLUMN IF NOT EXISTS speed_kmh DECIMAL(5, 2) DEFAULT 0;
+
+-- 2. Create transit location history table
+CREATE TABLE IF NOT EXISTS transit_location_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bus_id UUID REFERENCES buses(id) ON DELETE CASCADE,
+  driver_id UUID REFERENCES users(id),
+  lat DECIMAL(10, 8) NOT NULL,
+  lng DECIMAL(11, 8) NOT NULL,
+  speed_kmh DECIMAL(5, 2),
+  recorded_at TIMESTAMPTZ DEFAULT NOW(),
+  institution_id UUID REFERENCES institutions(id)
+);
+
+-- 3. Performance index for time-series queries
+CREATE INDEX IF NOT EXISTS idx_transit_history_bus_time
+  ON transit_location_history(bus_id, recorded_at DESC);
+
+-- 4. Enable RLS
+ALTER TABLE transit_location_history ENABLE ROW LEVEL SECURITY;
+
+-- 5. RLS Policies
+CREATE POLICY transit_history_select_policy ON transit_location_history
+  FOR SELECT USING (institution_id = get_auth_institution_id());
+
+CREATE POLICY transit_history_insert_policy ON transit_location_history
+  FOR INSERT WITH CHECK (institution_id = get_auth_institution_id());
+
+-- Service role bypass for backend writes
+CREATE POLICY transit_history_service_role ON transit_location_history
+  FOR ALL USING (true) WITH CHECK (true);
 
 
 -- ==========================================================

@@ -1824,4 +1824,44 @@ export async function recordStudentTransitTap(req: Request, res: Response) {
   }
 }
 
+// ========== LIVE BUS TRACKING — GET ACTIVE BUSES ==========
+export async function getLiveBuses(req: Request, res: Response) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('buses')
+      .select(`
+        id, vehicle_number, current_lat, current_lng,
+        last_location_at, is_active, speed_kmh,
+        bus_routes ( name, route_number )
+      `)
+      .eq('institution_id', req.user?.institution_id)
+      .eq('is_active', true);
 
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, buses: data || [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Internal server error fetching live buses.' });
+  }
+}
+
+// ========== LIVE BUS TRACKING — GET MY ASSIGNED BUSES (DRIVER) ==========
+export async function getMyBuses(req: Request, res: Response) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('buses')
+      .select(`id, vehicle_number, bus_routes ( name, route_number )`)
+      .eq('driver_id', req.user?.id)
+      .eq('institution_id', req.user?.institution_id);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, buses: data || [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Internal server error fetching driver buses.' });
+  }
+}

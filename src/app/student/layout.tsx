@@ -50,7 +50,25 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(savedProfile);
         const role = parsed.role || '';
-        const instType = parsed.institute_type || 'college';
+        let instType = parsed.institute_type || 'college';
+
+        const refreshProfile = () => {
+          const token = localStorage.getItem('iris_jwt_token');
+          if (!token) return;
+          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.profile) {
+                const freshType = data.profile.institute_type || 'college';
+                if (freshType !== instType) {
+                  parsed.institute_type = freshType;
+                  localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+                  window.location.reload();
+                }
+              }
+            })
+            .catch(() => {});
+        };
 
         if (instType === 'school') {
           alert('Student portal is not available for school-type institutes. Parents can access student details through the Parent Portal.');
@@ -64,6 +82,7 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
         }
 
         setAuthorized(true);
+        refreshProfile();
       } catch (e) {
         console.error('Failed parsing profile for student auth check:', e);
         setAuthorized(false);
