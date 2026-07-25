@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 // Public endpoint — no auth required.
 // Uses the anon key so RLS applies (institutions table should allow public SELECT).
 // Falls back to service key if the anon key cannot read the table (common before RLS is tuned).

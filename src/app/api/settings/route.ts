@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import { supabaseAdmin, isSupabaseOffline } from '../../../config/supabase';
 
+export const dynamic = 'force-dynamic';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 
 function getScopedSupabase(req: NextRequest): any {

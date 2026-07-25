@@ -180,7 +180,7 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
   }
 }
 
-export async function apiPost<T = any>(endpoint: string, body: any): Promise<ApiResponse<T>> {
+export async function apiPost<T = any>(endpoint: string, body: any = {}): Promise<ApiResponse<T>> {
   try {
     const url = getFormattedUrl(endpoint);
     const response = await request(url, {
@@ -198,7 +198,7 @@ export async function apiPost<T = any>(endpoint: string, body: any): Promise<Api
   }
 }
 
-export async function apiPut<T = any>(endpoint: string, body: any): Promise<ApiResponse<T>> {
+export async function apiPut<T = any>(endpoint: string, body: any = {}): Promise<ApiResponse<T>> {
   try {
     const response = await request(getFormattedUrl(endpoint), {
       method: 'PUT',
