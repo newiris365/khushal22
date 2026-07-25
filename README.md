@@ -1,6 +1,6 @@
 # IRIS 365 — AI-Powered Campus Operating System
 
-A feature-complete, multi-tenant campus management platform — currently in active development toward production hardening for v1.0. Designed for Indian educational institutions, built for **SIN Education and Technology Pvt. Ltd. (Jodhpur, Rajasthan)**.
+A feature-complete, multi-tenant campus management platform — currently in active development toward production hardening for v1.0. Designed for Indian educational institutions, built for **KSL Studio (Jodhpur, Rajasthan)**.
 
 ---
 

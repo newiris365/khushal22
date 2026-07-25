@@ -152,7 +152,7 @@ export default function CandidateFeesPage() {
             <div class="row bold" style="font-size: 18px;"><span>Total Amount Paid:</span> <span>INR ${fee.amount.toLocaleString()}</span></div>
             <div class="footer">
               This is a computer-generated transaction receipt and requires no manual signature.
-              <br/>© 2026 SIN Education & Technology Pvt. Ltd.
+              <br/>© 2026 KSL Studio.
             </div>
           </div>
           <script>window.print();</script>

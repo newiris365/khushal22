@@ -103,7 +103,7 @@ export default function GenericDashboard() {
 
         {/* Footer Info */}
         <div className="mt-12 text-center">
-          <p className="text-[10px] text-[#C4B5FD]/30">IRIS 365 by SIN Education and Technology Pvt. Ltd. | Jodhpur, Rajasthan</p>
+          <p className="text-[10px] text-[#C4B5FD]/30">IRIS 365 by KSL Studio | Jodhpur, Rajasthan</p>
         </div>
       </div>
     </div>

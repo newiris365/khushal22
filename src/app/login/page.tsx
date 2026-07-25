@@ -828,7 +828,7 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
-          <p className="text-[10px] text-[#C4B5FD]/50 font-light">&copy; 2026 SIN Education and Technology Pvt. Ltd.</p>
+          <p className="text-[10px] text-[#C4B5FD]/50 font-light">&copy; 2026 KSL Studio.</p>
         </div>
       </div>
 

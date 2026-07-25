@@ -245,7 +245,7 @@ export default function InstitutionDetailPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-white/5 py-8 px-6 bg-[#090615] text-center text-xs text-[#C4B5FD]/40 mt-10">
-        <p>© 2026 SIN Education and Technology Pvt. Ltd. All rights reserved.</p>
+        <p>© 2026 KSL Studio. All rights reserved.</p>
       </footer>
     </div>
   );

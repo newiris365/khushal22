@@ -242,7 +242,7 @@ export default function PublicAdmissionsLanding() {
       {/* Footer Contact bar */}
       <footer className="border-t border-[#6C2BD9]/20 bg-[#13102A]/80 py-10 text-center">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <span className="text-xs text-[#A78BFA]/60 font-mono">© 2026 SIN Education & Technology Pvt. Ltd. All rights reserved.</span>
+          <span className="text-xs text-[#A78BFA]/60 font-mono">© 2026 KSL Studio. All rights reserved.</span>
           <div className="flex gap-6 text-xs text-[#A78BFA]/80">
             <span className="flex items-center gap-1.5"><Phone className="w-4 h-4 text-emerald-400" /> +91 291 276 3310</span>
             <span className="flex items-center gap-1.5"><Mail className="w-4 h-4 text-[#A78BFA]" /> admissions@siet.edu.in</span>

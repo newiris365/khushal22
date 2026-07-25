@@ -427,7 +427,7 @@ export default function LandingPage() {
             <span className="font-heading font-bold text-white text-sm">IRIS 365</span>
           </div>
 
-          <p>&copy; 2026 SIN Education and Technology Pvt. Ltd. All rights reserved.</p>
+          <p>&copy; 2026 KSL Studio. All rights reserved.</p>
 
           <div className="flex gap-4 text-[#C4B5FD]/40">
             <span className="hover:text-white transition-colors">Jodhpur, Rajasthan</span>

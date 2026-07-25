@@ -348,7 +348,7 @@ export default function ApplicantHomePage() {
             <span className="font-bold text-white/60">IRIS 365</span>
             <span>— Applicant Portal</span>
           </div>
-          <p>© 2026 SIN Education and Technology Pvt. Ltd. All rights reserved.</p>
+          <p>© 2026 KSL Studio. All rights reserved.</p>
           <Link href="/login" className="hover:text-white transition-colors">Staff Login →</Link>
         </div>
       </footer>

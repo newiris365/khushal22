@@ -981,7 +981,7 @@ export async function aiHrChatbot(req: Request, res: Response) {
   try {
     const { prompt } = req.body;
     
-    let answer = `Regarding your query: "${prompt}". According to SIN Education policy manual Section 4.2, employees are entitled to 12 days of Casual Leave (CL) annually, which do not carry forward to the next financial year. Please consult the HR Admin desk for further details.`;
+    let answer = `Regarding your query: "${prompt}". According to KSL Studio policy manual Section 4.2, employees are entitled to 12 days of Casual Leave (CL) annually, which do not carry forward to the next financial year. Please consult the HR Admin desk for further details.`;
     
     if (prompt.toLowerCase().includes('sick leave')) {
       answer = `Under current Jodhpur SIET campus rules, Sick Leave (SL) credits accumulate up to 15 carry-forward days. A medical certificate must be uploaded for leaves exceeding 3 consecutive working days.`;
