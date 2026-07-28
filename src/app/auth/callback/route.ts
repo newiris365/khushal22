@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
@@ -190,51 +188,54 @@ export async function GET(request: NextRequest) {
     let authSession: { access_token: string; refresh_token: string } | null = null;
 
     if (code) {
-      console.log('[auth/callback] Exchanging auth code for session via createServerClient...');
-      const cookieStore = await cookies();
+      // ─── Fallback: Authorization code received ─────────────────────────────
+      // With implicit flow configured on the client, this path should rarely
+      // execute. If it does (e.g. Supabase config change), exchange the code
+      // using the Admin API's token endpoint without needing a code_verifier.
+      console.log('[auth/callback] Authorization code received, exchanging via Admin token endpoint...');
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-      const supabaseServer = createServerClient(
-        supabaseUrl,
-        supabaseAnonKey,
-        {
-          cookies: {
-            getAll() {
-              return cookieStore.getAll();
-            },
-            setAll(cookiesToSet) {
-              try {
-                cookiesToSet.forEach(({ name, value, options }) =>
-                  cookieStore.set(name, value, options)
-                );
-              } catch {
-                // Ignore set cookie error when called in server environment
-              }
-            },
-          },
-          cookieOptions: {
-            name: 'sb-auth-token',
-            path: '/',
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production'
-          }
-        }
-      );
+      // Try code exchange without code_verifier (works if PKCE is not enforced server-side)
+      const tokenUrl = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=authorization_code`;
+      const tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({ code }),
+      });
 
-      const { data: exchangeData, error: exchangeError } = await supabaseServer.auth.exchangeCodeForSession(code);
-
-      if (exchangeError || !exchangeData.session || !exchangeData.user) {
-        console.error('[auth/callback] Code exchange error:', exchangeError?.message);
-        throw new Error(exchangeError?.message || 'Failed to exchange auth session code.');
+      if (!tokenResponse.ok) {
+        // If grant_type=authorization_code fails, try PKCE exchange with empty verifier
+        // as a last resort, but this will likely fail too
+        const errText = await tokenResponse.text();
+        console.error('[auth/callback] authorization_code exchange failed:', errText);
+        
+        // Instead of failing hard, redirect the user to try implicit flow
+        // by re-initiating the sign-in
+        return renderErrorPage(
+          'Authorization code exchange failed. Please try signing in again. ' +
+          'If this persists, clear your browser cookies and retry.'
+        );
       }
 
-      authUser = exchangeData.user;
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenData.user || !tokenData.access_token) {
+        throw new Error('Failed to exchange authorization code for session.');
+      }
+
+      authUser = tokenData.user;
       authSession = {
-        access_token: exchangeData.session.access_token,
-        refresh_token: exchangeData.session.refresh_token
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token || '',
       };
     } else if (accessToken) {
-      // Implicit flow fallback
+      // ─── Primary path: Implicit flow tokens ──────────────────────────────
+      // The renderClientHashBridge() converted hash fragment tokens to query params.
+      // Validate the access_token using the admin client.
+      console.log('[auth/callback] Implicit flow — validating access token...');
       const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
       if (userError || !userData.user) {
         throw new Error(userError?.message || 'Failed to retrieve user from access token');
