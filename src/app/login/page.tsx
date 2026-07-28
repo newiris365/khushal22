@@ -361,9 +361,6 @@ export default function LoginPage() {
     setIsLoading(true);
     setSubmitError(null);
     try {
-      // Sign out of any existing Supabase session to clear stale PKCE state
-      await supabase.auth.signOut();
-
       // Clear any stale local sessions before starting OAuth redirect
       localStorage.removeItem('iris_jwt_token');
       localStorage.removeItem('iris_user_profile');

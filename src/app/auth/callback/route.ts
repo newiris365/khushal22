@@ -190,53 +190,48 @@ export async function GET(request: NextRequest) {
     let authSession: { access_token: string; refresh_token: string } | null = null;
 
     if (code) {
-      // ─── STEP 4: PKCE code exchange via direct HTTP POST ───────────────────
-      console.log('[auth/callback] STEP 4 — Attempting PKCE code exchange...');
+      console.log('[auth/callback] Exchanging auth code for session via createServerClient...');
       const cookieStore = await cookies();
-      const allCookies = cookieStore.getAll();
-      const verifierCookie = allCookies.find(c => c.name.includes('code-verifier') || c.name.includes('code_verifier') || c.name.includes('pkce'));
-      const code_verifier = verifierCookie?.value;
-
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://api.iris365.in';
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-      const tokenUrl = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=pkce`;
-      const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseAnonKey
-        },
-        body: JSON.stringify({
-          code,
-          code_verifier: code_verifier || ''
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Direct PKCE token exchange failed: ${errText}`);
-      }
-
-      const tokenData = await response.json();
-
-      const authData = {
-        user: tokenData.user,
-        session: {
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          expires_at: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600)
+      const supabaseServer = createServerClient(
+        supabaseUrl,
+        supabaseAnonKey,
+        {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll();
+            },
+            setAll(cookiesToSet) {
+              try {
+                cookiesToSet.forEach(({ name, value, options }) =>
+                  cookieStore.set(name, value, options)
+                );
+              } catch {
+                // Ignore set cookie error when called in server environment
+              }
+            },
+          },
+          cookieOptions: {
+            name: 'sb-auth-token',
+            path: '/',
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+          }
         }
-      };
+      );
 
-      if (!authData.session || !authData.user) {
-        throw new Error('Failed to exchange auth session code');
+      const { data: exchangeData, error: exchangeError } = await supabaseServer.auth.exchangeCodeForSession(code);
+
+      if (exchangeError || !exchangeData.session || !exchangeData.user) {
+        console.error('[auth/callback] Code exchange error:', exchangeError?.message);
+        throw new Error(exchangeError?.message || 'Failed to exchange auth session code.');
       }
 
-      authUser = authData.user;
+      authUser = exchangeData.user;
       authSession = {
-        access_token: authData.session.access_token,
-        refresh_token: authData.session.refresh_token
+        access_token: exchangeData.session.access_token,
+        refresh_token: exchangeData.session.refresh_token
       };
     } else if (accessToken) {
       // Implicit flow fallback
@@ -260,13 +255,12 @@ export async function GET(request: NextRequest) {
       throw new Error('No email returned from Google authentication provider');
     }
 
-    // Fetch user profile matching the authenticated email
+    // Fetch user profile matching the authenticated email (case-insensitive)
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('*, institutions(name, plan_tier, type)')
-
-      .eq('email', email)
-      .single();
+      .ilike('email', email)
+      .maybeSingle();
 
     if (profileError) {
       console.error('[auth/callback] Profile lookup error:', profileError.message);
