@@ -366,29 +366,8 @@ export default function LoginPage() {
       localStorage.removeItem('iris_user_profile');
       localStorage.removeItem('iris_refresh_token');
 
-      // Use a plain Supabase client with implicit flow for Google OAuth.
-      // The shared `supabase` client uses createBrowserClient which hardcodes
-      // flowType:'pkce'. PKCE stores a code_verifier in a cookie via document.cookie,
-      // but on Vercel serverless the callback route handler's cookies() API cannot
-      // reliably read it — causing "both auth code and code verifier should be
-      // non-empty" errors. Implicit flow returns tokens directly in the URL hash,
-      // bypassing cookies entirely.
-      const { createClient: createPlainClient } = await import('@supabase/supabase-js');
-      const oauthClient = createPlainClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        {
-          auth: {
-            flowType: 'implicit',
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          }
-        }
-      );
-
       const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') || '' : '';
-      const { error } = await oauthClient.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback?device_id=${encodeURIComponent(deviceId)}`
