@@ -186,62 +186,72 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let authUser = null;
+    let authUser: any = null;
     let authSession: { access_token: string; refresh_token: string } | null = null;
 
     if (code) {
-      // ─── STEP 4: PKCE code exchange via direct HTTP POST ───────────────────
-      console.log('[auth/callback] STEP 4 — Attempting PKCE code exchange...');
-      const cookieStore = await cookies();
-      const allCookies = cookieStore.getAll();
-      const verifierCookie = allCookies.find(c => c.name.includes('code-verifier') || c.name.includes('code_verifier') || c.name.includes('pkce'));
-      const code_verifier = verifierCookie?.value;
+      // ─── STEP 4: PKCE code exchange via createServerClient ─────────────────
+      console.log('[auth/callback] STEP 4 — Attempting server-side PKCE code exchange...');
+      try {
+        const cookieStore = await cookies();
+        const supabaseSSR = createServerClient(
+          supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bxdfmlqzstwcsujdgejn.supabase.co',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          {
+            cookies: {
+              getAll() {
+                return cookieStore.getAll();
+              },
+              setAll(cookiesToSet) {
+                try {
+                  cookiesToSet.forEach(({ name, value, options }) => {
+                    cookieStore.set(name, value, options);
+                  });
+                } catch {
+                  // Ignore in read-only route handler context
+                }
+              }
+            },
+            cookieOptions: {
+              name: 'sb-auth-token',
+              path: '/',
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production'
+            }
+          }
+        );
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://api.iris365.in';
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+        const { data: authData, error: authError } = await supabaseSSR.auth.exchangeCodeForSession(code);
 
-      const tokenUrl = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=pkce`;
-      const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseAnonKey
-        },
-        body: JSON.stringify({
-          code,
-          code_verifier: code_verifier || ''
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Direct PKCE token exchange failed: ${errText}`);
-      }
-
-      const tokenData = await response.json();
-
-      const authData = {
-        user: tokenData.user,
-        session: {
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          expires_at: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600)
+        if (!authError && authData?.session && authData?.user) {
+          authUser = authData.user;
+          authSession = {
+            access_token: authData.session.access_token,
+            refresh_token: authData.session.refresh_token
+          };
+          console.log('[auth/callback] Server-side PKCE code exchange SUCCEEDED for user:', authUser.email);
+        } else {
+          console.warn('[auth/callback] Server-side PKCE exchange failed:', authError?.message || 'No session returned');
         }
-      };
-
-      if (!authData.session || !authData.user) {
-        throw new Error('Failed to exchange auth session code');
+      } catch (exchangeErr: any) {
+        console.warn('[auth/callback] Server-side PKCE exception:', exchangeErr?.message);
       }
 
-      authUser = authData.user;
-      authSession = {
-        access_token: authData.session.access_token,
-        refresh_token: authData.session.refresh_token
-      };
+      // If server-side exchange failed (e.g. cookie stripped by mobile browser / proxy),
+      // redirect to /login with code so the browser client can exchange using document.cookie.
+      if (!authUser || !authSession) {
+        console.log('[auth/callback] Redirecting to /login for client-side PKCE fallback exchange...');
+        const loginExchangeUrl = new URL('/login', requestUrl.origin);
+        loginExchangeUrl.searchParams.set('code', code);
+        if (deviceId && deviceId !== 'unknown-device') {
+          loginExchangeUrl.searchParams.set('device_id', deviceId);
+        }
+        return NextResponse.redirect(loginExchangeUrl);
+      }
     } else if (accessToken) {
-      // Implicit flow fallback
+      // Implicit flow or client-side bridge fallback
       const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
-      if (userError || !userData.user) {
+      if (userError || !userData?.user) {
         throw new Error(userError?.message || 'Failed to retrieve user from access token');
       }
       authUser = userData.user;

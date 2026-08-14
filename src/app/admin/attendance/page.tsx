@@ -47,7 +47,7 @@ export default function AdminAttendancePage() {
 
   const triggerAutoStart = async () => {
     try {
-      await apiPost('/core/attendance/auto-start');
+      await apiPost('/core/attendance/auto-start', {});
     } catch (err) {
       // Silent fail - auto-start is best-effort
     }
