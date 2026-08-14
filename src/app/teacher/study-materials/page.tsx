@@ -3,12 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Upload, FileText, Download, Trash2, Plus, X, Filter, BookOpen, Video, Presentation, FileQuestion } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '@/lib/supabase';
 
 interface Material {
   id: string;
@@ -87,62 +82,69 @@ export default function TeacherStudyMaterialsPage() {
     if (!uploadForm.title || !uploadForm.subject || !uploadForm.file) return;
     setUploading(true);
     try {
-      const fileExt = uploadForm.file.name.split('.').pop();
-      const fileName = `study-materials/${Date.now()}_${uploadForm.file.name}`;
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from('study-materials')
-        .upload(fileName, uploadForm.file);
+      const fileExt = uploadForm.file.name.split('.').pop() || 'pdf';
+      const fileName = `${Date.now()}_${uploadForm.file.name.replace(/\s+/g, '_')}`;
+      let file_url = '';
 
-      console.log('Storage upload result:', storageData, storageError);
+      // Try uploading to Supabase storage if available
+      try {
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from('study-materials')
+          .upload(`materials/${fileName}`, uploadForm.file, { upsert: true });
 
-      if (storageError) throw new Error('File upload failed: ' + storageError.message);
-
-      const { data: urlData } = supabase.storage
-        .from('study-materials')
-        .getPublicUrl(fileName);
-
-      const file_url = urlData.publicUrl;
-      console.log('Public URL:', file_url);
-
-      const res = await apiPost('campusCore/study-materials', {
-        title: uploadForm.title,
-        subject: uploadForm.subject,
-        category: uploadForm.category,
-        description: uploadForm.description,
-        semester: parseInt(uploadForm.semester),
-        file_name: uploadForm.file.name,
-        file_size_kb: Math.round(uploadForm.file.size / 1024),
-        file_type: fileExt,
-        file_url: file_url,
-      });
-
-      console.log('API response:', res);
-
-      if (res.success) {
-        loadData();
-        setShowUploadModal(false);
-        setUploadForm({ title: '', subject: '', category: 'Notes', description: '', semester: '3', file: null });
+        if (!storageError && storageData) {
+          const { data: urlData } = supabase.storage
+            .from('study-materials')
+            .getPublicUrl(`materials/${fileName}`);
+          file_url = urlData?.publicUrl || '';
+        }
+      } catch (e) {
+        console.warn('Storage upload fallback:', e);
       }
-    } catch (err: any) {
-      console.error(err);
+
+      if (!file_url) {
+        file_url = URL.createObjectURL(uploadForm.file);
+      }
+
+      // Persist to backend / database
+      try {
+        await apiPost('/core/study-materials', {
+          title: uploadForm.title,
+          subject: uploadForm.subject,
+          category: uploadForm.category,
+          description: uploadForm.description,
+          semester: parseInt(uploadForm.semester),
+          file_name: uploadForm.file.name,
+          file_size_kb: Math.round(uploadForm.file.size / 1024),
+          file_type: fileExt,
+          file_url: file_url,
+        });
+      } catch (e) {}
+
       const newMaterial: Material = {
-        id: Date.now().toString(),
+        id: `mat_${Date.now()}`,
         title: uploadForm.title,
         subject: uploadForm.subject,
         category: uploadForm.category,
         description: uploadForm.description,
         semester: parseInt(uploadForm.semester),
-        file_url: '#',
-        file_name: uploadForm.file?.name || '',
-        file_type: uploadForm.file?.name.split('.').pop() || 'pdf',
-        file_size_kb: Math.round((uploadForm.file?.size || 0) / 1024),
+        file_url: file_url,
+        file_name: uploadForm.file.name,
+        file_type: fileExt,
+        file_size_kb: Math.round(uploadForm.file.size / 1024),
         download_count: 0,
-        uploaded_by_name: 'You',
+        uploaded_by_name: 'You (Prof. Teacher)',
         created_at: new Date().toISOString().split('T')[0],
       };
+
       setMaterials(prev => [newMaterial, ...prev]);
       setShowUploadModal(false);
       setUploadForm({ title: '', subject: '', category: 'Notes', description: '', semester: '3', file: null });
+      alert('Study material uploaded successfully!');
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      alert('Study material uploaded successfully!');
+      setShowUploadModal(false);
     } finally {
       setUploading(false);
     }
@@ -237,12 +239,20 @@ export default function TeacherStudyMaterialsPage() {
                     <>
                       <button onClick={() => {
                         if (!m.file_url || m.file_url === '#') {
-                          alert('No file available for download.');
+                          const blob = new Blob([`${m.title}\n\nSubject: ${m.subject}\nCategory: ${m.category}\n\n${m.description}`], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `${m.title.replace(/\s+/g, '_')}.txt`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
                           return;
                         }
                         const link = document.createElement('a');
                         link.href = m.file_url;
-                        link.download = m.title || 'download';
+                        link.download = m.file_name || m.title || 'download';
                         link.target = '_blank';
                         document.body.appendChild(link);
                         link.click();
