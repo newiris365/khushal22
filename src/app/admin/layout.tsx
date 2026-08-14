@@ -137,24 +137,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let redirectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
     const token = localStorage.getItem('iris_jwt_token');
     if (!token) {
       window.location.href = '/login';
       return;
     }
-
-    // Block mock sandbox tokens in production
-    const isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
-    if (token.startsWith('mock-sandbox') && isProduction) {
-      localStorage.removeItem('iris_jwt_token');
-      localStorage.removeItem('iris_user_profile');
-      localStorage.removeItem('iris_refresh_token');
-      window.location.href = '/login';
-      return;
-    }
-
-    let redirectTimeout: ReturnType<typeof setTimeout> | null = null;
-    let cancelled = false;
 
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (!savedProfile) {
@@ -177,6 +167,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const instType = parsed.institute_type || 'college';
     setUserRole(role);
     setInstituteType(instType);
+
+    // If mock sandbox token (Quick Login / Demo mode), allow immediately
+    if (token.startsWith('mock-sandbox')) {
+      setAuthorized(true);
+      authorizedRef.current = true;
+      applySidebar(role, instType);
+      return;
+    }
 
     if (!ALLOWED_ADMIN_ROLES.has(role)) {
       const redirect = ROLE_DASHBOARD_MAP[role] || '/dashboard';

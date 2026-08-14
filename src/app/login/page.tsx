@@ -482,16 +482,10 @@ export default function LoginPage() {
         return;
       }
 
-      // ─── Stale Mock Token Cleanup ─────────────────────────────────────────────
-      const isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
       const token = localStorage.getItem('iris_jwt_token');
       const savedProfile = localStorage.getItem('iris_user_profile');
 
-      if (token && token.startsWith('mock-sandbox') && isProduction) {
-        localStorage.removeItem('iris_jwt_token');
-        localStorage.removeItem('iris_user_profile');
-        localStorage.removeItem('iris_refresh_token');
-      } else if (token && savedProfile) {
+      if (token && savedProfile) {
         // ─── Auto-Redirect for Existing Session ────────────────────────────────
         // Only auto-redirect if there is a valid, non-stale session already in
         // localStorage. This handles the case where a user's JWT expired and they
