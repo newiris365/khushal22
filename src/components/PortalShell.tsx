@@ -128,6 +128,16 @@ export default function PortalShell({
   const [profile, setProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [disabledFeatures, setDisabledFeatures] = useState<string[]>([]);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('iris_theme') as 'dark' | 'light' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  const logoSrc = theme === 'light' ? '/iris_logo.jpeg' : '/dark_logo.jpeg';
 
   // Custom states for new features
   const [showFallbackBanner, setShowFallbackBanner] = useState(false);
@@ -276,8 +286,12 @@ export default function PortalShell({
         {/* Logo area */}
         <div className="p-5 border-b border-white/5 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#6C2BD9] to-[#06B6D4] flex items-center justify-center shadow-lg shadow-[#6C2BD9]/20">
-              <Shield className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
+              <img 
+                src={logoSrc} 
+                alt="IRIS 365 Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <span className="font-extrabold text-sm text-white tracking-tight">IRIS 365</span>

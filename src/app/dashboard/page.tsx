@@ -6,13 +6,20 @@ import { LogOut, LayoutDashboard, Users, Calendar, ClipboardList, Bell, Shield, 
 
 export default function GenericDashboard() {
   const [profile, setProfile] = useState<any>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
       setProfile(JSON.parse(savedProfile));
     }
+    const savedTheme = localStorage.getItem('iris_theme') as 'dark' | 'light' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
   }, []);
+
+  const logoSrc = theme === 'light' ? '/iris_logo.jpeg' : '/dark_logo.jpeg';
 
   if (!profile) return <div className="p-8 text-center text-xs text-[#C4B5FD]">Loading session...</div>;
 
@@ -61,7 +68,13 @@ export default function GenericDashboard() {
       {/* Header */}
       <header className="border-b border-[#6C2BD9]/25 bg-[#13102A]/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#6C2BD9] to-[#8B5CF6] flex items-center justify-center font-extrabold text-sm text-white">I</div>
+          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
+            <img 
+              src={logoSrc} 
+              alt="IRIS 365 Logo" 
+              className="w-full h-full object-cover"
+            />
+          </div>
           <span className="font-extrabold text-lg text-white">IRIS 365</span>
           <span className="text-[10px] bg-[#6C2BD9]/20 text-[#A78BFA] px-2 py-0.5 rounded-lg font-semibold uppercase tracking-wider">{profile.role} Portal</span>
         </div>
