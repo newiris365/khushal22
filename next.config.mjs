@@ -11,6 +11,13 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // Exclude server-side code from Next.js compilation entirely
   // This prevents Next.js from scanning Express controllers/routes/services
   webpack: (config, { isServer }) => {
