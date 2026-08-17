@@ -399,6 +399,31 @@ export default function LoginPage() {
       // Parse URL parameters to check for OAuth callback errors
       const params = new URLSearchParams(window.location.search);
 
+      // ─── Client-side PKCE Code Exchange Fallback ─────────────────────────────
+      // If server-side exchange could not access cookies (e.g. mobile webview / ITP),
+      // auth/callback redirects here with ?code=... to exchange directly in browser.
+      const oauthCode = params.get('code');
+      if (oauthCode) {
+        setIsCheckingSession(true);
+        (async () => {
+          try {
+            const { data, error } = await supabase.auth.exchangeCodeForSession(oauthCode);
+            if (error || !data?.session?.access_token) {
+              throw new Error(error?.message || 'Failed to complete OAuth verification.');
+            }
+            const deviceIdParam = params.get('device_id') || localStorage.getItem('iris_client_device_id') || '';
+            const callbackUrl = `/auth/callback?access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token || '')}&device_id=${encodeURIComponent(deviceIdParam)}`;
+            window.location.href = callbackUrl;
+          } catch (err: any) {
+            console.error('[login] Client-side PKCE exchange fallback error:', err);
+            setSubmitError(err?.message || 'Google sign-in verification failed. Please try again.');
+            if (active) setIsCheckingSession(false);
+            clearTimeout(timeout);
+          }
+        })();
+        return;
+      }
+
       // ─── OAuth Token Ingestion ────────────────────────────────────────────────
       // The auth/callback route redirects here with token, refresh, profile, and
       // path as query params. We store them in localStorage here — in a trusted
@@ -457,16 +482,10 @@ export default function LoginPage() {
         return;
       }
 
-      // ─── Stale Mock Token Cleanup ─────────────────────────────────────────────
-      const isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
       const token = localStorage.getItem('iris_jwt_token');
       const savedProfile = localStorage.getItem('iris_user_profile');
 
-      if (token && token.startsWith('mock-sandbox') && isProduction) {
-        localStorage.removeItem('iris_jwt_token');
-        localStorage.removeItem('iris_user_profile');
-        localStorage.removeItem('iris_refresh_token');
-      } else if (token && savedProfile) {
+      if (token && savedProfile) {
         // ─── Auto-Redirect for Existing Session ────────────────────────────────
         // Only auto-redirect if there is a valid, non-stale session already in
         // localStorage. This handles the case where a user's JWT expired and they

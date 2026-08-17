@@ -13622,3 +13622,20 @@ CREATE POLICY gate_incidents_policy ON gate_incidents
     FOR ALL USING (institution_id = get_auth_institution_id() OR get_auth_user_role() = 'SuperAdmin');
 
 CREATE INDEX IF NOT EXISTS idx_gate_incidents_inst ON gate_incidents(institution_id);
+
+
+-- ==========================================================
+-- MIGRATION: 20260716000000_applicant_homepage_visibility.sql
+-- ==========================================================
+
+-- Migration: Add is_visible_on_homepage flag to institutions table
+-- Purpose : SuperAdmin can control which institutions appear on the public applicant home page.
+-- Default : false — no institution is shown publicly until explicitly enabled.
+-- Apply   : Run this in the Supabase SQL Editor (do NOT auto-apply via CLI without review).
+
+ALTER TABLE institutions
+  ADD COLUMN IF NOT EXISTS is_visible_on_homepage BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN institutions.is_visible_on_homepage IS
+  'When true, this institution is listed on the public /home applicant discovery page. '
+  'Only SuperAdmin can toggle this flag. Defaults to false (hidden).';

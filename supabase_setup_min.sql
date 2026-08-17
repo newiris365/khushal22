@@ -10619,3 +10619,8 @@ DROP POLICY IF EXISTS gate_incidents_policy ON gate_incidents;
 CREATE POLICY gate_incidents_policy ON gate_incidents
 FOR ALL USING (institution_id = get_auth_institution_id() OR get_auth_user_role() = 'SuperAdmin');
 CREATE INDEX IF NOT EXISTS idx_gate_incidents_inst ON gate_incidents(institution_id);
+ALTER TABLE institutions
+ADD COLUMN IF NOT EXISTS is_visible_on_homepage BOOLEAN NOT NULL DEFAULT false;
+COMMENT ON COLUMN institutions.is_visible_on_homepage IS
+'When true, this institution is listed on the public /home applicant discovery page. '
+'Only SuperAdmin can toggle this flag. Defaults to false (hidden).';

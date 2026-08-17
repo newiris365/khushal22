@@ -123,7 +123,27 @@ export default function StudyMaterialsPage() {
                 <div className="text-[10px] text-[#C4B5FD]/40">{formatSize(m.file_size_kb)}</div>
                 <div className="text-[9px] text-[#C4B5FD]/30">{m.download_count} downloads</div>
               </div>
-              <button onClick={() => alert(`Downloading: ${m.file_url}`)}
+              <button onClick={() => {
+                if (!m.file_url || m.file_url === '#') {
+                  const blob = new Blob([`${m.title}\n\nSubject: ${m.subject}\nCategory: ${m.category}\n\n${m.description}`], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `${m.title.replace(/\s+/g, '_')}.txt`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                  return;
+                }
+                const link = document.createElement('a');
+                link.href = m.file_url;
+                link.download = m.file_name || m.title || 'download';
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
                 className="px-3 py-2 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 text-[#A78BFA] text-xs font-bold flex items-center gap-1 hover:bg-[#6C2BD9]/30 transition-all">
                 <Download className="w-4 h-4" />
               </button>

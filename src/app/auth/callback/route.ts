@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 // Force this route to always be server-rendered (never statically cached).
+// Required for cookie access on Netlify SSR deployments.
 export const dynamic = 'force-dynamic';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || '';
+
 
 // Create a service-role supabase client to fetch profiles bypassed RLS
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -80,6 +84,28 @@ const getRedirectPath = (role: string): string => {
   }
 };
 
+function computeFingerprint(req: NextRequest, deviceId: string): string {
+  const userAgent = req.headers.get('user-agent') || 'unknown';
+
+  // Try to resolve client IP
+  let ip = req.ip || req.headers.get('x-forwarded-for') || 'unknown';
+  if (ip.includes(',')) {
+    ip = ip.split(',')[0].trim();
+  }
+
+  let ipSegment = ip;
+  if (ip.includes(':')) {
+    // IPv6 subnet masking
+    ipSegment = ip.split(':').slice(0, 4).join(':');
+  } else if (ip.includes('.')) {
+    // IPv4 subnet masking
+    ipSegment = ip.split('.').slice(0, 3).join('.');
+  }
+
+  const raw = `${userAgent}-${ipSegment}-${deviceId}`;
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
 function renderErrorPage(errorMessage: string) {
   const html = `
     <!DOCTYPE html>
@@ -102,209 +128,57 @@ function renderErrorPage(errorMessage: string) {
   return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
 }
 
-/**
- * Client-side bridge page that handles BOTH:
- * 1. PKCE code exchange (reads code_verifier from browser cookies)
- * 2. Implicit flow hash fragments (reads access_token from URL hash)
- *
- * On Vercel serverless, the cookies() API from next/headers cannot reliably
- * read cookies set by document.cookie before the OAuth redirect. But the
- * browser CAN read its own cookies — so the PKCE exchange must happen
- * client-side.
- */
-function renderClientBridge(supabaseUrlForClient: string, supabaseAnonKey: string) {
+function renderClientHashBridge() {
   const html = `
     <!DOCTYPE html>
     <html>
     <head><title>Authenticating...</title></head>
     <body style="background-color:#0D0A1A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-      <div id="status" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
+      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
         <div style="width:40px;height:40px;border:3px solid rgba(124,58,237,0.3);border-top-color:#7C3AED;border-radius:50%;animation:spin 1s infinite linear;"></div>
-        <p style="font-size:14px;font-weight:500;color:#C4B5FD;">Completing Google sign-in...</p>
+        <p style="font-size:14px;font-weight:500;color:#C4B5FD;">Verifying Google login parameters...</p>
       </div>
       <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
       <script>
-        (async function(){
-          try {
-            var url = new URL(window.location.href);
-            var code = url.searchParams.get('code');
-            var deviceId = url.searchParams.get('device_id') || '';
-            var hash = window.location.hash;
-
-            // ─── Path 1: Hash fragment (implicit flow) ─────────────────────────
-            if (!code && hash && hash.includes('access_token=')) {
-              var params = new URLSearchParams(hash.substring(1));
-              var at = params.get('access_token');
-              var rt = params.get('refresh_token');
-              if (at) {
-                var u = new URL(window.location.href);
-                u.hash = '';
-                u.searchParams.delete('code');
-                u.searchParams.set('access_token', at);
-                if (rt) u.searchParams.set('refresh_token', rt);
-                window.location.href = u.toString();
+        (function(){
+          try{
+            const hash=window.location.hash;
+            if(hash&&hash.includes('access_token=')){
+              const params=new URLSearchParams(hash.substring(1));
+              const at=params.get('access_token');
+              const rt=params.get('refresh_token');
+              if(at){
+                const u=new URL(window.location.href);
+                u.searchParams.set('access_token',at);
+                if(rt)u.searchParams.set('refresh_token',rt);
+                u.hash='';
+                window.location.href=u.toString();
                 return;
               }
             }
-
-            // ─── Path 2: PKCE code exchange (client-side) ──────────────────────
-            if (code) {
-              // Read the PKCE code_verifier from browser cookies.
-              // @supabase/ssr stores it as chunked base64url cookies.
-              var allCookies = {};
-              document.cookie.split(';').forEach(function(c) {
-                var parts = c.trim().split('=');
-                var name = parts[0];
-                var val = parts.slice(1).join('=');
-                allCookies[name] = decodeURIComponent(val);
-              });
-
-              // Try multiple possible cookie name patterns
-              var possibleKeys = [
-                'sb-auth-token-code-verifier',
-                'sb-${supabaseUrlForClient.replace('https://', '').split('.')[0]}-auth-token-code-verifier'
-              ];
-
-              var codeVerifier = null;
-              for (var ki = 0; ki < possibleKeys.length; ki++) {
-                var storageKey = possibleKeys[ki];
-
-                // Try single cookie
-                if (allCookies[storageKey]) {
-                  codeVerifier = decodeVerifier(allCookies[storageKey]);
-                  if (codeVerifier) break;
-                }
-
-                // Try chunked cookies (.0, .1, .2, ...)
-                var combined = '';
-                for (var ci = 0; ci < 10; ci++) {
-                  var chunkName = storageKey + '.' + ci;
-                  if (allCookies[chunkName]) {
-                    combined += allCookies[chunkName];
-                  } else {
-                    break;
-                  }
-                }
-                if (combined) {
-                  codeVerifier = decodeVerifier(combined);
-                  if (codeVerifier) break;
-                }
-              }
-
-              if (!codeVerifier) {
-                // Last resort: scan all cookies for anything containing 'code-verifier'
-                var keys = Object.keys(allCookies);
-                for (var si = 0; si < keys.length; si++) {
-                  if (keys[si].includes('code-verifier') || keys[si].includes('code_verifier')) {
-                    codeVerifier = decodeVerifier(allCookies[keys[si]]);
-                    if (codeVerifier) break;
-                  }
-                }
-              }
-
-              if (!codeVerifier) {
-                showError('Could not find PKCE code verifier. Please clear cookies and try again.');
-                return;
-              }
-
-              // Exchange code + code_verifier via Supabase token endpoint
-              var tokenUrl = '${supabaseUrlForClient}'.replace(/\\/$/, '') + '/auth/v1/token?grant_type=pkce';
-              var resp = await fetch(tokenUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': '${supabaseAnonKey}'
-                },
-                body: JSON.stringify({
-                  auth_code: code,
-                  code_verifier: codeVerifier
-                })
-              });
-
-              if (!resp.ok) {
-                var errText = await resp.text();
-                console.error('PKCE exchange failed:', errText);
-                showError('Google sign-in verification failed. Please clear cookies and try again.');
-                return;
-              }
-
-              var tokenData = await resp.json();
-
-              if (tokenData.access_token) {
-                // Success! Redirect to the server-side handler with tokens as query params
-                var callbackUrl = new URL(window.location.origin + '/auth/callback');
-                callbackUrl.searchParams.set('access_token', tokenData.access_token);
-                if (tokenData.refresh_token) callbackUrl.searchParams.set('refresh_token', tokenData.refresh_token);
-                if (deviceId) callbackUrl.searchParams.set('device_id', deviceId);
-                window.location.href = callbackUrl.toString();
-                return;
-              }
-
-              showError('Token exchange returned no access token.');
-              return;
-            }
-
-            // No code and no hash tokens
-            window.location.href = '/login?error=' + encodeURIComponent('No authorization data returned from Google.');
-
-          } catch(e) {
-            console.error('Auth bridge error:', e);
-            showError('Authentication error: ' + (e.message || 'Unknown error'));
-          }
-
-          function decodeVerifier(val) {
-            if (!val) return null;
-            // Remove surrounding quotes
-            if (val.startsWith('"') && val.endsWith('"')) {
-              val = val.slice(1, -1);
-            }
-            // Handle base64url encoded values (from @supabase/ssr)
-            if (val.startsWith('base64-')) {
-              var b64 = val.substring(7);
-              var padded = b64.replace(/-/g, '+').replace(/_/g, '/');
-              while (padded.length % 4 !== 0) padded += '=';
-              try {
-                var decoded = atob(padded);
-                // The decoded value is JSON stringified by auth-js
-                try { return JSON.parse(decoded); } catch(e2) { return decoded; }
-              } catch(e) {
-                return null;
-              }
-            }
-            // Try JSON parse (raw format)
-            try { return JSON.parse(val); } catch(e) { return val; }
-          }
-
-          function showError(msg) {
-            document.getElementById('status').innerHTML =
-              '<div style="width:48px;height:48px;border-radius:50%;background-color:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">' +
-              '<svg style="width:24px;height:24px;color:#EF4444;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>' +
-              '</div>' +
-              '<p style="font-size:13px;color:#EF4444;font-weight:700;margin:0 0 8px 0;">Authentication Failed</p>' +
-              '<p style="font-size:12px;color:#C4B5FD;margin:0 0 16px 0;">' + msg + '</p>' +
-              '<a href="/login" style="display:inline-block;padding:10px 24px;background:linear-gradient(to right,#6C2BD9,#8B5CF6);color:white;text-decoration:none;border-radius:12px;font-weight:bold;font-size:13px;">Return to Login</a>';
+            window.location.href='/login?error='+encodeURIComponent('No authorization code or session tokens returned from Google.');
+          }catch(e){
+            window.location.href='/login?error='+encodeURIComponent('Authentication routing error');
           }
         })();
       </script>
     </body>
     </html>
   `;
-  return new NextResponse(html, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } });
+  return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
 }
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
 
+  const code = requestUrl.searchParams.get('code');
   const accessToken = requestUrl.searchParams.get('access_token');
   const refreshToken = requestUrl.searchParams.get('refresh_token');
+  const deviceId = requestUrl.searchParams.get('device_id') || 'unknown-device';
 
-  // ─── Client-side bridge for PKCE code exchange or hash fragment parsing ────
-  // If we have a `code` but no `access_token`, the PKCE exchange must happen
-  // client-side because the browser holds the code_verifier cookie.
-  // If we have neither, check for hash fragment tokens (implicit flow).
-  if (!accessToken) {
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    return renderClientBridge(supabaseUrl, anonKey);
+  // If no server-side query params exist, check client-side hash fragment (Implicit flow)
+  if (!code && !accessToken) {
+    return renderClientHashBridge();
   }
 
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
@@ -312,31 +186,97 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // ─── Validate access token via admin client ──────────────────────────────
-    // At this point, the client-side bridge has already exchanged the PKCE code
-    // for tokens. We just need to validate the access_token and look up the user.
-    console.log('[auth/callback] Validating access token via admin client...');
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
-    if (userError || !userData.user) {
-      throw new Error(userError?.message || 'Failed to retrieve user from access token');
+    let authUser: any = null;
+    let authSession: { access_token: string; refresh_token: string } | null = null;
+
+    if (code) {
+      // ─── STEP 4: PKCE code exchange via createServerClient ─────────────────
+      console.log('[auth/callback] STEP 4 — Attempting server-side PKCE code exchange...');
+      try {
+        const cookieStore = await cookies();
+        const supabaseSSR = createServerClient(
+          supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bxdfmlqzstwcsujdgejn.supabase.co',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          {
+            cookies: {
+              getAll() {
+                return cookieStore.getAll();
+              },
+              setAll(cookiesToSet) {
+                try {
+                  cookiesToSet.forEach(({ name, value, options }) => {
+                    cookieStore.set(name, value, options);
+                  });
+                } catch {
+                  // Ignore in read-only route handler context
+                }
+              }
+            },
+            cookieOptions: {
+              name: 'sb-auth-token',
+              path: '/',
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production'
+            }
+          }
+        );
+
+        const { data: authData, error: authError } = await supabaseSSR.auth.exchangeCodeForSession(code);
+
+        if (!authError && authData?.session && authData?.user) {
+          authUser = authData.user;
+          authSession = {
+            access_token: authData.session.access_token,
+            refresh_token: authData.session.refresh_token
+          };
+          console.log('[auth/callback] Server-side PKCE code exchange SUCCEEDED for user:', authUser.email);
+        } else {
+          console.warn('[auth/callback] Server-side PKCE exchange failed:', authError?.message || 'No session returned');
+        }
+      } catch (exchangeErr: any) {
+        console.warn('[auth/callback] Server-side PKCE exception:', exchangeErr?.message);
+      }
+
+      // If server-side exchange failed (e.g. cookie stripped by mobile browser / proxy),
+      // redirect to /login with code so the browser client can exchange using document.cookie.
+      if (!authUser || !authSession) {
+        console.log('[auth/callback] Redirecting to /login for client-side PKCE fallback exchange...');
+        const loginExchangeUrl = new URL('/login', requestUrl.origin);
+        loginExchangeUrl.searchParams.set('code', code);
+        if (deviceId && deviceId !== 'unknown-device') {
+          loginExchangeUrl.searchParams.set('device_id', deviceId);
+        }
+        return NextResponse.redirect(loginExchangeUrl);
+      }
+    } else if (accessToken) {
+      // Implicit flow or client-side bridge fallback
+      const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+      if (userError || !userData?.user) {
+        throw new Error(userError?.message || 'Failed to retrieve user from access token');
+      }
+      authUser = userData.user;
+      authSession = {
+        access_token: accessToken,
+        refresh_token: refreshToken || ''
+      };
     }
-    const authUser = userData.user;
-    const authSession = {
-      access_token: accessToken,
-      refresh_token: refreshToken || ''
-    };
+
+    if (!authUser || !authSession) {
+      throw new Error('Authentication session structure is invalid');
+    }
 
     const email = authUser.email;
     if (!email) {
       throw new Error('No email returned from Google authentication provider');
     }
 
-    // Fetch user profile matching the authenticated email (case-insensitive)
+    // Fetch user profile matching the authenticated email
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('*, institutions(name, plan_tier, type)')
-      .ilike('email', email)
-      .maybeSingle();
+
+      .eq('email', email)
+      .single();
 
     if (profileError) {
       console.error('[auth/callback] Profile lookup error:', profileError.message);
@@ -376,6 +316,7 @@ export async function GET(request: NextRequest) {
       institution_id: resolvedInstitutionId,
       role: normalizedRole,
       email,
+      // fingerprint intentionally omitted — computed on Vercel serverless IP/UA, never matches Render
       supabase_token: authSession.access_token,
       supabase_refresh_token: authSession.refresh_token,
       institute_type: resolvedInstituteType
@@ -397,6 +338,14 @@ export async function GET(request: NextRequest) {
     const redirectPath = getRedirectPath(normalizedRole);
 
     // ─── Reliable token delivery via URL redirect ─────────────────────────────
+    // The previous HTML bridge approach (inline <script> writing localStorage)
+    // was silently failing — browser security policies (CSP, ITP, incognito mode)
+    // can block inline script execution or localStorage access in third-party contexts.
+    //
+    // New approach: redirect to /login with the token embedded as a URL query param.
+    // The login page React code reads it, writes localStorage, then navigates to the
+    // correct dashboard — this always runs in a trusted first-party page context.
+    // ─────────────────────────────────────────────────────────────────────────────
     const loginRedirectUrl = new URL('/login', requestUrl.origin);
     loginRedirectUrl.searchParams.set('token', token);
     loginRedirectUrl.searchParams.set('refresh', authSession.refresh_token);
