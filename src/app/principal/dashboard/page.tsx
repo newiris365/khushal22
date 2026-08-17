@@ -1,27 +1,30 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, GraduationCap, TrendingUp, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Users, GraduationCap, TrendingUp, AlertTriangle, Calendar } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
 export default function PrincipalDashboard() {
-  const [stats, setStats] = useState({ students: 0, faculty: 0, attendance: 0, passRate: 0 });
+  const [stats, setStats] = useState({ students: 0, faculty: 0, attendance: 0, pendingPTMs: 0 });
+  const [gradeStrength, setGradeStrength] = useState<any[]>([]);
   const [recentNotices, setRecentNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [summaryRes, noticesRes] = await Promise.all([
-          apiGet('campusCore/attendance/institution-summary'),
+        const [metricsRes, noticesRes] = await Promise.all([
+          apiGet('school/principal/metrics'),
           apiGet('campusCore/notices'),
         ]);
-        if (summaryRes.success) {
-          setStats(s => ({
-            ...s,
-            attendance: summaryRes.total_students || 0,
-            students: summaryRes.total_students || 0,
-          }));
+        if (metricsRes.success) {
+          setStats({
+            students: metricsRes.totalStudents || 0,
+            faculty: metricsRes.totalFaculty || 0,
+            attendance: metricsRes.todaysAttendancePct || 0,
+            pendingPTMs: metricsRes.pendingPTMCount || 0
+          });
+          setGradeStrength(metricsRes.totalStrengthPerGrade || []);
         }
         if (noticesRes.success) setRecentNotices((noticesRes.notices || []).slice(0, 5));
       } catch (err) { console.error(err); }
@@ -45,8 +48,8 @@ export default function PrincipalDashboard() {
         {[
           { label: 'Total Students', value: stats.students, icon: GraduationCap, color: 'text-blue-400' },
           { label: 'Faculty', value: stats.faculty, icon: Users, color: 'text-emerald-400' },
-          { label: 'Avg Attendance', value: `${stats.attendance}%`, icon: TrendingUp, color: 'text-violet-400' },
-          { label: 'Pass Rate', value: `${stats.passRate}%`, icon: AlertTriangle, color: 'text-amber-400' },
+          { label: 'Today\'s Attendance', value: `${stats.attendance}%`, icon: TrendingUp, color: 'text-violet-400' },
+          { label: 'Pending PTMs', value: stats.pendingPTMs, icon: Calendar, color: 'text-amber-400' },
         ].map(s => (
           <div key={s.label} className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
             <div className="flex items-center gap-3">
@@ -58,6 +61,35 @@ export default function PrincipalDashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Student Strength per Grade */}
+      <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-white">Student Strength per Grade</h2>
+        {gradeStrength.length === 0 ? (
+          <p className="text-slate-400 text-sm">No grade strength data available.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {gradeStrength.map((g: any) => {
+              const maxCount = Math.max(...gradeStrength.map((x: any) => x.count), 1);
+              const percent = Math.round((g.count / maxCount) * 100);
+              return (
+                <div key={g.grade} className="bg-white/5 rounded-lg p-4 border border-white/5 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold text-slate-200">Grade {g.grade}</span>
+                    <span className="text-purple-400 font-bold">{g.count} Students</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-2">
+                    <div 
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${percent}%`, background: 'linear-gradient(90deg, #8B5CF6 0%, #6366F1 100%)' }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
@@ -80,3 +112,4 @@ export default function PrincipalDashboard() {
     </div>
   );
 }
+

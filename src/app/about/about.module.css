@@ -1,0 +1,201 @@
+/* Custom CSS Module for IRIS 365 Cyberpunk About Page */
+
+.cyberpunkBg {
+  background-color: #050010;
+  background-image: 
+    radial-gradient(circle at 50% 50%, #0d0020 0%, #000000 100%),
+    linear-gradient(rgba(138, 43, 226, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(138, 43, 226, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Glassmorphism UI Cards (glass-card) as specified */
+.glassCard {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(138, 43, 226, 0.05);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glassCard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(138, 43, 226, 0.4);
+  box-shadow: 0 12px 40px 0 rgba(138, 43, 226, 0.15);
+}
+
+/* Glass pill badge (glass-pill) as specified */
+.glassPill {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px 0 rgba(138, 43, 226, 0.03);
+}
+
+/* Glowing text */
+.textGlowPurple {
+  text-shadow: 0 0 15px rgba(138, 43, 226, 0.6);
+}
+
+.textGlowGreen {
+  text-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+}
+
+/* HUD Scanning Terminal styling */
+.terminalHud {
+  background: rgba(5, 0, 15, 0.85);
+  border: 1px solid rgba(138, 43, 226, 0.3);
+  box-shadow: inset 0 0 30px rgba(138, 43, 226, 0.2), 0 8px 32px 0 rgba(138, 43, 226, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.terminalGrid {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(138, 43, 226, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(138, 43, 226, 0.04) 1px, transparent 1px);
+}
+
+/* CSS Scanning Line */
+.scanningLine {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to bottom, transparent, rgba(138, 43, 226, 0.5), rgba(138, 43, 226, 0.8), rgba(138, 43, 226, 0.5), transparent);
+  opacity: 0.8;
+  pointer-events: none;
+  animation: scan 4s linear infinite;
+  z-index: 10;
+}
+
+@keyframes scan {
+  0% {
+    top: -5%;
+  }
+  100% {
+    top: 105%;
+  }
+}
+
+/* Pulse keyframes for CTA glow */
+@keyframes pulseGlow {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.95);
+    filter: blur(40px) drop-shadow(0 0 10px rgba(138, 43, 226, 0.2));
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+    filter: blur(48px) drop-shadow(0 0 30px rgba(138, 43, 226, 0.5));
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(0.95);
+    filter: blur(40px) drop-shadow(0 0 10px rgba(138, 43, 226, 0.2));
+  }
+}
+
+.pulsingGlow {
+  animation: pulseGlow 5s ease-in-out infinite;
+}
+
+/* SVG Line Animations */
+.svgPathDefault {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.04);
+  stroke-width: 1.5;
+  transition: all 0.5s ease;
+}
+
+.svgPathActive {
+  fill: none;
+  stroke: url(#purpleGlowGradient);
+  stroke-width: 2.5;
+  stroke-dasharray: 8, 4;
+  animation: dashPulse 25s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.9));
+}
+
+@keyframes dashPulse {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+/* Scroll reveal animations */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.revealActive {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Delay modifiers */
+.delay100 { transition-delay: 100ms; }
+.delay200 { transition-delay: 200ms; }
+.delay300 { transition-delay: 300ms; }
+.delay400 { transition-delay: 400ms; }
+.delay500 { transition-delay: 500ms; }
+
+/* Custom Double Ring Avatar Border */
+.avatarRing {
+  position: relative;
+  display: inline-block;
+  padding: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.4) 0%, rgba(16, 185, 129, 0.1) 100%);
+}
+
+.avatarRingInner {
+  border-radius: 50%;
+  padding: 4px;
+  background: #050010;
+  border: 2px dashed rgba(138, 43, 226, 0.8);
+}
+
+/* Custom Hamburger Icon with animated morphing */
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 24px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 50;
+}
+
+.hamburger span {
+  width: 100%;
+  height: 2px;
+  background-color: #ffffff;
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hamburgerOpen span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+  background-color: #8A2BE2;
+}
+
+.hamburgerOpen span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburgerOpen span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+  background-color: #8A2BE2;
+}

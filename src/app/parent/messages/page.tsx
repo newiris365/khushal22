@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { 
   MessageSquare, Send, Clock, User, AlertCircle, RefreshCw, ChevronRight, Check
 } from 'lucide-react';
+import { io } from 'socket.io-client';
 
 interface Message {
   id: string;
@@ -22,19 +23,72 @@ interface Teacher {
 }
 
 export default function ParentMessagesPage() {
-  const [teachers, setTeachers] = useState<Teacher[]>([
-    { id: 't-1', name: 'Dr. Aditya Kumar', subject: 'Compiler Design' },
-    { id: 't-2', name: 'Prof. Sarah Vance', subject: 'Database Systems' },
-    { id: 't-3', name: 'Dr. Vivek Sharma', subject: 'Artificial Intelligence' }
-  ]);
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('t-1');
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [socket, setSocket] = useState<any>(null);
+
+  // Fetch teachers on mount
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
+
+  const fetchTeachers = async () => {
+    try {
+      const token = localStorage.getItem('iris_jwt_token') || '';
+      const res = await fetch('/api/v1/parent/ptm/teachers', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.teachers) {
+        setTeachers(data.teachers);
+        if (data.teachers.length > 0) {
+          setSelectedTeacherId(data.teachers[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch teachers:', err);
+    }
+  };
+
+  // Setup Socket connection and message listening
+  useEffect(() => {
+    const token = localStorage.getItem('iris_jwt_token') || '';
+    if (!token) return;
+
+    // Connect to /notifications socket namespace
+    const socketInstance = io(window.location.origin + '/notifications', {
+      auth: { token }
+    });
+
+    setSocket(socketInstance);
+
+    socketInstance.on('connect', () => {
+      console.log('[SOCKET] Connected to notifications namespace');
+    });
+
+    socketInstance.on('new_message', (data: any) => {
+      // If message belongs to the currently active conversation
+      if (data.message && (data.message.sender_id === selectedTeacherId || data.message.receiver_id === selectedTeacherId)) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === data.message.id)) return prev;
+          return [...prev, data.message];
+        });
+      }
+    });
+
+    return () => {
+      socketInstance.disconnect();
+    };
+  }, [selectedTeacherId]);
 
   useEffect(() => {
-    fetchMessages();
+    if (selectedTeacherId) {
+      fetchMessages();
+    }
   }, [selectedTeacherId]);
 
   const fetchMessages = async () => {
@@ -74,15 +128,8 @@ export default function ParentMessagesPage() {
         })
       });
       const data = await res.json();
-      if (data.success) {
-        setMessages(prev => [...prev, {
-          id: data.message.id,
-          sender_role: 'Parent',
-          sender_id: 'parent_id',
-          receiver_id: selectedTeacherId,
-          message: inputText,
-          created_at: new Date().toISOString()
-        }]);
+      if (data.success && data.message) {
+        setMessages(prev => [...prev, data.message]);
         setInputText('');
       }
     } catch (err) {
@@ -187,6 +234,12 @@ export default function ParentMessagesPage() {
                           <span className="block text-[9px] mt-1 text-white/50 text-right">
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {isSelf && msg.sla_deadline && (
+                            <div className="flex items-center gap-1 text-[8px] text-emerald-300/80 mt-1 border-t border-white/10 pt-1">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>Expected reply: {new Date(msg.sla_deadline).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -225,3 +278,4 @@ export default function ParentMessagesPage() {
     </div>
   );
 }
+

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { supabaseAdmin } from '../config/supabase';
 import { getDbPool, tableExists, runSql } from '../config/db';
 import logger from '../config/logger';
+import { sendTextMessage } from '../services/whatsapp';
 
 // ─── AUTO-CREATE CLASS_SECTIONS TABLE ON STARTUP ──────────────
 let classSectionsReady = false;
@@ -163,20 +164,23 @@ export async function listClassSections(req: Request, res: Response) {
       student_count: 0,
     }));
 
-    // Count actual students per grade from students table (semester = grade for schools)
+    // Count actual students per class section from students table
     const { data: studentCounts } = await supabaseAdmin
       .from('students')
-      .select('semester')
-      .eq('institution_id', institution_id);
+      .select('class_section_id')
+      .eq('institution_id', institution_id)
+      .not('class_section_id', 'is', null);
 
     if (studentCounts) {
-      const countMap: Record<number, number> = {};
+      const countMap: Record<string, number> = {};
       studentCounts.forEach((s: any) => {
-        const g = s.semester || 0;
-        countMap[g] = (countMap[g] || 0) + 1;
+        const csid = s.class_section_id;
+        if (csid) {
+          countMap[csid] = (countMap[csid] || 0) + 1;
+        }
       });
       classes.forEach((c: any) => {
-        c.student_count = countMap[c.grade] || 0;
+        c.student_count = countMap[c.id] || 0;
       });
     }
 
@@ -600,3 +604,256 @@ export async function ensureAllSchemaTables(): Promise<void> {
     }
   }
 }
+
+// ─── MARK DAILY ATTENDANCE (SCHOOL) ──────────────────────────
+export async function markDailyAttendance(req: Request, res: Response) {
+  try {
+    const { class_section_id, date, academic_year, records } = req.body;
+    const institutionId = req.user?.institution_id;
+
+    if (!institutionId) {
+      return res.status(400).json({ success: false, error: 'No institution context.' });
+    }
+    if (!class_section_id || !date || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ success: false, error: 'class_section_id, date, and records are required.' });
+    }
+
+    // Authorization check: User must be Admin/SuperAdmin/Principal/Director, OR the assigned Class Teacher
+    if (req.user?.role === 'Teacher') {
+      const { data: classSection } = await supabaseAdmin
+        .from('class_sections')
+        .select('class_teacher_id')
+        .eq('id', class_section_id)
+        .maybeSingle();
+
+      if (!classSection || classSection.class_teacher_id !== req.user.id) {
+        return res.status(403).json({ success: false, error: 'Only the assigned Class Teacher can mark attendance for this section.' });
+      }
+    }
+
+    const resolvedAcademicYear = academic_year || new Date().getFullYear().toString();
+
+    const dbRecords = records.map((r: any) => ({
+      institution_id: institutionId,
+      student_id: r.student_id,
+      date,
+      academic_year: resolvedAcademicYear,
+      status: r.status,
+      marked_by: req.user?.id
+    }));
+
+    const { error } = await supabaseAdmin
+      .from('school_attendance')
+      .upsert(dbRecords, { onConflict: 'student_id,date,academic_year' });
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    // Trigger WhatsApp notification immediately for Absent students
+    (async () => {
+      try {
+        const absentStudents = records.filter((r: any) => r.status === 'Absent');
+        for (const r of absentStudents) {
+          const { data: studentInfo } = await supabaseAdmin
+            .from('students')
+            .select('users(full_name), guardian_phone, institutions(name)')
+            .eq('id', r.student_id)
+            .maybeSingle();
+
+          const studentName = (studentInfo as any)?.users?.full_name || 'your child';
+          const institutionName = (studentInfo as any)?.institutions?.name || 'School';
+          const guardianPhone = studentInfo?.guardian_phone;
+
+          const message = `Dear Parent, your child ${studentName} was marked ABSENT today (${date}) at ${institutionName}. Please contact the school if this was unplanned. - IRIS 365`;
+
+          // 1. Send to guardian phone on student record
+          if (guardianPhone) {
+            await sendTextMessage(guardianPhone, message, 'attendance_alert');
+          }
+
+          // 2. Send to verified parent users linked to the student
+          const { data: parentLinks } = await supabaseAdmin
+            .from('parent_student_links')
+            .select('parent_user_id, users(phone)')
+            .eq('student_id', r.student_id)
+            .eq('verified', true);
+
+          if (parentLinks && parentLinks.length > 0) {
+            for (const link of parentLinks) {
+              const parentPhone = (link as any)?.users?.phone;
+              if (parentPhone && parentPhone !== guardianPhone) {
+                await sendTextMessage(parentPhone, message, 'attendance_alert');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[SCHOOL ATTENDANCE WHATSAPP] Background notification error:', err);
+      }
+    })();
+
+    return res.status(200).json({ success: true, count: dbRecords.length, message: 'Daily attendance marked successfully.' });
+  } catch (err: any) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[markDailyAttendance] Error:', errorMsg);
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
+}
+
+// ─── GET PRINCIPAL DASHBOARD METRICS ─────────────────────────
+export async function getPrincipalDashboardMetrics(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'No institution context.' });
+
+    // 1. Total Strength per Grade
+    const { data: sections } = await supabaseAdmin
+      .from('class_sections')
+      .select('id, grade, section')
+      .eq('institution_id', institutionId);
+
+    const { data: students } = await supabaseAdmin
+      .from('students')
+      .select('id, class_section_id')
+      .eq('institution_id', institutionId);
+
+    const sectionGradeMap = new Map<string, number>();
+    sections?.forEach((s: any) => {
+      sectionGradeMap.set(s.id, s.grade);
+    });
+
+    const gradeStrength: Record<number, number> = {};
+    students?.forEach((s: any) => {
+      const grade = s.class_section_id ? sectionGradeMap.get(s.class_section_id) : null;
+      if (grade !== undefined && grade !== null) {
+        gradeStrength[grade] = (gradeStrength[grade] || 0) + 1;
+      }
+    });
+
+    const totalStrengthPerGrade = Object.entries(gradeStrength).map(([grade, count]) => ({
+      grade: Number(grade),
+      count
+    })).sort((a, b) => a.grade - b.grade);
+
+    // 2. Today's Attendance %
+    const todayStr = new Date().toISOString().split('T')[0];
+    const { data: attendanceToday } = await supabaseAdmin
+      .from('school_attendance')
+      .select('status')
+      .eq('institution_id', institutionId)
+      .eq('date', todayStr);
+
+    let todaysAttendancePct = 0;
+    if (attendanceToday && attendanceToday.length > 0) {
+      const presentCount = attendanceToday.filter((a: any) => a.status === 'Present' || a.status === 'Half-Day').length;
+      todaysAttendancePct = Math.round((presentCount / attendanceToday.length) * 100);
+    }
+
+    // 3. Pending PTM Requests
+    const { count: pendingPTMCount } = await supabaseAdmin
+      .from('ptm_bookings')
+      .select('*', { count: 'exact', head: true })
+      .eq('institution_id', institutionId)
+      .eq('status', 'pending');
+
+    // 4. Total Students Count
+    const totalStudents = students?.length || 0;
+
+    // 5. Total Faculty (Teacher) Count
+    const { count: totalFaculty } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('institution_id', institutionId)
+      .eq('role', 'Teacher')
+      .eq('is_active', true);
+
+    return res.json({
+      success: true,
+      totalStudents,
+      totalFaculty: totalFaculty || 0,
+      todaysAttendancePct,
+      pendingPTMCount: pendingPTMCount || 0,
+      totalStrengthPerGrade
+    });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[getPrincipalDashboardMetrics] Error:', errorMsg);
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
+}
+
+// ─── ADMIN: BULK VERIFY PARENT LINKS ────────────────────────
+export async function bulkVerifyParentLinks(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'No institution context.' });
+
+    // Find all unverified parent_student_links
+    const { data: unverifiedLinks, error: linksError } = await supabaseAdmin
+      .from('parent_student_links')
+      .select(`
+        id,
+        parent_user_id,
+        student_id,
+        users:parent_user_id(phone),
+        students:student_id(guardian_phone, institution_id)
+      `)
+      .eq('verified', false);
+
+    if (linksError) throw linksError;
+
+    const toVerifyIds: string[] = [];
+    const parentUserIdsToUpdate: string[] = [];
+
+    (unverifiedLinks || []).forEach((link: any) => {
+      if (link.students?.institution_id !== institutionId) return;
+
+      const parentPhone = link.users?.phone;
+      const guardianPhone = link.students?.guardian_phone;
+
+      if (parentPhone && guardianPhone) {
+        const cleanParent = parentPhone.replace(/[^0-9]/g, '');
+        const cleanGuardian = guardianPhone.replace(/[^0-9]/g, '');
+
+        if (cleanParent === cleanGuardian && cleanParent.length > 0) {
+          toVerifyIds.push(link.id);
+          parentUserIdsToUpdate.push(link.parent_user_id);
+        }
+      }
+    });
+
+    if (toVerifyIds.length === 0) {
+      return res.json({ success: true, message: 'No links matched the bulk-verification phone criteria.', count: 0 });
+    }
+
+    // 1. Set verified = true on links
+    const { error: updateError } = await supabaseAdmin
+      .from('parent_student_links')
+      .update({ verified: true })
+      .in('id', toVerifyIds);
+
+    if (updateError) throw updateError;
+
+    // 2. Set is_verified = true on parent_profiles
+    const { error: profileError } = await supabaseAdmin
+      .from('parent_profiles')
+      .update({ is_verified: true, verified_at: new Date().toISOString() })
+      .in('user_id', parentUserIdsToUpdate);
+
+    if (profileError) {
+      console.warn('[bulkVerifyParentLinks] Profile update warning (non-fatal):', profileError.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Successfully verified ${toVerifyIds.length} parent-student link(s) based on matching Guardian Phone.`,
+      count: toVerifyIds.length
+    });
+  } catch (err: any) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[bulkVerifyParentLinks] Error:', errorMsg);
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
+}
+

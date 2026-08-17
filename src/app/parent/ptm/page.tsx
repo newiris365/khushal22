@@ -52,11 +52,18 @@ export default function ParentPTMPage() {
 
   const authHeaders: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-  // Fetch teachers on mount
+  // Fetch teachers on mount and setup polling
   useEffect(() => {
     fetchTeachers();
     fetchBookings();
+
+    const interval = setInterval(() => {
+      fetchBookings();
+    }, 15000); // Poll bookings status every 15 seconds
+
+    return () => clearInterval(interval);
   }, []);
+
 
   // Fetch slots when teacher or date changes
   useEffect(() => {

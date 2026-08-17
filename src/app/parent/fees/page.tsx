@@ -31,7 +31,10 @@ export default function ParentFeesPage() {
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
   useEffect(() => {
-    apiGet('/core/parent/fee-summary').then(res => {
+    const selectedStudentId = localStorage.getItem('iris_selected_student_id');
+    const queryParam = selectedStudentId ? `?student_id=${selectedStudentId}` : '';
+
+    apiGet(`/core/parent/fee-summary${queryParam}`).then(res => {
       if (res.success) setSummary(res.summary);
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -53,8 +56,8 @@ export default function ParentFeesPage() {
     if (!selectedMethod || !summary) return;
     setIsPaying(true);
     try {
-      const childRes = await apiGet('/core/parent/child-info');
-      const studentId = childRes.child?.student_id;
+      const selectedStudentId = localStorage.getItem('iris_selected_student_id');
+      const studentId = selectedStudentId || (await apiGet('/core/parent/child-info')).child?.student_id;
       if (!studentId) { alert('No child linked.'); setIsPaying(false); return; }
 
       if (selectedMethod === 'wallet') {

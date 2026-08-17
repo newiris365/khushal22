@@ -31,11 +31,14 @@ export default function ParentDashboardPage() {
   const loadDashboard = async () => {
     setLoading(true);
     try {
+      const selectedStudentId = localStorage.getItem('iris_selected_student_id');
+      const queryParam = selectedStudentId ? `?student_id=${selectedStudentId}` : '';
+
       const [childRes, summaryRes, busRes, notifRes] = await Promise.all([
-        apiGet('/core/parent/child-info'),
-        apiGet('/core/parent/daily-summary'),
-        apiGet('/core/parent/child/bus-status'),
-        apiGet('/core/parent/notifications/unread-count'),
+        apiGet(`/core/parent/child-info${queryParam}`),
+        apiGet(`/core/parent/daily-summary${queryParam}`),
+        apiGet(`/core/parent/child/bus-status${queryParam}`),
+        apiGet(`/core/parent/notifications/unread-count`),
       ]);
 
       if (childRes.success && childRes.child) {
@@ -467,6 +470,16 @@ export default function ParentDashboardPage() {
                 <span className="text-xs text-[#A78BFA] flex items-center gap-1"><Coffee className="w-3 h-3 text-violet-400" /> Canteen</span>
                 <span className="text-xs font-bold text-violet-400">₹{summary.canteen_spend}</span>
               </div>
+              {summary.today_meals && summary.today_meals.length > 0 && (
+                <div className="bg-[#13102A]/40 border border-[#6C2BD9]/10 rounded-xl p-3 space-y-1">
+                  <span className="text-[9px] uppercase tracking-wider text-[#A78BFA]/60 font-semibold block">Today's Meals:</span>
+                  <div className="text-[10px] text-slate-300 space-y-0.5 max-h-16 overflow-y-auto font-medium">
+                    {summary.today_meals.map((meal: string, idx: number) => (
+                      <div key={idx}>• {meal}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center bg-[#13102A] p-3 rounded-xl border border-[#6C2BD9]/15">
                 <span className="text-xs text-[#A78BFA] flex items-center gap-1"><Wallet className="w-3 h-3 text-violet-400" /> Wallet</span>
                 <span className="text-xs font-bold text-violet-400">₹{child?.wallet_balance || 0}</span>

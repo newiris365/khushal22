@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 import { 
   Shield, 
   BookOpen, 
@@ -21,96 +24,220 @@ import {
   Terminal,
   Zap,
   Globe,
-  GraduationCap
+  GraduationCap,
+  ChevronDown,
+  Search,
+  MessageSquare
 } from 'lucide-react';
 
 const MODULES = [
   {
     icon: Shield,
     title: "Campus Core",
-    desc: "Smart QR/Biometric attendance, printable RFID Digital IDs, and class auto-schedulers.",
-    color: "from-blue-500 to-indigo-600",
-    badge: "v1 Core"
-  },
-  {
-    icon: Coffee,
-    title: "Cashless Canteen",
-    desc: "Pre-order meal passes, real-time menu allergy tags, and Express Queue pickup alerts.",
-    color: "from-amber-500 to-orange-600",
-    badge: "Cashless"
-  },
-  {
-    icon: Dumbbell,
-    title: "FitZone Module",
-    desc: "Trainer-led gym slot scheduling, conflict-free bookings, and equipment service logs.",
-    color: "from-emerald-500 to-teal-600",
-    badge: "Wellness"
-  },
-  {
-    icon: Home,
-    title: "Hostel Warden Desk",
-    desc: "Warden blocks mapping, automated room allocations, and maintenance logs.",
-    color: "from-purple-500 to-pink-600",
-    badge: "Residential"
-  },
-  {
-    icon: Key,
-    title: "Smart Gate Security",
-    desc: "Guard entry-log override, visitor guest passes, and instant incident logging.",
-    color: "from-rose-500 to-red-600",
-    badge: "Harden Security"
+    desc: "RFID gate biometric check-ins, automated class registers, and student profile indexing with strict data checks.",
+    badge: "System Core",
+    color: "from-blue-500/20 to-purple-500/20"
   },
   {
     icon: BookOpen,
-    title: "Library+",
-    desc: "Search index catalogs, late fee returns, and real-time available stock checks.",
-    color: "from-cyan-500 to-blue-600",
-    badge: "Academic"
+    title: "Academics",
+    desc: "Stateless grading charts, online assignment drops, and timetables coordinated with custom database triggers.",
+    badge: "Core Service",
+    color: "from-purple-500/20 to-pink-500/20"
+  },
+  {
+    icon: Coffee,
+    title: "Canteen Wallet",
+    desc: "Cashless student wallet logs, RFID meal sweeps, and automatic transaction audits with zero race conditions.",
+    badge: "Financial",
+    color: "from-amber-500/20 to-orange-500/20"
+  },
+  {
+    icon: Dumbbell,
+    title: "FitZone Wellness",
+    desc: "Gym checking scanners, locker assignment locks, and sports equipment inventory managed automatically.",
+    badge: "Residential",
+    color: "from-emerald-500/20 to-teal-500/20"
   },
   {
     icon: Calendar,
-    title: "Events Hub",
-    desc: "Public ticketing, volunteer tasks allocations, and coordinator dashboards.",
-    color: "from-violet-500 to-fuchsia-600",
-    badge: "Social"
+    title: "Events Desk",
+    desc: "Seat mapping reservations, dynamic QR scanners, and automated check-ins with fast cache tables.",
+    badge: "Student Life",
+    color: "from-rose-500/20 to-red-500/20"
   },
   {
-    icon: MapPin,
-    title: "Transit Tracker",
-    desc: "Interactive Leaflet maps tracking active bus coordinate streams in real-time.",
-    color: "from-teal-500 to-emerald-600",
-    badge: "Realtime GPS"
-  },
-  {
-    icon: TrendingUp,
-    title: "Director Dashboard",
-    desc: "Advanced multi-tenant financial insights, attendance dips, and fee collection summaries.",
-    color: "from-indigo-500 to-violet-600",
-    badge: "Analytics"
-  },
-  {
-    icon: Bot,
-    title: "AI Concierge",
-    desc: "Institutional natural-language helper answers schedules, fees, and marks dynamically.",
-    color: "from-fuchsia-500 to-rose-600",
-    badge: "LLM Helper"
+    icon: Key,
+    title: "Hostel Key",
+    desc: "Visitor log systems, warden approval modules, and night check-in monitoring with real-time alerts.",
+    badge: "Security",
+    color: "from-indigo-500/20 to-blue-500/20"
   }
 ];
 
 const MOCK_LOGS = [
-  { type: "ATTENDANCE", text: "Student 23CSE051 scanned Rotating QR: Present in DBMS", time: "Just now" },
-  { type: "PAYMENT", text: "Canteen Wallet top-up of INR 500 via Razorpay successful", time: "1m ago" },
-  { type: "SECURITY", text: "Gate 1 RFID scan: Visitor Pass #4092 checked-in", time: "3m ago" },
+  { type: "ATTENDANCE", text: "RFID Gate Terminal 04 verified student roll 23CSE051: Present", time: "Just now" },
+  { type: "PAYMENT", text: "Canteen Cashless Wallet check-out Order #4092: INR 85.00", time: "1m ago" },
+  { type: "SECURITY", text: "Warden approved late-night entry request for roll 23ECE012", time: "3m ago" },
   { type: "HOSTEL", text: "Warden Jaswant Singh approved plumbing complaint for Room A-101", time: "5m ago" },
   { type: "TRANSIT", text: "Bus RJ19-PA-1024 GPS telemetry packet broadcasted: Speed 45km/h", time: "8m ago" },
   { type: "AI", text: "AI Assistant resolved student timetable query in 320ms", time: "10m ago" }
 ];
 
+const FAQ_DATA = [
+  {
+    id: "q1",
+    category: "Architecture",
+    question: "What is IRIS 365 and how does it integrate campus ecosystems?",
+    answer: "IRIS 365 is an integrated Operating System for educational institutions. It unifies administrative control, academic tracking, student residential life, transport telemetry, gate clearance, canteen management, and AI assistance into a single real-time cloud console."
+  },
+  {
+    id: "q2",
+    category: "Security",
+    question: "How is student data protected across modules?",
+    answer: "All telemetry, personal credentials, and transaction records are encrypted using AES-256 at rest and TLS 1.3 in transit. Strict Role-Based Access Control (RBAC) ensures students, faculty, wardens, drivers, and directors access only authorized data scopes."
+  },
+  {
+    id: "q3",
+    category: "Deployment",
+    question: "Can IRIS 365 deploy on-premise or hybrid cloud setups?",
+    answer: "Yes. While IRIS 365 is optimized for serverless cloud deployment, we support hybrid on-premise hardware appliances for local gate biometric terminals, canteen POS units, and local bus GPS relays."
+  },
+  {
+    id: "q4",
+    category: "Modules",
+    question: "Is it possible to enable only specific modules (e.g., Canteen & Transport)?",
+    answer: "Absolutely. IRIS 365 uses a modular micro-frontend design. You can enable specific sub-systems like Gate Pass & Transport and expand to full Academic or Residential modules later without downtime."
+  },
+  {
+    id: "q5",
+    category: "Support",
+    question: "How can our campus schedule a customized demo?",
+    answer: "You can click 'Request a Demo' in the navigation bar or scroll to the demo registration section to request instant staging environment access for your administration team."
+  }
+];
+
+const WhyIrisSection: React.FC = () => {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const tiltX = -(y - rect.height / 2) / 18;
+    const tiltY = (x - rect.width / 2) / 18;
+    card.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale3d(1.02, 1.02, 1.02)`;
+    card.style.transition = "none";
+  };
+
+  const handleMouseLeave = () => {
+    const card = cardRef.current;
+    if (!card) return;
+    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+    card.style.transition = "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)";
+  };
+
+  return (
+    <section id="features" className="w-full max-w-[1240px] mx-auto px-6 sm:px-8 py-20 relative z-20">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.12fr_0.88fr] gap-12 lg:gap-16 items-center">
+        {/* Left Column - Feature List */}
+        <div className="text-left flex flex-col items-start">
+          <div className="flex items-center gap-2 px-3.5 py-1 text-xs font-medium bg-[#8A2BE2]/10 text-white rounded-full border border-[#8A2BE2]/25">
+            <span className="w-2 h-2 rounded-full bg-[#8A2BE2] animate-pulse" />
+            <span className="text-[10px] sm:text-xs text-white/80 uppercase tracking-wide">Why IRIS 365</span>
+            <span className="text-[8px] font-mono tracking-widest bg-white/10 px-1.5 py-0.5 rounded-full ml-1">AI-native</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-[2.2rem] font-bold text-white font-orbitron mt-5 leading-[1.1] uppercase tracking-tight">
+            One platform. <br /> Every operation.
+          </h2>
+
+          <p className="text-white/55 text-sm md:text-base font-sans font-light leading-relaxed mt-5 max-w-[520px]">
+            From the moment a student walks through the gate to the time they graduate,
+            IRIS 365 connects every operation — academic, physical, social, and logistical —
+            into a single intelligent system.
+          </p>
+
+          <div className="flex flex-col mt-6 w-full max-w-[550px]">
+            {[
+              { label: "Smart Attendance", desc: "QR and biometric auto-marking, no manual registers ever." },
+              { label: "AI Room and Resource Allocation", desc: "Hostel rooms, library seats, gym slots — all auto-assigned by AI." },
+              { label: "Live Campus Tracking", desc: "Bus GPS, gate entry logs, canteen orders — all real-time." },
+              { label: "Role-Based Access", desc: "11 different dashboards for every role from student to director." },
+              { label: "Unified Wallet and Payments", desc: "One wallet for canteen, library fines, fees and gym across all modules." }
+            ].map((row, idx, arr) => (
+              <div key={idx} className="w-full">
+                <div className="flex items-center gap-3 py-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#8A2BE2]/45 shrink-0 flex items-center justify-center border border-[#8A2BE2]">
+                    <div className="w-1 h-1 rounded-full bg-white" />
+                  </div>
+                  <div className="font-sans text-sm text-white leading-normal">
+                    <span className="font-semibold">{row.label}</span>
+                    <span className="font-light text-xs text-white/55"> — {row.desc}</span>
+                  </div>
+                </div>
+                {idx !== arr.length - 1 && <div className="border-t border-white/8 my-2" />}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2.5 mt-7 max-w-[550px]">
+            {["Role-based Access", "Real-time Analytics", "QR Everywhere", "AI-powered", "PWA Ready", "Offline Support"].map((chip) => (
+              <span key={chip} className="text-xs text-white/70 border border-white/10 bg-white/5 rounded-full px-4 py-1.5 hover:bg-white/10 transition-all cursor-pointer">
+                {chip}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Column - Today's Campus Live Card */}
+        <div
+          ref={cardRef}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          style={{ transformStyle: "preserve-3d", willChange: "transform" }}
+          className="rounded-3xl p-6 sm:p-7 border border-white/10 bg-white/[0.03] backdrop-blur-md shadow-2xl relative w-full"
+        >
+          <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
+            <div>
+              <h3 className="font-sans font-semibold text-sm sm:text-base text-white">Today's Campus Overview</h3>
+              <p className="text-xs text-white/45 font-light mt-0.5">Live Real-time Feed</p>
+            </div>
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { title: "🎓 Academic", stat: "23 classes today · 4 exams upcoming", dotColor: "#5B14B7" },
+              { title: "🍽 Canteen", stat: "847 orders · ₹24,350 revenue today", dotColor: "#4B0082" },
+              { title: "🚌 Transport", stat: "12 buses active · 3 routes on time", dotColor: "#0033A0" },
+              { title: "🤖 AI Chatbot", stat: "142 queries resolved today", dotColor: "#8A2BE2" }
+            ].map((card) => (
+              <div key={card.title} className="rounded-xl p-4 flex items-center justify-between bg-white/[0.02] hover:bg-white/[0.06] transition-colors border border-white/5">
+                <div className="flex items-center gap-3">
+                  <div style={{ backgroundColor: card.dotColor }} className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+                  <span className="font-semibold text-xs sm:text-sm text-white">{card.title}</span>
+                </div>
+                <span className="font-light text-xs text-white/50 text-right">{card.stat}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
-  const [pricingStudents, setPricingStudents] = useState(500);
-  const [pricingTier, setPricingTier] = useState("Campus");
   const [liveLogs, setLiveLogs] = useState(MOCK_LOGS);
+  
+  // FAQ States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [expandedFaqId, setExpandedFaqId] = useState<string | null>(null);
 
   // Simulate incoming real-time telemetry logs
   useEffect(() => {
@@ -150,62 +277,37 @@ export default function LandingPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Compute mock monthly cost based on selected parameters
-  const calculateCost = () => {
-    let ratePerStudent = 12;
-    if (pricingTier === "Seed") ratePerStudent = 8;
-    if (pricingTier === "University") ratePerStudent = 15;
-    if (pricingTier === "Enterprise") ratePerStudent = 20;
-
-    return (pricingStudents * ratePerStudent).toLocaleString('en-IN', {
-      maximumFractionDigits: 0,
-      style: 'currency',
-      currency: 'INR'
-    });
-  };
+  // Filter FAQs
+  const filteredFaqs = FAQ_DATA.filter((faq) => {
+    const matchesCategory = selectedCategory === "All" || faq.category === selectedCategory;
+    const matchesQuery = 
+      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesQuery;
+  });
 
   return (
-    <div className="min-h-screen bg-[#0D0A1A] text-white flex flex-col font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen bg-[#050010] text-white flex flex-col font-sans antialiased overflow-x-hidden relative">
+      {/* Ambient Background Video */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline 
+        className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none opacity-40 mix-blend-screen"
+        src="/bg-video.mp4"
+      />
+
       {/* Radial backdrop glows */}
-      <div className="absolute w-[600px] h-[600px] rounded-full bg-[#6C2BD9]/10 blur-3xl -top-100 -left-100 pointer-events-none"></div>
-      <div className="absolute w-[800px] h-[800px] rounded-full bg-[#06B6D4]/5 blur-3xl top-[40%] right-[-20%] pointer-events-none"></div>
-      <div className="absolute w-[700px] h-[700px] rounded-full bg-[#EC4899]/5 blur-3xl bottom-[-10%] left-[-10%] pointer-events-none"></div>
+      <div className="absolute w-[600px] h-[600px] rounded-full bg-[#6C2BD9]/10 blur-3xl -top-100 -left-100 pointer-events-none z-0"></div>
+      <div className="absolute w-[800px] h-[800px] rounded-full bg-[#06B6D4]/5 blur-3xl top-[40%] right-[-20%] pointer-events-none z-0"></div>
+      <div className="absolute w-[700px] h-[700px] rounded-full bg-[#EC4899]/5 blur-3xl bottom-[-10%] left-[-10%] pointer-events-none z-0"></div>
 
       {/* Navigation Navbar */}
-      <header className="sticky top-0 z-50 w-full bg-[#0D0A1A]/70 backdrop-blur-md border-b border-white/5 py-4 px-6 md:px-12 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#6C2BD9] to-[#06B6D4] flex items-center justify-center shadow-lg shadow-[#6C2BD9]/20">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <span className="font-heading font-extrabold text-lg tracking-tight">IRIS <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6]">365</span></span>
-            <span className="block text-[8px] text-[#C4B5FD]/50 font-mono tracking-widest uppercase">Campus OS</span>
-          </div>
-        </div>
-
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#C4B5FD]/75">
-          <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#simulator" className="hover:text-white transition-colors">Console</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-          <Link href="/home" className="flex items-center gap-1.5 text-[#06B6D4] hover:text-white transition-colors font-semibold">
-            <GraduationCap className="w-4 h-4" /> Apply Now
-          </Link>
-          <span className="text-white/10">|</span>
-          <span className="text-[10px] font-mono bg-[#6C2BD9]/10 border border-[#6C2BD9]/30 text-[#C4B5FD] px-2.5 py-1 rounded-full uppercase tracking-wider">SIET Jodhpur</span>
-        </nav>
-
-        <div className="flex items-center gap-3">
-          <Link href="/login?fresh=1" className="px-5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold tracking-wide transition-all">
-            Dashboard Sign In
-          </Link>
-          <Link href="/login?fresh=1" className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-xs font-bold tracking-wide transition-all shadow-md shadow-[#6C2BD9]/20">
-            Launch Portal →
-          </Link>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero Section */}
-      <section className="relative z-10 px-6 py-20 md:py-32 max-w-6xl mx-auto flex flex-col items-center text-center">
+      <section id="hero" className="relative z-10 px-6 pt-28 pb-20 md:pt-40 md:pb-32 max-w-6xl mx-auto flex flex-col items-center text-center">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#6C2BD9]/10 border border-[#6C2BD9]/30 text-[#C4B5FD] text-xs font-semibold mb-6">
           <Zap className="w-3.5 h-3.5 text-[#06B6D4]" />
           <span>Integrated Campus Management System</span>
@@ -226,7 +328,7 @@ export default function LandingPage() {
           <Link href="/login?fresh=1" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-sm transition-all">
             Management Console →
           </Link>
-          <a href="#features" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/3 border border-white/5 hover:bg-white/8 text-[#C4B5FD]/70 font-medium text-sm transition-all">
+          <a href="#modules" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/3 border border-white/5 hover:bg-white/8 text-[#C4B5FD]/70 font-medium text-sm transition-all">
             Explore Modules
           </a>
         </div>
@@ -258,8 +360,11 @@ export default function LandingPage() {
         </Link>
       </section>
 
+      {/* Why IRIS Section */}
+      <WhyIrisSection />
+
       {/* Features Showcase Section */}
-      <section id="features" className="relative z-10 px-6 py-20 bg-[#120F26]/40 border-y border-white/5">
+      <section id="modules" className="relative z-10 px-6 py-20 bg-transparent border-y border-white/5">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="font-heading font-extrabold text-3xl md:text-4xl text-white">Consolidated Core Modules</h2>
@@ -354,86 +459,115 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Calculator Section */}
-      <section id="pricing" className="relative z-10 px-6 py-20 bg-[#120F26]/40 border-t border-white/5 w-full">
+      {/* FAQ Section */}
+      <section className="relative z-10 px-6 py-20 bg-transparent border-t border-white/5 w-full">
         <div className="max-w-4xl mx-auto">
+          {/* Header */}
           <div className="text-center mb-12">
-            <h2 className="font-heading font-extrabold text-3xl md:text-4xl text-white">Institution Plan Estimation</h2>
-            <p className="text-[#C4B5FD]/60 text-xs mt-2">Choose the plan matches your campus profile and adjust the slider to estimate monthly licensing costs.</p>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-[#8A2BE2]/30 text-[#C4B5FD] text-[10px] font-orbitron font-bold uppercase tracking-wider mb-4">
+              <MessageSquare className="w-3.5 h-3.5 text-[#06B6D4]" />
+              <span>Got Questions?</span>
+            </div>
+            <h2 className="font-heading font-extrabold text-3xl md:text-4xl text-white">Frequently Asked Questions</h2>
+            <p className="text-[#C4B5FD]/60 text-xs mt-2 font-sans">
+              Find answers to architectural, deployment, and security specifications for the IRIS 365 OS.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-[#090615]/80 border border-white/10 p-8 rounded-3xl shadow-xl">
-            <div className="flex flex-col gap-6">
-              {/* Pricing Tier Options */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-bold tracking-wider text-[#C4B5FD] uppercase">Product Tier</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {["Seed", "Campus", "University", "Enterprise"].map((tier) => (
-                    <button 
-                      key={tier}
-                      onClick={() => setPricingTier(tier)}
-                      className={`py-2 px-4 rounded-xl border text-xs font-semibold transition-all ${
-                        pricingTier === tier 
-                          ? "bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] border-transparent text-white" 
-                          : "bg-white/5 border-white/10 hover:bg-white/10 text-[#C4B5FD]"
-                      }`}
+          {/* Search and Filters */}
+          <div className="flex flex-col gap-6 mb-10">
+            {/* Search Input */}
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Search FAQ questions and answers..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-5 py-3.5 pl-12 rounded-2xl bg-white/3 border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-[#8A2BE2] focus:ring-4 focus:ring-[#8A2BE2]/10 transition-all duration-300"
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/30 pointer-events-none" />
+            </div>
+
+            {/* Category Pills */}
+            <div className="flex flex-wrap gap-2 justify-center">
+              {['All', 'Architecture', 'Security', 'Deployment', 'Modules', 'Support'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-2 rounded-full text-[10px] font-orbitron font-bold uppercase tracking-wider transition-all duration-300 ${
+                    selectedCategory === cat
+                      ? "bg-gradient-to-r from-[#5B14B7] to-[#8A2BE2] text-white border-transparent shadow-md shadow-[#8A2BE2]/10"
+                      : "bg-white/5 border border-white/10 text-[#C4B5FD]/80 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* FAQ Accordion List */}
+          <div className="flex flex-col gap-4">
+            <AnimatePresence>
+              {filteredFaqs.length > 0 ? (
+                filteredFaqs.map((faq) => {
+                  const isExpanded = expandedFaqId === faq.id;
+                  return (
+                    <motion.div
+                      key={faq.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="rounded-2xl border border-white/8 bg-[#090117]/80 hover:border-[#8A2BE2]/30 overflow-hidden transition-all duration-300"
                     >
-                      {tier}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <button
+                        onClick={() => setExpandedFaqId(isExpanded ? null : faq.id)}
+                        className="w-full px-6 py-5 flex items-center justify-between text-left gap-4"
+                      >
+                        <div className="flex flex-col gap-1.5 text-left">
+                          <span className="text-[9px] font-mono uppercase bg-white/5 border border-white/10 text-[#C4B5FD] px-2 py-0.5 rounded self-start tracking-wider">
+                            {faq.category}
+                          </span>
+                          <span className="font-heading font-bold text-white text-sm tracking-wide mt-1">
+                            {faq.question}
+                          </span>
+                        </div>
+                        <div className={`w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-white/70 transition-transform duration-300 shrink-0 ${
+                          isExpanded ? 'rotate-180 text-white' : ''
+                        }`}>
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </button>
 
-              {/* Slider */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-[#C4B5FD] uppercase tracking-wider text-[10px]">Estimated Students</span>
-                  <span className="text-[#06B6D4] font-mono text-sm">{pricingStudents}</span>
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          >
+                            <div className="px-6 pb-6 text-xs text-[#C4B5FD]/75 leading-relaxed font-sans border-t border-white/5 pt-4">
+                              {faq.answer}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-10 text-xs text-[#C4B5FD]/45">
+                  No matching queries found. Try searching for other keywords.
                 </div>
-                <input 
-                  type="range" 
-                  min="50" 
-                  max="5000" 
-                  step="50"
-                  value={pricingStudents}
-                  onChange={(e) => setPricingStudents(parseInt(e.target.value))}
-                  className="w-full accent-[#06B6D4] bg-white/10 h-1.5 rounded-lg outline-none cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center justify-center p-6 bg-white/5 rounded-2xl border border-white/5 text-center">
-              <span className="text-xs text-[#C4B5FD]/60 uppercase tracking-widest font-semibold">Estimated Monthly Fee</span>
-              <span className="text-4xl md:text-5xl font-heading font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] mt-4 tracking-tight">
-                {calculateCost()}
-              </span>
-              <span className="text-[10px] text-[#C4B5FD]/40 mt-2">Billed annually. Dynamic discount scales apply for Jodhpur institutions.</span>
-              
-              <Link href="/login?fresh=1" className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs transition-all tracking-wide">
-                Get Institutional Proposal →
-              </Link>
-            </div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </section>
 
       {/* Footer Section */}
-      <footer className="mt-auto border-t border-white/5 py-12 px-6 bg-[#090615] text-center text-xs text-[#C4B5FD]/50 font-light">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#6C2BD9]/25 border border-[#6C2BD9]/30 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-[#06B6D4]" />
-            </div>
-            <span className="font-heading font-bold text-white text-sm">IRIS 365</span>
-          </div>
-
-          <p>&copy; 2026 KSL Studio. All rights reserved.</p>
-
-          <div className="flex gap-4 text-[#C4B5FD]/40">
-            <span className="hover:text-white transition-colors">Jodhpur, Rajasthan</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

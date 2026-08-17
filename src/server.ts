@@ -89,6 +89,12 @@ const notificationsNs = io.of('/notifications');
 notificationsNs.on('connection', (socket) => {
   logger.info('Notifications client connected', { socketId: socket.id });
 
+  const userId = (socket as any).user?.id;
+  if (userId) {
+    socket.join(`user_${userId}`);
+    logger.info(`Socket ${socket.id} joined personal room user_${userId}`);
+  }
+
   socket.on('join_institution', (institutionId: string) => {
     socket.join(`institution_${institutionId}`);
   });

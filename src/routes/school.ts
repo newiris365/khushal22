@@ -7,6 +7,9 @@ import {
   deleteClassSection,
   listTeachers,
   setupSchema,
+  markDailyAttendance,
+  getPrincipalDashboardMetrics,
+  bulkVerifyParentLinks,
 } from '../controllers/school';
 
 const router = Router();
@@ -20,6 +23,11 @@ router.delete('/classes/:id', requireRole(['Admin', 'SuperAdmin', 'Director', 'P
 
 router.get('/teachers', requireRole(['Admin', 'SuperAdmin', 'Director', 'Principal', 'Teacher']), listTeachers);
 
+router.post('/attendance/mark', requireRole(['Admin', 'SuperAdmin', 'Teacher']), markDailyAttendance);
+router.get('/principal/metrics', requireRole(['Admin', 'SuperAdmin', 'Director', 'Principal']), getPrincipalDashboardMetrics);
+router.post('/admin/verify-links', requireRole(['Admin', 'SuperAdmin']), bulkVerifyParentLinks);
+
 router.post('/setup/schema', requireRole(['Admin', 'SuperAdmin']), setupSchema);
 
 export default router;
+

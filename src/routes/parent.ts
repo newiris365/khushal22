@@ -10,13 +10,44 @@ import {
   bookPTM,
   getParentBookings,
   cancelPTMBooking,
+  getParentChildren,
 } from '../controllers/parent';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { supabaseAdmin } from '../config/supabase';
 
 const router = Router();
 
 router.use(authMiddleware);
 
+// Middleware to block unverified parent links
+async function requireVerifiedParent(req: any, res: any, next: any) {
+  if (req.user?.role === 'Parent') {
+    // Allow children fetching and child linking
+    if (req.path === '/children' || req.path === '/link' || req.path.startsWith('/link/')) {
+      return next();
+    }
+
+    const { data: verifiedLinks } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('id')
+      .eq('parent_user_id', req.user.id)
+      .eq('verified', true)
+      .limit(1);
+
+    if (!verifiedLinks || verifiedLinks.length === 0) {
+      return res.status(403).json({
+        success: false,
+        code: 'UNVERIFIED_PARENT',
+        error: 'Access denied. Parent-student link is pending verification.'
+      });
+    }
+  }
+  next();
+}
+
+router.use(requireVerifiedParent);
+
+router.get('/children', requireRole(['Parent']), getParentChildren);
 router.get('/child/:id/today', getChildToday);
 router.get('/child/:id/daily-report/:date', getChildDailyReport);
 
@@ -32,3 +63,4 @@ router.get('/ptm/bookings', requireRole(['Parent']), getParentBookings);
 router.post('/ptm/cancel/:id', requireRole(['Parent']), cancelPTMBooking);
 
 export default router;
+

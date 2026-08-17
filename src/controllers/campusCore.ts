@@ -4296,14 +4296,52 @@ export async function getMyBusETA(req: Request, res: Response) {
 // =========================================================================
 // PARENT MODULE CONTROLLERS
 // =========================================================================
+async function resolveParentStudent(parentId: string, studentId?: string) {
+  let query = supabaseAdmin
+    .from('parent_student_links')
+    .select('student_id, verified, is_primary, students(*, departments(name), institutions(institute_type), users(full_name, name))')
+    .eq('parent_user_id', parentId)
+    .eq('verified', true);
+
+  if (studentId) {
+    query = query.eq('student_id', studentId);
+  } else {
+    query = query.order('is_primary', { ascending: false }).limit(1);
+  }
+
+  const { data, error } = await query;
+  if (error || !data || data.length === 0) return null;
+
+  return data[0];
+}
+
 export async function getParentChildInfo(req: Request, res: Response) {
   try {
-    const { data, error } = await supabaseAdmin.rpc('get_parent_child_info');
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      return res.status(404).json({ success: false, error: 'No linked child found. Please link your child first.' });
+    const parentId = req.user?.id;
+    const { student_id } = req.query;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const link = await resolveParentStudent(parentId, student_id as string);
+    if (!link || !link.students) {
+      return res.status(404).json({ success: false, error: 'No verified child found.' });
     }
-    return res.status(200).json({ success: true, child: data[0] });
+
+    const student = link.students as any;
+    const child = {
+      student_id: student.id,
+      student_name: student.users?.full_name || student.name || '',
+      roll_number: student.roll_number,
+      course: student.course,
+      department_name: student.departments?.name || '',
+      semester: student.semester,
+      year: student.year,
+      guardian_phone: student.guardian_phone,
+      wallet_balance: student.wallet_balance,
+      institution_id: student.institution_id,
+      institute_type: student.institutions?.institute_type || 'college'
+    };
+
+    return res.status(200).json({ success: true, child });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -4311,12 +4349,131 @@ export async function getParentChildInfo(req: Request, res: Response) {
 
 export async function getParentDailySummary(req: Request, res: Response) {
   try {
-    const { date } = req.query;
-    const { data, error } = await supabaseAdmin.rpc('get_parent_daily_summary', {
-      p_date: date || new Date().toISOString().split('T')[0]
-    });
-    if (error) throw error;
-    return res.status(200).json({ success: true, summary: data?.[0] || null });
+    const parentId = req.user?.id;
+    const { date, student_id } = req.query;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const link = await resolveParentStudent(parentId, student_id as string);
+    if (!link || !link.students) {
+      return res.status(404).json({ success: false, error: 'No verified child found.' });
+    }
+
+    const childStudent = link.students as any;
+    const targetDate = date ? (date as string) : new Date().toISOString().split('T')[0];
+    const todayStart = `${targetDate}T00:00:00.000Z`;
+    const todayEnd = `${targetDate}T23:59:59.999Z`;
+
+    const isSchool = childStudent.institutions?.institute_type === 'school';
+
+    // 1. Fetch Attendance Stats
+    let totalClasses = 0;
+    let presentClasses = 0;
+    let attendancePct = 100;
+
+    if (isSchool) {
+      const { data: allAtt } = await supabaseAdmin
+        .from('school_attendance')
+        .select('status')
+        .eq('student_id', childStudent.id);
+
+      totalClasses = allAtt?.length || 0;
+      presentClasses = allAtt?.filter((a: any) => ['Present', 'Leave', 'Half-Day'].includes(a.status)).length || 0;
+      attendancePct = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 100;
+    } else {
+      const { data: allAtt } = await supabaseAdmin
+        .from('attendance')
+        .select('status')
+        .eq('student_id', childStudent.id);
+
+      totalClasses = allAtt?.length || 0;
+      presentClasses = allAtt?.filter((a: any) => ['present', 'late'].includes(a.status)).length || 0;
+      attendancePct = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 100;
+    }
+
+    // 2. Fetch Canteen Spend & Today's Meals
+    const { data: canteenOrders } = await supabaseAdmin
+      .from('canteen_orders')
+      .select('items, total_amount')
+      .eq('student_id', childStudent.id)
+      .gte('order_time', todayStart)
+      .lte('order_time', todayEnd);
+
+    let canteenSpend = 0;
+    const meals: string[] = [];
+    if (canteenOrders) {
+      canteenOrders.forEach((o: any) => {
+        canteenSpend += Number(o.total_amount);
+        if (Array.isArray(o.items)) {
+          o.items.forEach((item: any) => {
+            if (item.name) meals.push(`${item.name} (x${item.qty || 1})`);
+            else if (item.item_name) meals.push(`${item.item_name} (x${item.qty || 1})`);
+          });
+        }
+      });
+    }
+
+    // 3. Fetch Gate Entries
+    const { data: gateEntries } = await supabaseAdmin
+      .from('gate_entries')
+      .select('direction, timestamp')
+      .eq('person_id', childStudent.id)
+      .eq('person_type', 'student')
+      .gte('timestamp', todayStart)
+      .lte('timestamp', todayEnd)
+      .order('timestamp', { ascending: true });
+
+    let gateIn: string | null = null;
+    let gateOut: string | null = null;
+    if (gateEntries) {
+      const inEntry = gateEntries.find(e => e.direction === 'in');
+      const outEntry = [...gateEntries].reverse().find(e => e.direction === 'out');
+      if (inEntry) {
+        gateIn = new Date(inEntry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      if (outEntry) {
+        gateOut = new Date(outEntry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+
+    // 4. Fetch Pending Fees
+    const { data: studentFees } = await supabaseAdmin
+      .from('student_fees')
+      .select('amount, paid_amount')
+      .eq('student_id', childStudent.id)
+      .in('payment_status', ['pending', 'partial']);
+
+    let pendingFees = 0;
+    if (studentFees) {
+      studentFees.forEach((f: any) => {
+        pendingFees += Number(f.amount) - Number(f.paid_amount || 0);
+      });
+    }
+
+    // 5. Fetch Bus Status
+    const { data: busTracking } = await supabaseAdmin
+      .from('bus_tracking')
+      .select('boarded_at')
+      .eq('student_id', childStudent.id)
+      .gte('boarded_at', todayStart)
+      .lte('boarded_at', todayEnd)
+      .maybeSingle();
+
+    const summary = {
+      student_name: childStudent.users?.full_name || childStudent.name || 'Student',
+      attendance_present: presentClasses,
+      attendance_total: totalClasses,
+      attendance_pct: attendancePct,
+      canteen_spend: canteenSpend,
+      today_meals: meals,
+      bus_boarded: !!busTracking,
+      bus_time: busTracking ? new Date(busTracking.boarded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+      gate_in: gateIn,
+      gate_out: gateOut,
+      pending_fees: pendingFees,
+      wallet_balance: childStudent.wallet_balance || 0
+    };
+
+    return res.status(200).json({ success: true, summary });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -4327,6 +4484,22 @@ export async function parentTopupWallet(req: Request, res: Response) {
     const { student_id, amount, description } = req.body;
     if (!student_id || !amount || amount <= 0) {
       return res.status(400).json({ success: false, error: 'student_id and valid amount required.' });
+    }
+
+    const parentId = req.user?.id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    // Verify parent is linked and verified to student_id to enforce RLS / prevent data leaks
+    const { data: link, error: linkErr } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('id')
+      .eq('parent_user_id', parentId)
+      .eq('student_id', student_id)
+      .eq('verified', true)
+      .maybeSingle();
+
+    if (linkErr || !link) {
+      return res.status(403).json({ success: false, error: 'Access denied. Unverified parent student link.' });
     }
 
     const { data: student, error: fetchErr } = await supabaseAdmin
@@ -4368,21 +4541,17 @@ export async function parentTopupWallet(req: Request, res: Response) {
 
 export async function getParentWallet(req: Request, res: Response) {
   try {
-    // Get linked child
-    const { data: childData, error: childError } = await supabaseAdmin.rpc('get_parent_child_info');
-    if (childError) throw childError;
-    if (!childData || childData.length === 0) {
-      return res.status(200).json({ success: true, balance: 0, transactions: [], child: null });
-    }
-    const child = childData[0];
-    const studentId = child.student_id;
+    const parentId = req.user?.id;
+    const { student_id } = req.query;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
 
-    // Get wallet balance from students table
-    const { data: student } = await supabaseAdmin
-      .from('students')
-      .select('wallet_balance')
-      .eq('id', studentId)
-      .maybeSingle();
+    const link = await resolveParentStudent(parentId, student_id as string);
+    if (!link || !link.students) {
+      return res.status(404).json({ success: false, error: 'No verified child found.' });
+    }
+
+    const childStudent = link.students as any;
+    const studentId = childStudent.id;
 
     // Get wallet transactions
     const { data: transactions } = await supabaseAdmin
@@ -4394,9 +4563,9 @@ export async function getParentWallet(req: Request, res: Response) {
 
     return res.status(200).json({
       success: true,
-      balance: student?.wallet_balance || 0,
+      balance: childStudent.wallet_balance || 0,
       transactions: transactions || [],
-      child: { name: child.student_name, roll: child.student_roll }
+      child: { name: childStudent.users?.full_name || childStudent.name || '', roll: childStudent.roll_number }
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -4405,12 +4574,15 @@ export async function getParentWallet(req: Request, res: Response) {
 
 export async function getParentFeeSummary(req: Request, res: Response) {
   try {
-    const { data: childData, error: childError } = await supabaseAdmin.rpc('get_parent_child_info');
-    if (childError) throw childError;
-    if (!childData || childData.length === 0) {
+    const parentId = req.user?.id;
+    const { student_id } = req.query;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const link = await resolveParentStudent(parentId, student_id as string);
+    if (!link || !link.students) {
       return res.status(200).json({ success: true, summary: { total_fees: 0, total_paid: 0, pending_amount: 0, fines: 0, wallet_balance: 0, breakdown: [], installments: [], recent_payments: [] } });
     }
-    const studentId = childData[0].student_id;
+    const studentId = (link.students as any).id;
 
     const { data: structures } = await supabaseAdmin
       .from('fee_structures')
@@ -5089,6 +5261,11 @@ export async function autoGenerateTimetable(req: Request, res: Response) {
     const v_slots = time_slots?.length ? time_slots : ['09:00 - 10:00 AM', '10:15 - 11:15 AM', '11:30 - 12:30 PM', '02:00 - 03:00 PM'];
     const v_rooms = inputRooms?.length ? inputRooms : ['Room 1', 'Room 2', 'Room 3'];
 
+    // Fetch existing timetable for conflict detection (moved up to avoid declaration errors)
+    const { data: existing } = await supabaseAdmin
+      .from('timetable').select('day_of_week, time_slot, teacher_id, room')
+      .eq('institution_id', institution_id);
+
     // ─── STEP 0: Pre-assign Period 1 to class teachers ──────────
     // Fetch class sections with their class_teacher_id
     const { data: classSections } = await supabaseAdmin
@@ -5159,9 +5336,7 @@ export async function autoGenerateTimetable(req: Request, res: Response) {
     const allLessons = [...classTeacherLessons, ...lessons];
 
     // ─── STEP 2: Fetch existing timetable for conflict detection ──
-    const { data: existing } = await supabaseAdmin
-      .from('timetable').select('day_of_week, time_slot, teacher_id, room')
-      .eq('institution_id', institution_id);
+    // (Already fetched at the beginning of function to avoid TDZ block scoping issues)
 
     // Build conflict maps: teacher conflicts, room conflicts, class_section conflicts
     const teacherOccupied = new Set<string>();   // "day|slot|teacher_id"

@@ -4,21 +4,76 @@ import { supabaseAdmin } from '../config/supabase';
 export async function getChildToday(req: Request, res: Response) {
   try {
     const { id } = req.params;
+    const parentId = req.user?.id;
 
-    const { data: scheduleData, error: timetableError } = await supabaseAdmin
-      .from('timetable')
-      .select('*, staff(name)')
-      .order('time_slot');
+    // Check if parent user is linked and verified for this student
+    if (req.user?.role === 'Parent') {
+      const { data: link, error: linkErr } = await supabaseAdmin
+        .from('parent_student_links')
+        .select('id')
+        .eq('parent_user_id', parentId)
+        .eq('student_id', id)
+        .eq('verified', true)
+        .maybeSingle();
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const { data: attendanceData } = await supabaseAdmin
-      .from('attendance')
-      .select('status')
-      .eq('student_id', id)
-      .eq('date', todayStr)
+      if (linkErr || !link) {
+        return res.status(403).json({ success: false, error: 'Access denied. Parent student link is not verified.' });
+      }
+    }
+
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('institution_id, class_section_id, semester, department_id')
+      .eq('id', id)
       .maybeSingle();
 
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+
+    const { data: inst } = await supabaseAdmin
+      .from('institutions')
+      .select('institute_type')
+      .eq('id', student.institution_id)
+      .maybeSingle();
+
+    const isSchool = inst?.institute_type === 'school';
+
+    let scheduleQuery = supabaseAdmin
+      .from('timetable')
+      .select('*, staff(name)')
+      .eq('institution_id', student.institution_id);
+
+    if (isSchool) {
+      scheduleQuery = scheduleQuery.eq('class_section_id', student.class_section_id);
+    } else {
+      scheduleQuery = scheduleQuery.eq('department_id', student.department_id).eq('semester', student.semester);
+    }
+
+    const { data: scheduleData, error: timetableError } = await scheduleQuery.order('time_slot');
+
     if (timetableError) throw timetableError;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let attendanceStatus = 'Absent';
+
+    if (isSchool) {
+      const { data: attendanceData } = await supabaseAdmin
+        .from('school_attendance')
+        .select('status')
+        .eq('student_id', id)
+        .eq('date', todayStr)
+        .maybeSingle();
+      attendanceStatus = attendanceData?.status || 'Absent';
+    } else {
+      const { data: attendanceData } = await supabaseAdmin
+        .from('attendance')
+        .select('status')
+        .eq('student_id', id)
+        .eq('date', todayStr)
+        .maybeSingle();
+      attendanceStatus = attendanceData?.status || 'absent';
+    }
 
     const schedule = (scheduleData || []).map(item => ({
       id: item.id,
@@ -32,26 +87,35 @@ export async function getChildToday(req: Request, res: Response) {
       success: true,
       schedule,
       current_period: schedule[0] || null,
-      attendance_status: attendanceData?.status || 'absent'
+      attendance_status: attendanceStatus
     });
   } catch (err: any) {
-    const mockSchedule = [
-      { id: 's-1', time_slot: '09:00 AM - 10:00 AM', subject: 'Compiler Design', teacher: 'Dr. Aditya Kumar', room: 'CS-301' },
-      { id: 's-2', time_slot: '10:00 AM - 11:00 AM', subject: 'Database Systems', teacher: 'Prof. Sarah Vance', room: 'CS-302' },
-      { id: 's-3', time_slot: '11:15 AM - 12:15 PM', subject: 'Artificial Intelligence', teacher: 'Dr. Vivek Sharma', room: 'Lab 4' }
-    ];
-    return res.status(200).json({
-      success: true,
-      schedule: mockSchedule,
-      current_period: mockSchedule[0],
-      attendance_status: 'present'
-    });
+    console.error('[getChildToday] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch student timetable.' });
   }
 }
+
 
 export async function getChildDailyReport(req: Request, res: Response) {
   try {
     const { id, date } = req.params;
+    const parentId = req.user?.id;
+
+    // Check if parent user is linked and verified for this student
+    if (req.user?.role === 'Parent') {
+      const { data: link, error: linkErr } = await supabaseAdmin
+        .from('parent_student_links')
+        .select('id')
+        .eq('parent_user_id', parentId)
+        .eq('student_id', id)
+        .eq('verified', true)
+        .maybeSingle();
+
+      if (linkErr || !link) {
+        return res.status(403).json({ success: false, error: 'Access denied. Parent student link is not verified.' });
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('parent_daily_reports')
       .select('*')
@@ -66,22 +130,8 @@ export async function getChildDailyReport(req: Request, res: Response) {
       report: data
     });
   } catch (err: any) {
-    const reportDate = req.params.date || new Date().toISOString().split('T')[0];
-    const mockReport = {
-      student_id: req.params.id,
-      date: reportDate,
-      attendance_status: 'Present',
-      current_period: 'Completed',
-      meals_today: 'Samosa, Fruit Juice (Canteen)',
-      gate_in_time: `${reportDate}T09:05:00Z`,
-      gate_out_time: `${reportDate}T17:15:00Z`,
-      canteen_spend: 85.00,
-      notices_count: 2
-    };
-    return res.status(200).json({
-      success: true,
-      report: mockReport
-    });
+    console.error('[getChildDailyReport] Error:', err.message);
+    return res.status(404).json({ success: false, error: 'Daily report not found.' });
   }
 }
 
@@ -115,12 +165,34 @@ export async function sendParentMessage(req: Request, res: Response) {
 
     if (error) throw error;
 
+    // Emit real-time Socket.io event in notifications namespace
+    try {
+      const { notificationsNs } = require('../server');
+      if (notificationsNs) {
+        // Emit to teacher's personal room
+        notificationsNs.to(`user_${teacher_id}`).emit('new_message', {
+          sender_id: senderId,
+          sender_role: senderRole,
+          message: data
+        });
+        
+        // Emit to institution-wide room
+        notificationsNs.to(`institution_${institutionId}`).emit('new_message_alert', {
+          teacher_id,
+          sender_name: (req.user as any)?.name || 'A parent'
+        });
+      }
+    } catch (sockErr) {
+      console.error('[SOCKET] Failed to emit message notification:', sockErr);
+    }
+
     return res.status(200).json({
       success: true,
       message: data
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message || 'Message send operation failed.' });
+    console.error('[sendParentMessage] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to send message.' });
   }
 }
 
@@ -178,6 +250,7 @@ export async function getConversationThreads(req: Request, res: Response) {
             .from('parent_student_links')
             .select('students(name)')
             .eq('parent_user_id', otherUser.id)
+            .eq('verified', true)
             .maybeSingle();
           if (link?.students) {
             studentName = (link.students as any).name || '';
@@ -209,7 +282,6 @@ export async function getConversationThreads(req: Request, res: Response) {
 export async function getPTMTeachers(req: Request, res: Response) {
   try {
     const parentId = req.user?.id;
-    const institutionId = req.user?.institution_id;
     if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
 
     // Find child via parent_student_links
@@ -217,50 +289,92 @@ export async function getPTMTeachers(req: Request, res: Response) {
       .from('parent_student_links')
       .select('student_id')
       .eq('parent_user_id', parentId)
+      .eq('verified', true)
       .maybeSingle();
 
-    let teachers: any[] = [];
+    if (!link?.student_id) {
+      return res.status(200).json({ success: true, teachers: [], message: 'No verified linked student found.' });
+    }
 
-    if (link?.student_id) {
-      // Get student's department/semester to find relevant teachers
-      const { data: student } = await supabaseAdmin
-        .from('students')
-        .select('department_id, semester')
-        .eq('id', link.student_id)
+    // Get student's class_section_id, department_id, semester
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('id, institution_id, class_section_id, department_id, semester')
+      .eq('id', link.student_id)
+      .maybeSingle();
+
+    if (!student) {
+      return res.status(200).json({ success: true, teachers: [], message: 'Student profile not found.' });
+    }
+
+    // Get institution type
+    const { data: inst } = await supabaseAdmin
+      .from('institutions')
+      .select('institute_type')
+      .eq('id', student.institution_id)
+      .maybeSingle();
+
+    const isSchool = inst?.institute_type === 'school';
+    let teacherIds: string[] = [];
+
+    if (isSchool && student.class_section_id) {
+      // 1. Fetch Class Teacher from class_sections
+      const { data: classSection } = await supabaseAdmin
+        .from('class_sections')
+        .select('class_teacher_id')
+        .eq('id', student.class_section_id)
         .maybeSingle();
 
-      // Get teachers from same department (or all if no department match)
-      let query = supabaseAdmin
-        .from('users')
-        .select('id, name, email')
-        .eq('role', 'Teacher')
-        .eq('is_active', true);
-
-      if (institutionId) {
-        query = query.eq('institution_id', institutionId);
+      if (classSection?.class_teacher_id) {
+        teacherIds.push(classSection.class_teacher_id);
       }
 
-      const { data: allTeachers, error } = await query.order('name');
-      if (error) throw error;
-      teachers = allTeachers || [];
+      // 2. Fetch Subject Teachers from timetable for this class_section_id
+      const { data: timetableTeachers } = await supabaseAdmin
+        .from('timetable')
+        .select('teacher_id')
+        .eq('class_section_id', student.class_section_id)
+        .not('teacher_id', 'is', null);
+
+      if (timetableTeachers) {
+        timetableTeachers.forEach((t: any) => {
+          if (t.teacher_id) teacherIds.push(t.teacher_id);
+        });
+      }
     } else {
-      // No child linked — return all teachers in institution
-      let query = supabaseAdmin
+      // College logic: Fetch Subject Teachers from timetable matching department_id and semester
+      const { data: timetableTeachers } = await supabaseAdmin
+        .from('timetable')
+        .select('teacher_id')
+        .eq('department_id', student.department_id)
+        .eq('semester', student.semester)
+        .not('teacher_id', 'is', null);
+
+      if (timetableTeachers) {
+        timetableTeachers.forEach((t: any) => {
+          if (t.teacher_id) teacherIds.push(t.teacher_id);
+        });
+      }
+    }
+
+    // Deduplicate teacher IDs
+    teacherIds = Array.from(new Set(teacherIds));
+
+    let teachers: any[] = [];
+    if (teacherIds.length > 0) {
+      const { data: allTeachers, error } = await supabaseAdmin
         .from('users')
         .select('id, name, email')
+        .in('id', teacherIds)
         .eq('role', 'Teacher')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('name');
 
-      if (institutionId) {
-        query = query.eq('institution_id', institutionId);
-      }
-
-      const { data: allTeachers, error } = await query.order('name');
       if (error) throw error;
       teachers = allTeachers || [];
     }
 
-    // Enrich with subjects taught (from timetable if available)
+    // Enrich with subjects taught (from timetable)
     const enriched = await Promise.all(teachers.map(async (t) => {
       const { data: subjects } = await supabaseAdmin
         .from('timetable')
@@ -289,8 +403,10 @@ export async function getPTMSlots(req: Request, res: Response) {
     const { teacherId } = req.params;
     const dateParam = req.query.date as string | undefined;
     const targetDate = dateParam || new Date().toISOString().split('T')[0];
+    const institutionId = req.user?.institution_id;
 
-    const { data, error } = await supabaseAdmin
+    // Check if slots already exist in database
+    let { data: slotsData, error } = await supabaseAdmin
       .from('ptm_slots')
       .select('*')
       .eq('teacher_id', teacherId)
@@ -298,6 +414,48 @@ export async function getPTMSlots(req: Request, res: Response) {
       .order('slot_time');
 
     if (error) throw error;
+
+    // If no slots configured, auto-populate with default slots (3:00 PM - 5:00 PM in 15-minute intervals)
+    if (!slotsData || slotsData.length === 0) {
+      const defaultSlots = [
+        '03:00 PM - 03:15 PM',
+        '03:15 PM - 03:30 PM',
+        '03:30 PM - 03:45 PM',
+        '03:45 PM - 04:00 PM',
+        '04:00 PM - 04:15 PM',
+        '04:15 PM - 04:30 PM',
+        '04:30 PM - 04:45 PM',
+        '04:45 PM - 05:00 PM'
+      ];
+
+      // Find the teacher's institution_id
+      const { data: teacherUser } = await supabaseAdmin
+        .from('users')
+        .select('institution_id')
+        .eq('id', teacherId)
+        .maybeSingle();
+
+      const instId = teacherUser?.institution_id || institutionId || 'a0000000-0000-0000-0000-000000000001';
+
+      const insertRows = defaultSlots.map(slot => ({
+        institution_id: instId,
+        teacher_id: teacherId,
+        date: targetDate,
+        slot_time: slot,
+        available: true
+      }));
+
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from('ptm_slots')
+        .insert(insertRows)
+        .select();
+
+      if (insertError) {
+        console.error('[getPTMSlots] Failed to insert default slots:', insertError.message);
+      } else if (inserted) {
+        slotsData = inserted;
+      }
+    }
 
     // Filter out already-booked slots
     const { data: bookings } = await supabaseAdmin
@@ -309,7 +467,7 @@ export async function getPTMSlots(req: Request, res: Response) {
 
     const bookedTimes = new Set((bookings || []).map((b: any) => b.slot_time));
 
-    const slots = (data || []).map(s => ({
+    const slots = (slotsData || []).map(s => ({
       id: s.id,
       time: s.slot_time,
       available: s.available && !bookedTimes.has(s.slot_time),
@@ -319,7 +477,6 @@ export async function getPTMSlots(req: Request, res: Response) {
     return res.status(200).json({ success: true, slots });
   } catch (err: any) {
     console.error('[getPTMSlots] Error:', err.message);
-    // Return empty array on error — no fake data
     return res.status(200).json({ success: true, slots: [] });
   }
 }
@@ -459,3 +616,37 @@ export async function cancelPTMBooking(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message || 'Failed to cancel booking.' });
   }
 }
+
+// ─── GET LINKED CHILDREN LIST FOR SWITCHER ────────────────────
+export async function getParentChildren(req: Request, res: Response) {
+  try {
+    const parentId = req.user?.id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const { data: links, error } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('id, verified, is_primary, student_id, students(*, departments(name), institutions(institute_type), users(full_name))')
+      .eq('parent_user_id', parentId);
+
+    if (error) throw error;
+
+    const children = (links || []).map((l: any) => ({
+      link_id: l.id,
+      verified: l.verified,
+      is_primary: l.is_primary,
+      student_id: l.student_id,
+      name: l.students?.users?.full_name || l.students?.name || 'Student',
+      roll_number: l.students?.roll_number,
+      semester: l.students?.semester,
+      course: l.students?.course,
+      wallet_balance: l.students?.wallet_balance,
+      department_name: l.students?.departments?.name || '',
+      institute_type: l.students?.institutions?.institute_type || 'college'
+    }));
+
+    return res.status(200).json({ success: true, children });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch linked children.' });
+  }
+}
+
