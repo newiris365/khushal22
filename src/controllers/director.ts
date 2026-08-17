@@ -817,6 +817,122 @@ export async function getThresholds(req: Request, res: Response) {
   }
 }
 
+export async function checkAlertThresholds(institutionId: string) {
+  try {
+    const { data: thresholds } = await supabaseAdmin
+      .from('alert_thresholds')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .eq('is_enabled', true);
+
+    if (!thresholds || thresholds.length === 0) return;
+
+    for (const thresh of thresholds) {
+      let trigger = false;
+      let title = '';
+      let message = '';
+      let currentVal = 0;
+
+      if (thresh.alert_type === 'attendance_low') {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: att } = await supabaseAdmin
+          .from('daily_attendance_summary')
+          .select('attendance_percent')
+          .eq('institution_id', institutionId)
+          .eq('date', today);
+        
+        let avg = 82;
+        if (att && att.length > 0) {
+          avg = att.reduce((acc, c: any) => acc + parseFloat(c.attendance_percent), 0) / att.length;
+        }
+        currentVal = avg;
+        
+        const threshVal = parseFloat(thresh.threshold_value);
+        if (thresh.comparison === 'lt' && avg < threshVal) trigger = true;
+        else if (thresh.comparison === 'gt' && avg > threshVal) trigger = true;
+        else if (thresh.comparison === 'eq' && avg === threshVal) trigger = true;
+
+        if (trigger) {
+          title = 'Low Attendance Alert';
+          message = `Campus-wide attendance rate of ${avg.toFixed(1)}% falls below the target threshold of ${threshVal}%`;
+        }
+      } 
+      
+      else if (thresh.alert_type === 'complaint_overdue') {
+        const fiveDaysAgo = new Date();
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - parseInt(thresh.threshold_value));
+        
+        const { count } = await supabaseAdmin
+          .from('hostel_complaints')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', institutionId)
+          .in('status', ['open', 'Open', 'assigned', 'in_progress'])
+          .lt('created_at', fiveDaysAgo.toISOString());
+        
+        currentVal = count || 0;
+        if (currentVal > 0) {
+          trigger = true;
+          title = 'Stale Complaints Alert';
+          message = `Found ${currentVal} open hostel complaints that have remained unresolved for more than ${thresh.threshold_value} days.`;
+        }
+      }
+
+      else if (thresh.alert_type === 'library_overdue_surge') {
+        const { count } = await supabaseAdmin
+          .from('library_fines')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'unpaid');
+        
+        currentVal = count || 0;
+        const threshVal = parseFloat(thresh.threshold_value);
+        if (currentVal > threshVal) {
+          trigger = true;
+          title = 'Library Overdue Books Surge';
+          message = `Total unpaid overdue library fines index stands at ${currentVal}, exceeding the threshold of ${threshVal}.`;
+        }
+      }
+
+      if (trigger) {
+        const { data: existing } = await supabaseAdmin
+          .from('director_alerts')
+          .select('id')
+          .eq('institution_id', institutionId)
+          .eq('type', thresh.alert_type)
+          .eq('is_resolved', false)
+          .maybeSingle();
+
+        if (!existing) {
+          const { data: alertData, error: insErr } = await supabaseAdmin
+            .from('director_alerts')
+            .insert({
+              institution_id: institutionId,
+              type: thresh.alert_type,
+              severity: 'critical',
+              title,
+              message,
+              module: 'Core',
+              data: { value: currentVal, limit: thresh.threshold_value }
+            })
+            .select()
+            .single();
+
+          if (!insErr && alertData) {
+            logger.warn(`[DIRECTOR ALERT TRIGGERED]: ${title} - ${message}`);
+            try {
+              const { directorNs } = require('../server');
+              if (directorNs) {
+                directorNs.to('director:dashboard').emit('director:alert_triggered', alertData);
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error in checkAlertThresholds: ' + err.message);
+  }
+}
+
 export async function updateThreshold(req: Request, res: Response) {
   try {
     const { type } = req.params;
@@ -857,6 +973,12 @@ export async function updateThreshold(req: Request, res: Response) {
         notify_via
       };
     }
+
+    // Trigger immediate alert check evaluation in background
+    checkAlertThresholds(institutionId).catch(err => {
+      logger.error('Failed evaluating threshold alert checks:', err);
+    });
+
     return res.status(200).json({ success: true, threshold: resultData });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -887,58 +1009,108 @@ export async function getInsights(req: Request, res: Response) {
   }
 }
 
+export async function refreshAIInsightsJob() {
+  try {
+    const { data: insts } = await supabaseAdmin
+      .from('institutions')
+      .select('id');
+
+    if (!insts || insts.length === 0) return;
+
+    for (const inst of insts) {
+      const institutionId = inst.id;
+
+      // Gather telemetry metrics for this institution
+      let lowAttendanceCount = 0;
+      try {
+        const { count } = await supabaseAdmin
+          .from('attendance')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', institutionId)
+          .eq('status', 'absent');
+        if (count !== null) lowAttendanceCount = count;
+      } catch {}
+
+      let unresolvedComplaints = 0;
+      try {
+        const { count } = await supabaseAdmin
+          .from('hostel_complaints')
+          .select('*', { count: 'exact', head: true })
+          .eq('institution_id', institutionId)
+          .in('status', ['open', 'assigned', 'in_progress']);
+        if (count !== null) unresolvedComplaints = count;
+      } catch {}
+
+      let canteenRevenue: number[] = [];
+      try {
+        const { data: orders } = await supabaseAdmin
+          .from('canteen_orders')
+          .select('total_amount')
+          .eq('institution_id', institutionId)
+          .eq('payment_status', 'Completed')
+          .order('order_time', { ascending: false })
+          .limit(10);
+        if (orders) {
+          canteenRevenue = orders.map((o: any) => parseFloat(o.total_amount || 0));
+        }
+      } catch {}
+
+      const campusDataPayload = {
+        attendance_low_count: lowAttendanceCount,
+        unresolved_complaints_count: unresolvedComplaints,
+        canteen_revenue_daily: canteenRevenue.length > 0 ? canteenRevenue : [4500, 3200, 6400, 5100],
+        days_since_last_exam: 12
+      };
+
+      const insights = await generateDirectorAIInsights(campusDataPayload);
+
+      // Insert new insights
+      for (const item of insights) {
+        try {
+          await supabaseAdmin
+            .from('ai_insights')
+            .insert({
+              institution_id: institutionId,
+              insight_type: item.type,
+              title: item.title,
+              description: item.description,
+              severity: item.severity,
+              recommendation: item.recommendation,
+              affected_entities: { count: item.affected_count }
+            });
+        } catch (dbErr) {
+          logger.error('Failed to insert AI insight into database:', dbErr);
+        }
+      }
+    }
+    logger.info('[CRON] Refreshed AI Insights successfully for all institutions.');
+  } catch (err: any) {
+    logger.error('[CRON] Error during AI insights refresh job: ' + err.message);
+  }
+}
+
 export async function generateInsights(req: Request, res: Response) {
   try {
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
 
-    const campusDataPayload = {
-      attendance_low_count: 5,
-      unresolved_complaints_count: 3,
-      canteen_revenue_daily: [4500, 3200, 6400, 5100],
-      days_since_last_exam: 12
-    };
+    // Trigger background generation asynchronously
+    refreshAIInsightsJob().catch((err) => {
+      logger.error('Error running background AI insights generator:', err);
+    });
 
-    const insights = await generateDirectorAIInsights(campusDataPayload);
+    // Fetch and return last cached insights immediately
+    const { data: dbData } = await supabaseAdmin
+      .from('ai_insights')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .eq('is_dismissed', false)
+      .order('generated_at', { ascending: false });
 
-    const saved: any[] = [];
-    for (const item of insights) {
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('ai_insights')
-          .insert({
-            institution_id: institutionId,
-            insight_type: item.type,
-            title: item.title,
-            description: item.description,
-            severity: item.severity,
-            recommendation: item.recommendation,
-            affected_entities: { count: item.affected_count }
-          })
-          .select()
-          .single();
-        if (!error && data) {
-          saved.push(data);
-        } else {
-          throw error || new Error('No data returned');
-        }
-      } catch (dbErr) {
-        logger.warn('Failed to insert insight into DB, returning standard memory model:', dbErr);
-        saved.push({
-          id: `ins_${Math.random().toString(36).substr(2, 9)}`,
-          institution_id: institutionId,
-          insight_type: item.type,
-          title: item.title,
-          description: item.description,
-          severity: item.severity,
-          recommendation: item.recommendation,
-          affected_entities: { count: item.affected_count },
-          generated_at: new Date().toISOString(),
-          is_dismissed: false
-        });
-      }
-    }
-
-    return res.status(200).json({ success: true, insights: saved });
+    return res.status(200).json({ 
+      success: true, 
+      insights: dbData || [],
+      message: 'Background insights generation triggered successfully.'
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -1033,38 +1205,8 @@ export async function generateReportOnDemand(req: Request, res: Response) {
       }
     };
 
-    let pdfBuffer: Buffer;
-    try {
-      // 1. Try Puppeteer HTML-to-PDF rendering compiler
-      const sampleHtml = `
-        <html>
-          <head>
-            <style>
-              body { font-family: sans-serif; padding: 40px; color: #1F2937; }
-              h1 { color: #6C2BD9; text-align: center; }
-              .section { border-top: 1px solid #E5E7EB; margin-top: 20px; padding-top: 20px; }
-            </style>
-          </head>
-          <body>
-            <h1>IRIS 365 Campus Report</h1>
-            <p><strong>Report Type:</strong> ${report_type.toUpperCase()}</p>
-            <p><strong>Date:</strong> ${targetDate}</p>
-            <div class="section">
-              <h3>Operations Summary Statistics</h3>
-              <ul>
-                <li>Attendance Rate today: 84%</li>
-                <li>Fee Revenues today: ₹1,85,000</li>
-                <li>Students inside Campus: 48</li>
-              </ul>
-            </div>
-          </body>
-        </html>
-      `;
-      pdfBuffer = await generatePuppeteerPDF(sampleHtml);
-    } catch {
-      // 2. Dynamic fallback to robust local PDFKit compiler
-      pdfBuffer = await generatePDFKitFallback(reportDataPayload);
-    }
+    // Standardize directly on PDFKit for serverless environment stability
+    const pdfBuffer = await generatePDFKitFallback(reportDataPayload);
 
     // Upload file to storage bucket
     const fileName = `Report_${report_type}_${targetDate}_${Date.now()}.pdf`;
@@ -1423,12 +1565,20 @@ export async function generateAndDownloadPDFReport(req: Request, res: Response) 
       </html>
     `;
 
-    let pdfBuffer: Buffer;
-    try {
-      pdfBuffer = await generatePuppeteerPDF(sampleHtml);
-    } catch {
-      pdfBuffer = await generatePDFKitFallback(reportDataPayload);
-    }
+    // Standardize directly on PDFKit for serverless environment stability
+    const reportDataPayload = {
+      report_type: report_type,
+      report_date: today,
+      data: {
+        attendance_rate: reportData.attendance?.rate || 0,
+        fee_collected: reportData.fees?.total_collected || 0,
+        students_on_campus: reportData.total_students || 0,
+        open_complaints: reportData.complaints?.pending || 0,
+        active_bus_trips: reportData.modules?.active_transit_subs || 0,
+        events_count: reportData.events?.total || 0
+      }
+    };
+    const pdfBuffer = await generatePDFKitFallback(reportDataPayload);
 
     const fileName = `Report_${reportTypeLabel.toLowerCase()}_${effectiveStartDate}_to_${effectiveEndDate}_${Date.now()}.pdf`;
     let publicUrl = '';
@@ -1550,6 +1700,75 @@ export async function getStudentFullProfile(req: Request, res: Response) {
       movements = data || [];
     } catch {}
 
+    // 5. Fetch Library Books Borrowed
+    let borrowedBooks: any[] = [];
+    try {
+      const { data: books } = await supabaseAdmin
+        .from('book_issues')
+        .select('id, issue_date, due_date, books(title, author)')
+        .eq('student_id', id)
+        .eq('status', 'issued');
+      if (books) {
+        borrowedBooks = books.map((b: any) => ({
+          id: b.id,
+          title: b.books?.title,
+          author: b.books?.author,
+          issue_date: b.issue_date,
+          due_date: b.due_date
+        }));
+      }
+    } catch {}
+
+    // 6. Fetch Active Transit Route
+    let transitSubscription: any = null;
+    try {
+      const { data: transitSub } = await supabaseAdmin
+        .from('transport_subscriptions')
+        .select('id, stop_name, status, bus_routes(name, route_number)')
+        .eq('student_id', id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (transitSub && transitSub.bus_routes) {
+        transitSubscription = {
+          id: transitSub.id,
+          route_number: transitSub.bus_routes.route_number,
+          route_name: transitSub.bus_routes.name,
+          stop_name: transitSub.stop_name
+        };
+      }
+    } catch {}
+
+    // 7. Fetch Canteen Wallet Balance
+    let walletBalance = 0;
+    try {
+      const { data: wallet } = await supabaseAdmin
+        .from('canteen_wallets')
+        .select('balance')
+        .eq('student_id', id)
+        .maybeSingle();
+      if (wallet) walletBalance = parseFloat(wallet.balance || 0);
+    } catch {}
+
+    // 8. Fetch Last 5 Canteen Purchases
+    let canteenPurchases: any[] = [];
+    try {
+      const { data: orders } = await supabaseAdmin
+        .from('canteen_orders')
+        .select('id, total_amount, order_time, status, payment_status')
+        .eq('student_id', id)
+        .order('order_time', { ascending: false })
+        .limit(5);
+      if (orders) {
+        canteenPurchases = orders.map((o: any) => ({
+          id: o.id,
+          amount: parseFloat(o.total_amount || 0),
+          date: o.order_time,
+          status: o.status,
+          payment_status: o.payment_status
+        }));
+      }
+    } catch {}
+
     return res.status(200).json({
       success: true,
       profile: {
@@ -1563,8 +1782,15 @@ export async function getStudentFullProfile(req: Request, res: Response) {
         attendance_rate: attendanceRate,
         fee_status: feeStatus,
         recent_movements: movements,
-        canteen_wallet_balance: 350, // mock
-        active_subscriptions: { transit: 'Active', gym: 'None', library: '2 Books checked out' }
+        canteen_wallet_balance: walletBalance,
+        active_subscriptions: {
+          transit: transitSubscription ? `${transitSubscription.route_number} - ${transitSubscription.route_name} (Stop: ${transitSubscription.stop_name})` : 'None',
+          gym: 'None',
+          library: borrowedBooks.length > 0 ? `${borrowedBooks.length} Books checked out` : 'None'
+        },
+        library_books: borrowedBooks,
+        transit_route: transitSubscription,
+        canteen_purchases: canteenPurchases
       }
     });
   } catch (err: any) {
@@ -1804,59 +2030,170 @@ export async function getFinancialPL(req: Request, res: Response) {
       .eq('year', year)
       .maybeSingle();
 
-    // Standard costs configuration baseline
+    const lastDay = new Date(year, month, 0).getDate();
+    const startOfMonth = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endOfMonth = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    // 1. Fetch Staff Costs from payroll_runs table
+    let staffCosts = 1200000; // default baseline fallback
+    try {
+      const { data: payrolls } = await supabaseAdmin
+        .from('payroll_runs')
+        .select('total_gross')
+        .eq('institution_id', institutionId)
+        .eq('month', month)
+        .eq('year', year);
+
+      if (payrolls && payrolls.length > 0) {
+        staffCosts = payrolls.reduce((acc: number, p: any) => acc + (parseFloat(p.total_gross) || 0), 0);
+      }
+    } catch (e) {
+      logger.error('Error fetching staff costs from payroll_runs:', e);
+    }
+
+    // 2. Fetch Utility & Maintenance costs from operating_expenses table
+    let maintenanceCosts = 300000; // default baseline fallback
+    let utilityCosts = 150000; // default baseline fallback
+    try {
+      const { data: expenses } = await supabaseAdmin
+        .from('operating_expenses')
+        .select('category, amount')
+        .eq('institution_id', institutionId)
+        .gte('expense_date', startOfMonth)
+        .lte('expense_date', endOfMonth);
+
+      if (expenses && expenses.length > 0) {
+        const maintExp = expenses.filter((e: any) => e.category === 'maintenance');
+        const utilExp = expenses.filter((e: any) => e.category === 'utility');
+        if (maintExp.length > 0) {
+          maintenanceCosts = maintExp.reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+        }
+        if (utilExp.length > 0) {
+          utilityCosts = utilExp.reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+        }
+      }
+    } catch (e) {
+      logger.error('Error fetching operating expenses:', e);
+    }
+
     const costBreakdown = plRecord?.cost_breakdown || {
-      staff: 1200000,
-      maintenance: 300000,
-      utilities: 150000
+      staff: staffCosts,
+      maintenance: maintenanceCosts,
+      utilities: utilityCosts
     };
 
-    // 2. Aggregate actual dynamic revenues from database
-    let feesRevenue = 4100000; // default baseline
-    let canteenRevenue = 115000;
-    let eventsRevenue = 60000;
-    let gymRevenue = 42000;
-    let hostelRevenue = 620000;
+    // 3. Aggregate actual dynamic revenues from database
+    let feesRevenue = 0;
+    let canteenRevenue = 0;
+    let gymRevenue = 0;
+    let transitRevenue = 0;
+    let hostelRevenue = 0;
 
+    // Fees Revenue: Completed payments from fee_payments
     try {
-      // Query completed fees for specified month
       const { data: fees } = await supabaseAdmin
         .from('fee_payments')
         .select('amount_paid')
         .eq('institution_id', institutionId)
         .eq('status', 'Completed')
-        .gte('payment_date', `${year}-${String(month).padStart(2, '0')}-01`)
-        .lte('payment_date', `${year}-${String(month).padStart(2, '0')}-31`);
+        .gte('payment_date', startOfMonth)
+        .lte('payment_date', endOfMonth);
       
       if (fees && fees.length > 0) {
-        feesRevenue = fees.reduce((acc, f: any) => acc + parseFloat(f.amount_paid), 0);
+        feesRevenue = fees.reduce((acc, f: any) => acc + parseFloat(f.amount_paid || 0), 0);
       }
-    } catch {}
+    } catch (e) {
+      logger.error('Error calculating fees revenue:', e);
+    }
 
+    // Canteen Revenue: Completed orders from canteen_orders
     try {
-      // Query completed canteen orders
+      const startDateTime = `${startOfMonth}T00:00:00Z`;
+      const endDateTime = `${endOfMonth}T23:59:59Z`;
       const { data: orders } = await supabaseAdmin
         .from('canteen_orders')
         .select('total_amount')
         .eq('institution_id', institutionId)
         .eq('payment_status', 'Completed')
-        .gte('order_time', `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`)
-        .lte('order_time', `${year}-${String(month).padStart(2, '0')}-31T23:59:59Z`);
+        .gte('order_time', startDateTime)
+        .lte('order_time', endDateTime);
 
       if (orders && orders.length > 0) {
-        canteenRevenue = orders.reduce((acc, o: any) => acc + parseFloat(o.total_amount), 0);
+        canteenRevenue = orders.reduce((acc, o: any) => acc + parseFloat(o.total_amount || 0), 0);
       }
-    } catch {}
+    } catch (e) {
+      logger.error('Error calculating canteen revenue:', e);
+    }
+
+    // Gym Revenue: service_subscriptions where service_type = 'gym' and status != 'cancelled'
+    try {
+      const startDateTime = `${startOfMonth}T00:00:00Z`;
+      const endDateTime = `${endOfMonth}T23:59:59Z`;
+      const { data: gymSubs } = await supabaseAdmin
+        .from('service_subscriptions')
+        .select('amount_paid')
+        .eq('institution_id', institutionId)
+        .eq('service_type', 'gym')
+        .neq('status', 'cancelled')
+        .gte('created_at', startDateTime)
+        .lte('created_at', endDateTime);
+
+      if (gymSubs && gymSubs.length > 0) {
+        gymRevenue = gymSubs.reduce((acc, s: any) => acc + parseFloat(s.amount_paid || 0), 0);
+      }
+    } catch (e) {
+      logger.error('Error calculating gym revenue:', e);
+    }
+
+    // Transit Revenue: service_subscriptions where service_type = 'transit' and status != 'cancelled'
+    try {
+      const startDateTime = `${startOfMonth}T00:00:00Z`;
+      const endDateTime = `${endOfMonth}T23:59:59Z`;
+      const { data: transitSubs } = await supabaseAdmin
+        .from('service_subscriptions')
+        .select('amount_paid')
+        .eq('institution_id', institutionId)
+        .eq('service_type', 'transit')
+        .neq('status', 'cancelled')
+        .gte('created_at', startDateTime)
+        .lte('created_at', endDateTime);
+
+      if (transitSubs && transitSubs.length > 0) {
+        transitRevenue = transitSubs.reduce((acc, s: any) => acc + parseFloat(s.amount_paid || 0), 0);
+      }
+    } catch (e) {
+      logger.error('Error calculating transit revenue:', e);
+    }
+
+    // Hostel Revenue: service_subscriptions where service_type = 'hostel' and status != 'cancelled'
+    try {
+      const startDateTime = `${startOfMonth}T00:00:00Z`;
+      const endDateTime = `${endOfMonth}T23:59:59Z`;
+      const { data: hostelSubs } = await supabaseAdmin
+        .from('service_subscriptions')
+        .select('amount_paid')
+        .eq('institution_id', institutionId)
+        .eq('service_type', 'hostel')
+        .neq('status', 'cancelled')
+        .gte('created_at', startDateTime)
+        .lte('created_at', endDateTime);
+
+      if (hostelSubs && hostelSubs.length > 0) {
+        hostelRevenue = hostelSubs.reduce((acc, s: any) => acc + parseFloat(s.amount_paid || 0), 0);
+      }
+    } catch (e) {
+      logger.error('Error calculating hostel revenue:', e);
+    }
 
     const revenueBreakdown = {
       fees: feesRevenue,
       canteen: canteenRevenue,
-      events: eventsRevenue,
       gym: gymRevenue,
+      transit: transitRevenue,
       hostel: hostelRevenue
     };
 
-    const totalRevenue = feesRevenue + canteenRevenue + eventsRevenue + gymRevenue + hostelRevenue;
+    const totalRevenue = feesRevenue + canteenRevenue + gymRevenue + transitRevenue + hostelRevenue;
     const totalCosts = Object.values(costBreakdown).reduce((acc: number, c: any) => acc + parseFloat(c), 0);
     const netSurplus = totalRevenue - totalCosts;
 
@@ -2135,6 +2472,74 @@ export async function resolveAnomaly(req: Request, res: Response) {
     });
     if (error) throw error;
     return res.status(200).json(data);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getSchemaHealth(req: Request, res: Response) {
+  try {
+    const tablesAndViews = [
+      { name: 'daily_attendance_summary', type: 'view' },
+      { name: 'daily_fee_summary', type: 'view' },
+      { name: 'campus_occupancy', type: 'view' },
+      { name: 'system_anomalies', type: 'table' },
+      { name: 'naac_snapshots', type: 'table' },
+      { name: 'director_alerts', type: 'table' },
+      { name: 'strategic_goals', type: 'table' },
+      { name: 'financial_pl', type: 'table' },
+      { name: 'board_reports', type: 'table' },
+      { name: 'competitor_benchmarks', type: 'table' },
+      { name: 'student_journey_scores', type: 'table' }
+    ];
+
+    const rpcs = [
+      { name: 'get_campus_pulse', args: {} },
+      { name: 'get_fee_recovery_tracking', args: { p_semester: null, p_department_id: null } },
+      { name: 'get_attendance_trends', args: { p_period: 'weekly', p_department_id: null, p_weeks: 12 } },
+      { name: 'get_complaint_sla_monitoring', args: {} },
+      { name: 'get_naac_accreditation_data', args: {} },
+      { name: 'detect_system_anomalies', args: {} },
+      { name: 'resolve_anomaly', args: { p_anomaly_id: '00000000-0000-0000-0000-000000000000', p_resolution_notes: '' } }
+    ];
+
+    const healthStatus: any[] = [];
+
+    // Check tables & views
+    await Promise.all(tablesAndViews.map(async (tv) => {
+      const { error } = await supabaseAdmin
+        .from(tv.name)
+        .select('*')
+        .limit(0);
+
+      const isMissing = error && (error.code === 'PGRST104' || error.status === 404 || error.message?.toLowerCase().includes('does not exist'));
+      healthStatus.push({
+        name: tv.name,
+        type: tv.type,
+        status: isMissing ? 'missing' : 'healthy',
+        details: isMissing ? error.message : 'Available'
+      });
+    }));
+
+    // Check RPCs
+    await Promise.all(rpcs.map(async (rpc) => {
+      const { error } = await supabaseAdmin.rpc(rpc.name, rpc.args);
+      const isMissing = error && (error.code === 'PGRST104' || error.status === 404 || (error.message?.toLowerCase().includes('function') && error.message?.toLowerCase().includes('does not exist')));
+      healthStatus.push({
+        name: rpc.name,
+        type: 'rpc',
+        status: isMissing ? 'missing' : 'healthy',
+        details: isMissing ? error.message : 'Available'
+      });
+    }));
+
+    const allHealthy = healthStatus.every(item => item.status === 'healthy');
+
+    return res.status(200).json({
+      success: true,
+      healthy: allHealthy,
+      components: healthStatus
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

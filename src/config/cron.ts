@@ -491,6 +491,18 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
+// 10b. AI Insights Generator (Runs every hour: '0 * * * *')
+cron.schedule('0 * * * *', async () => {
+  logger.info('Running Background AI Insights Generator Cron...');
+  try {
+    const { refreshAIInsightsJob } = require('../controllers/director');
+    await refreshAIInsightsJob();
+    logger.info('Background AI Insights generation complete.');
+  } catch (err: any) {
+    logger.error('Failed executing AI Insights generator cron: ' + err.message);
+  }
+});
+
 // 11. Alerts Thresholds Processing Engine (Runs every 15 minutes: '*/15 * * * *')
 cron.schedule('*/15 * * * *', async () => {
   logger.info('Running Director Alert Thresholds Engine...');

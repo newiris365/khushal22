@@ -3,22 +3,12 @@ import { supabaseAdmin } from '../config/supabase';
 import logger from '../config/logger';
 
 export async function generatePuppeteerPDF(htmlContent: string): Promise<Buffer> {
-  try {
-    // Attempt dynamic import of puppeteer to prevent build crashes if not fully installed
-    const puppeteer = require('puppeteer');
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4', margin: { top: '40px', bottom: '40px', left: '40px', right: '40px' } });
-    await browser.close();
-    return pdfBuffer;
-  } catch (err) {
-    logger.warn('Puppeteer PDF compiler missing or failed. Falling back to PDFKit compiler: ', err);
-    throw err; // Trigger PDFKit fallback outside
-  }
+  logger.info('[PDF] Puppeteer bypassed. Standardizing on PDFKit for serverless environment.');
+  return generatePDFKitFallback({
+    report_type: 'custom',
+    report_date: new Date().toISOString().split('T')[0],
+    data: {}
+  });
 }
 
 export async function generatePDFKitFallback(reportData: any): Promise<Buffer> {

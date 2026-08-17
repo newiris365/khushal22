@@ -44,6 +44,7 @@ import {
   getNAACData,
   getSystemAnomalies,
   resolveAnomaly,
+  getSchemaHealth,
 } from '../controllers/director';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -120,5 +121,6 @@ router.get('/complaint-sla', getComplaintSLA);
 router.get('/naac-data', getNAACData);
 router.get('/anomalies', getSystemAnomalies);
 router.put('/anomalies/:id/resolve', resolveAnomaly);
+router.get('/schema-health', getSchemaHealth);
 
 export default router;
