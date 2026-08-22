@@ -718,3 +718,56 @@ export async function createParentComplaint(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+export async function reschedulePTM(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { date, slot_time } = req.body;
+    const parentId = req.user?.id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    if (!date || !slot_time) {
+      return res.status(400).json({ success: false, error: 'New date and slot_time are required.' });
+    }
+
+    const { data: booking, error: findErr } = await supabaseAdmin
+      .from('ptm_bookings')
+      .select('id, teacher_id, date, slot_time')
+      .eq('id', id)
+      .eq('parent_id', parentId)
+      .maybeSingle();
+
+    if (findErr || !booking) {
+      return res.status(404).json({ success: false, error: 'Original PTM booking not found.' });
+    }
+
+    // Re-enable old slot
+    await supabaseAdmin
+      .from('ptm_slots')
+      .update({ available: true })
+      .eq('teacher_id', booking.teacher_id)
+      .eq('date', booking.date)
+      .eq('slot_time', booking.slot_time);
+
+    // Update booking with new date & slot_time
+    const { data: updated, error: updateErr } = await supabaseAdmin
+      .from('ptm_bookings')
+      .update({ date, slot_time, status: 'confirmed' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // Mark new slot unavailable
+    await supabaseAdmin
+      .from('ptm_slots')
+      .update({ available: false })
+      .eq('teacher_id', booking.teacher_id)
+      .eq('date', date)
+      .eq('slot_time', slot_time);
+
+    return res.status(200).json({ success: true, booking: updated });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to reschedule PTM.' });
+  }
+}

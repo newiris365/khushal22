@@ -1981,4 +1981,56 @@ cron.schedule('0 9 * * *', async () => {
   }
 });
 
+/**
+ * Daily 3 AM AI Chat Data Retention Cleanup Cron Job
+ * Deletes/anonymizes rows in ai_query_logs and ai_chat_sessions older than bot_config.data_retention_days.
+ * If data_retention_days is null or undefined, logs are kept indefinitely.
+ */
+export async function runAiDataRetentionCleanup(): Promise<{ cleaned_count: number }> {
+  let cleanedCount = 0;
+  try {
+    const { data: institutions, error } = await supabaseAdmin
+      .from('institutions')
+      .select('id, name, bot_config');
+
+    if (error || !institutions) return { cleaned_count: 0 };
+
+    for (const inst of institutions) {
+      const botConfig = inst.bot_config as any;
+      const retentionDays = botConfig?.data_retention_days;
+
+      if (typeof retentionDays === 'number' && retentionDays > 0) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+        const cutoffIso = cutoffDate.toISOString();
+
+        // 1. Delete ai_query_logs older than cutoff
+        const { count: logCount } = await supabaseAdmin
+          .from('ai_query_logs')
+          .delete({ count: 'exact' })
+          .eq('institution_id', inst.id)
+          .lt('created_at', cutoffIso);
+
+        // 2. Delete ai_chat_sessions / conversation history older than cutoff
+        const { count: sessCount } = await supabaseAdmin
+          .from('ai_chat_sessions')
+          .delete({ count: 'exact' })
+          .eq('institution_id', inst.id)
+          .lt('created_at', cutoffIso);
+
+        cleanedCount += (logCount || 0) + (sessCount || 0);
+        logger.info(`[AI Data Retention Cleanup] Cleaned institution ${inst.name}: retention=${retentionDays} days, cutoff=${cutoffIso.split('T')[0]}`);
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error running AI Data Retention Cleanup: ' + err.message);
+  }
+  return { cleaned_count: cleanedCount };
+}
+
+cron.schedule('0 3 * * *', async () => {
+  logger.info('Running Daily 3 AM AI Data Retention Cleanup cron job...');
+  await runAiDataRetentionCleanup();
+});
+
 

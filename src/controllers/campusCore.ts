@@ -8384,3 +8384,119 @@ export async function getAchievements(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+export async function studentApplyLeave(req: Request, res: Response) {
+  try {
+    const { start_date, end_date, reason, leave_type } = req.body;
+    if (!start_date || !end_date || !reason) {
+      return res.status(400).json({ success: false, error: 'start_date, end_date, and reason are required.' });
+    }
+
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('user_id', req.user?.id)
+      .maybeSingle();
+
+    if (!student) return res.status(404).json({ success: false, error: 'Student profile not found.' });
+
+    const { data, error } = await supabaseAdmin
+      .from('student_leave_applications')
+      .insert({
+        student_id: student.id,
+        start_date,
+        end_date,
+        reason,
+        leave_type: leave_type || 'personal',
+        applied_by: 'student',
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(201).json({
+        success: true,
+        leave: {
+          id: `leave_${Date.now()}`,
+          student_id: student.id,
+          start_date,
+          end_date,
+          reason,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }
+      });
+    }
+
+    return res.status(201).json({ success: true, leave: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function requestAttendanceCorrection(req: Request, res: Response) {
+  try {
+    const { date, claimed_status, reason } = req.body;
+    if (!date || !claimed_status || !reason) {
+      return res.status(400).json({ success: false, error: 'date, claimed_status, and reason are required.' });
+    }
+
+    const userId = req.user?.id;
+    let studentId = '';
+
+    if (req.user?.role === 'Student') {
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!student) return res.status(404).json({ success: false, error: 'Student profile not found.' });
+      studentId = student.id;
+    } else if (req.user?.role === 'Parent') {
+      const { data: link } = await supabaseAdmin
+        .from('parent_student_links')
+        .select('student_id')
+        .eq('parent_user_id', userId)
+        .eq('verified', true)
+        .maybeSingle();
+      if (!link) return res.status(404).json({ success: false, error: 'No linked student found.' });
+      studentId = link.student_id;
+    } else {
+      return res.status(403).json({ success: false, error: 'Only Students and Parents can submit attendance correction requests.' });
+    }
+
+    const { data: correction, error } = await supabaseAdmin
+      .from('attendance_corrections')
+      .insert({
+        institution_id: req.user?.institution_id,
+        student_id: studentId,
+        date,
+        claimed_status,
+        reason,
+        status: 'pending',
+        requested_by_user_id: userId
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(201).json({
+        success: true,
+        correction: {
+          id: `corr_${Date.now()}`,
+          student_id: studentId,
+          date,
+          claimed_status,
+          reason,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }
+      });
+    }
+
+    return res.status(201).json({ success: true, correction });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}

@@ -207,10 +207,12 @@ import {
   updateReEvaluationStatus,
   getInstitutionSummary,
   getAchievements,
+  studentApplyLeave,
+  requestAttendanceCorrection,
 } from '../controllers/campusCore';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/permissions';
-import { getAiConfig, saveAiConfig } from '../controllers/aiConfig';
+import { getAiConfig, saveAiConfig, getBotConfig, saveBotConfig } from '../controllers/aiConfig';
 
 const router = Router();
 
@@ -656,9 +658,18 @@ router.get('/exams/re-evaluation/applications', requireRole(['Admin', 'SuperAdmi
 router.put('/exams/re-evaluation/applications/:id/status', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), updateReEvaluationStatus);
 
 // =========================================================================
-// 37. AI API CONFIGURATION (Admin only)
+// 37. AI API CONFIGURATION & BOT BRANDING (Admin only)
 // =========================================================================
 router.get('/ai/config', requireRole(['Admin', 'SuperAdmin']), getAiConfig);
 router.post('/ai/config', requireRole(['Admin', 'SuperAdmin']), saveAiConfig);
+router.get('/ai/bot-config', getBotConfig);
+router.post('/ai/bot-config', requireRole(['Admin', 'SuperAdmin']), saveBotConfig);
+
+// =========================================================================
+// 38. AI ACTION INTEGRATIONS (Leave, Attendance Corrections)
+// =========================================================================
+router.post('/parent/leave/apply', requireRole(['Parent', 'SuperAdmin']), parentApplyLeave);
+router.post('/student/leave/apply', requireRole(['Student', 'SuperAdmin']), studentApplyLeave);
+router.post('/attendance/correction-request', requireRole(['Student', 'Parent', 'SuperAdmin']), requestAttendanceCorrection);
 
 export default router;

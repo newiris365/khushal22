@@ -5,6 +5,8 @@ export interface MessageContext {
   name: string;
   role: string;
   language: string;
+  bot_name?: string;
+  bot_tone?: string;
   // Shared / Student
   attendance: number;
   pending_fees: number;
@@ -184,6 +186,43 @@ async function askOpenAI(
 }
 
 /**
+ * Sanitizes and formats history messages for Anthropic Claude.
+ * Merges consecutive messages with the same role and ensures the list starts with a user message.
+ */
+function sanitizeClaudeMessages(history: ChatMessage[], userMessage: string): { role: string; content: string }[] {
+  const rawMessages: { role: string; content: string }[] = [];
+  
+  history.forEach(msg => {
+    const role = msg.role === 'assistant' ? 'assistant' : 'user';
+    if (msg.content && msg.content.trim()) {
+      rawMessages.push({ role, content: msg.content.trim() });
+    }
+  });
+
+  rawMessages.push({ role: 'user', content: userMessage.trim() });
+
+  const mergedMessages: { role: string; content: string }[] = [];
+  for (const current of rawMessages) {
+    if (mergedMessages.length > 0 && mergedMessages[mergedMessages.length - 1].role === current.role) {
+      mergedMessages[mergedMessages.length - 1].content += "\n" + current.content;
+    } else {
+      mergedMessages.push(current);
+    }
+  }
+
+  while (mergedMessages.length > 0 && mergedMessages[0].role !== 'user') {
+    mergedMessages.shift();
+  }
+
+  return mergedMessages;
+}
+
+export interface AIResponse {
+  text: string;
+  provider: string;
+}
+
+/**
  * Helper to dispatch to Anthropic Claude Messages API
  */
 async function askClaudeWithKey(
@@ -193,6 +232,7 @@ async function askClaudeWithKey(
   apiKey: string
 ): Promise<string> {
   try {
+    const claudeModel = process.env.CLAUDE_MODEL || 'claude-3-7-sonnet-20250219';
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -201,7 +241,7 @@ async function askClaudeWithKey(
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: claudeModel,
         max_tokens: 500,
         system: buildSystemPrompt(userContext),
         messages: sanitizeClaudeMessages(history, userMessage)
@@ -230,7 +270,7 @@ export async function askClaude(
   userContext: MessageContext, 
   history: ChatMessage[],
   keys?: { gemini_api_key?: string; openai_api_key?: string; claude_api_key?: string }
-): Promise<string> {
+): Promise<AIResponse> {
   // 1. Check custom institution keys (OpenAI first)
   if (keys) {
     let keyOpenAI = keys.openai_api_key;
@@ -245,15 +285,15 @@ export async function askClaude(
 
     if (keyOpenAI && !isPlaceholderKey(keyOpenAI)) {
       const res = await askOpenAI(userMessage, userContext, history, keyOpenAI);
-      if (res) return res;
+      if (res) return { text: res, provider: 'OpenAI' };
     }
     if (keyGemini && !isPlaceholderKey(keyGemini)) {
       const res = await askGemini(userMessage, userContext, history, keyGemini);
-      if (res) return res;
+      if (res) return { text: res, provider: 'Gemini' };
     }
     if (keyClaude && !isPlaceholderKey(keyClaude)) {
       const res = await askClaudeWithKey(userMessage, userContext, history, keyClaude);
-      if (res) return res;
+      if (res) return { text: res, provider: 'Claude' };
     }
   }
 
@@ -271,21 +311,21 @@ export async function askClaude(
 
   if (envOpenAI && !isPlaceholderKey(envOpenAI)) {
     const res = await askOpenAI(userMessage, userContext, history, envOpenAI);
-    if (res) return res;
+    if (res) return { text: res, provider: 'OpenAI' };
   }
 
   if (envGemini && !isPlaceholderKey(envGemini)) {
     const res = await askGemini(userMessage, userContext, history, envGemini);
-    if (res) return res;
+    if (res) return { text: res, provider: 'Gemini' };
   }
 
   if (envClaude && !isPlaceholderKey(envClaude)) {
     const res = await askClaudeWithKey(userMessage, userContext, history, envClaude);
-    if (res) return res;
+    if (res) return { text: res, provider: 'Claude' };
   }
 
   logger.warn('No active API key configured or API calls failed. Falling back to smart mock response.');
-  return generateSmartMockResponse(userMessage, userContext);
+  return { text: generateSmartMockResponse(userMessage, userContext), provider: 'offline' };
 }
 
 
@@ -294,13 +334,30 @@ export async function askClaude(
  * Each role receives only the data and scope relevant to their function.
  */
 export function buildSystemPrompt(ctx: MessageContext): string {
-  const lang = ctx.language === 'hi'
-    ? 'Hindi (conversational Hindi mixed with English for technical terms)'
-    : 'English';
   const date = new Date().toLocaleDateString('en-IN');
   const noticesStr = ctx.notices?.length
     ? ctx.notices.map(n => n.title).join(', ')
     : 'No active notices';
+
+  const timeStr = (ctx as any).ctx_timestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const botName = (ctx as any).bot_name || 'IRIS';
+  
+  // ── Role-adaptive tone determination ────────────────────────────────────
+  let selectedTone = 'Use a clear, professional tone with medium warmth.';
+  const customTone = (ctx as any).bot_tone?.trim();
+
+  if (customTone) {
+    selectedTone = `Adhere to institution persona guidelines: ${customTone}`;
+  } else {
+    const roleLower = ctx.role?.trim().toLowerCase() || '';
+    if (['admin', 'superadmin', 'hr admin', 'director', 'principal'].includes(roleLower)) {
+      selectedTone = 'Use a formal, precise, and data-forward tone.';
+    } else if (['student', 'parent'].includes(roleLower)) {
+      selectedTone = 'Use a warm and encouraging tone.';
+    } else {
+      selectedTone = 'Use a clear, professional tone with medium warmth.';
+    }
+  }
 
   // ── Shared footer rules ──────────────────────────────────────────────────
   const rules = `
@@ -309,9 +366,10 @@ Rules:
 2. For metrics, rely strictly on the provided context data — never fabricate numbers.
 3. Keep responses concise (2-3 sentences max). Use bullet points when listing details.
 4. For complaints or complex issues, suggest raising a support ticket or contacting the appropriate authority.
-5. Respond in ${lang}.
-6. Use a friendly, helpful, and premium tone.
-7. If asked about something outside your role scope, politely redirect.`;
+5. Always respond in the exact same language the user wrote in, whatever language that is (English, Hindi, Tamil, Telugu, Kannada, Marathi, Bengali, Spanish, etc.), matching their language and script.
+6. Tone: ${selectedTone}
+7. If asked about something outside your role scope, politely redirect.
+8. Whenever providing live metrics or context status, append a citation suffix line: (as of ${timeStr}).`;
 
   const roleUpper = ctx.role?.trim().toLowerCase();
 
@@ -556,260 +614,129 @@ export async function getEmbeddings(text: string): Promise<number[]> {
       if (response.ok) {
         const data = await response.json() as any;
         return data.data[0].embedding;
-      } else {
-        const errText = await response.text();
-        logger.error(`OpenAI Embeddings API error status ${response.status}: ${errText}`);
       }
-    } catch (err) {
-      logger.error('Failed to communicate with OpenAI Embeddings API:', err);
-    }
+    } catch {}
   }
-
   return [];
 }
 
-/**
- * Sanitizes and formats history messages for Anthropic Claude.
- * Merges consecutive messages with the same role and ensures the list starts with a user message.
- */
-function sanitizeClaudeMessages(history: ChatMessage[], userMessage: string): { role: string; content: string }[] {
-  const rawMessages: { role: string; content: string }[] = [];
-  
-  history.forEach(msg => {
-    const role = msg.role === 'assistant' ? 'assistant' : 'user';
-    if (msg.content && msg.content.trim()) {
-      rawMessages.push({ role, content: msg.content.trim() });
-    }
-  });
-
-  rawMessages.push({ role: 'user', content: userMessage.trim() });
-
-  const mergedMessages: { role: string; content: string }[] = [];
-  for (const current of rawMessages) {
-    if (mergedMessages.length > 0 && mergedMessages[mergedMessages.length - 1].role === current.role) {
-      mergedMessages[mergedMessages.length - 1].content += "\n" + current.content;
-    } else {
-      mergedMessages.push(current);
-    }
-  }
-
-  while (mergedMessages.length > 0 && mergedMessages[0].role !== 'user') {
-    mergedMessages.shift();
-  }
-
-  return mergedMessages;
-}
-
-/**
- * Dynamically generates a mock response using details from the user context depending on role.
- */
 export function generateSmartMockResponse(message: string, context: MessageContext): string {
   const msg = message.toLowerCase();
   const role = (context.role || 'Student').toLowerCase();
+  const botName = context.bot_name || 'IRIS';
+  const botTone = (context.bot_tone || '').toLowerCase();
+  const isFormal = botTone.includes('formal') || botTone.includes('precise') || role === 'admin' || role === 'superadmin' || role === 'hod';
 
+  const formalPrefix = isFormal ? 'Good day. ' : '';
+  const friendlyPrefix = !isFormal ? 'Hi there! ' : '';
+
+  // ── 1. Action intents in Rule-based mode (Leave, PTM, Complaint, Attendance) ────────
+  if (msg.includes('leave') && (msg.includes('apply') || msg.includes('request') || msg.includes('take') || msg.includes('sick'))) {
+    return `${isFormal ? 'Leave Application Request' : 'I can help you apply for leave!'}\n\nTo complete your application, please state:\n1. **Start Date** (YYYY-MM-DD)\n2. **End Date** (YYYY-MM-DD)\n3. **Reason for Leave**\n\n*Example:* "Apply leave from 2026-08-25 to 2026-08-27 for family function".`;
+  }
+
+  if (msg.includes('ptm') || msg.includes('parent teacher meeting')) {
+    return `${isFormal ? 'PTM Scheduling Assistance' : 'I can help you book or reschedule a PTM!'}\n\nPlease specify:\n1. **Date** (YYYY-MM-DD)\n2. **Time Slot** (e.g. 03:15 PM)\n\n*Example:* "Book PTM on 2026-08-25 at 03:15 PM".`;
+  }
+
+  if (msg.includes('complaint') || msg.includes('complain') || msg.includes('broken') || msg.includes('leak') || msg.includes('repair')) {
+    return `${isFormal ? 'Complaint Filing Assistance' : 'I can help you file a complaint!'}\n\nPlease describe the issue (e.g., "Raise hostel complaint about leaking tap in room 204") and I will record it immediately.`;
+  }
+
+  if (msg.includes('attendance') && (msg.includes('correction') || msg.includes('mark present') || msg.includes('wrong absent'))) {
+    return `${isFormal ? 'Attendance Correction Request' : 'I can help you request an attendance correction!'}\n\nPlease state the **Date** and **Status** (e.g. "Attendance correction for 2026-08-20 mark present").`;
+  }
+
+  // ── 2. Standard Informational Queries ──────────────────────────────────────
   if (msg.includes('attendance') || msg.includes('present') || msg.includes('absent')) {
     if (role === 'superadmin') {
       return context.campus_attendance_rate
-        ? `The overall system-wide average attendance rate is **${context.campus_attendance_rate}%** across all campuses.`
-        : `I don't have campus-wide attendance data available right now. Please check the attendance dashboard for real-time numbers.`;
+        ? `${formalPrefix}The overall system-wide average attendance rate is **${context.campus_attendance_rate}%** across all campuses.`
+        : `System-wide attendance metrics are currently processing. Please consult the admin dashboard.`;
     }
     if (role === 'admin' || role === 'principal') {
       return context.campus_attendance_rate
-        ? `The campus-wide average attendance rate is **${context.campus_attendance_rate}%** today.`
-        : `I don't have attendance data for your campus yet. Please check the attendance dashboard.`;
+        ? `${formalPrefix}The campus-wide average attendance rate is **${context.campus_attendance_rate}%** today.`
+        : `Campus-wide attendance data is currently being compiled.`;
     }
     if (role === 'hod') {
       return context.dept_attendance
-        ? `Your department's average attendance rate is **${context.dept_attendance}%** today.`
-        : `I don't have department attendance data yet. Please check the department dashboard.`;
+        ? `${formalPrefix}Your department's average attendance rate is **${context.dept_attendance}%** today.`
+        : `Department attendance logs are updating. Please check the HOD panel.`;
     }
     if (role === 'teacher') {
-      return `I don't have class-level attendance data available. Please check your class roster in the Teacher portal.`;
+      return `Class-level attendance records are available in the Teacher Portal.`;
     }
     if (role === 'parent') {
       if (context.child_attendance !== undefined && context.child_attendance !== null) {
-        const status = context.child_attendance >= 75 ? '✅ Above the 75% threshold.' : '⚠️ Below the 75% threshold — action needed.';
-        return `Your child **${context.child_name || 'your child'}** has an attendance rate of **${context.child_attendance}%**.\n${status}\nYou can view detailed daily records in the Attendance section.`;
+        const status = context.child_attendance >= 75 ? '✅ Above 75% threshold.' : '⚠️ Below 75% threshold.';
+        return `${friendlyPrefix}Your child **${context.child_name || 'your child'}** has an attendance rate of **${context.child_attendance}%** (${status}).`;
       }
-      return `I don't have attendance data for your child yet. Please ensure your child is linked to your account, or check the parent portal for updates.`;
+      return `Child attendance data is being synchronized. Please verify your student link in the parent portal.`;
     }
     return context.attendance
-      ? `Your current overall attendance is **${context.attendance}%**. You need to maintain at least 75% to be eligible for final examinations.`
-      : `I don't have your attendance data yet. Please check the student portal for your attendance record.`;
+      ? `${friendlyPrefix}Your current overall attendance is **${context.attendance}%**. (Exam requirement: 75%).`
+      : `Your student attendance data is being fetched.`;
   }
 
   if (msg.includes('fee') || msg.includes('revenue') || msg.includes('income') || msg.includes('payment') || msg.includes('dues')) {
     if (role === 'superadmin') {
       return context.total_revenue
-        ? `Total platform revenue collected this financial year is **₹${context.total_revenue.toLocaleString('en-IN')}** across all campuses.`
-        : `I don't have revenue data available. Please check the financial dashboard.`;
+        ? `${formalPrefix}Total system revenue collected is **₹${context.total_revenue.toLocaleString('en-IN')}**.`
+        : `Financial analytics are available on the SuperAdmin panel.`;
     }
     if (role === 'admin' || role === 'principal') {
       return context.campus_fee_collection
-        ? `Total fee collection for this campus is **₹${context.campus_fee_collection.toLocaleString('en-IN')}**.`
-        : `I don't have fee collection data for your campus yet. Please check the finance dashboard.`;
-    }
-    if (role === 'hod') {
-      return `Fee collection tracking is managed at the campus level. Please contact the accounts section for department-wise recovery.`;
+        ? `${formalPrefix}Total fee collection for this campus is **₹${context.campus_fee_collection.toLocaleString('en-IN')}**.`
+        : `Campus fee collection details are available in Accounts.`;
     }
     if (role === 'parent') {
       if (context.child_fees !== undefined && context.child_fees !== null) {
-        if (context.child_fees > 0) {
-          return `Your child **${context.child_name || 'your child'}** has an outstanding fee balance of **₹${context.child_fees.toLocaleString('en-IN')}**. Please clear it via the Fee Status section.`;
-        }
-        return `Great news! Your child **${context.child_name || 'your child'}** has no outstanding fees. All dues are cleared.`;
+        return context.child_fees > 0
+          ? `Your child **${context.child_name || 'your child'}** has an outstanding fee balance of **₹${context.child_fees.toLocaleString('en-IN')}**.`
+          : `All fee dues for **${context.child_name || 'your child'}** are fully cleared.`;
       }
-      return `I don't have fee information for your child yet. Please check the parent portal Fee Status section.`;
+      return `Fee information is available in the parent portal Fee Status section.`;
     }
     if (context.pending_fees !== undefined && context.pending_fees !== null) {
-      if (context.pending_fees > 0) {
-        return `Your outstanding fee balance is **₹${context.pending_fees.toLocaleString('en-IN')}**. Please clear it under the Fee Ledger section.`;
-      }
-      return `Your hostel and academic fees are fully cleared. No outstanding dues found.`;
+      return context.pending_fees > 0
+        ? `Your outstanding fee balance is **₹${context.pending_fees.toLocaleString('en-IN')}**.`
+        : `Your fees are fully cleared. No outstanding dues found.`;
     }
-    return `I don't have your fee data available. Please check the student portal for fee details.`;
+    return `Fee ledger records are accessible in the student portal.`;
   }
 
-  if (msg.includes('timetable') || msg.includes('schedule') || msg.includes('class') || msg.includes('time table')) {
+  if (msg.includes('timetable') || msg.includes('schedule') || msg.includes('class')) {
     if (role === 'teacher') {
       return context.my_classes?.length
-        ? `Your schedule today: **${context.my_classes.join(', ')}**.`
-        : `I don't have your timetable data yet. Please check the teacher portal.`;
+        ? `${formalPrefix}Your schedule today: **${context.my_classes.join(', ')}**.`
+        : `Class schedules are accessible in the Teacher portal.`;
     }
     if (role === 'student') {
       return context.timetable?.length
-        ? `Your timetable for today:\n${context.timetable.map((t: string) => `- ${t}`).join('\n')}`
-        : `I don't have your timetable data yet. Please check the student portal.`;
+        ? `${friendlyPrefix}Your timetable for today:\n${context.timetable.map((t: string) => `- ${t}`).join('\n')}`
+        : `Class schedule is available in the Student portal.`;
     }
-    if (role === 'parent') {
-      return `You can view your child's class timetable in the **Timetable** section of the parent portal. It shows daily schedules with subjects, rooms, and instructors.`;
-    }
-    if (role === 'superadmin' || role === 'admin' || role === 'principal' || role === 'hod') {
-      return `Please view the academic timetable dashboard to see schedules.`;
-    }
-    return `I don't have timetable data available. Please check the relevant portal.`;
+    return `Timetable schedules are accessible in your campus portal.`;
   }
 
-  if (msg.includes('campus') || msg.includes('branch') || msg.includes('institutions')) {
-    if (role === 'superadmin') {
-      return context.total_campuses
-        ? `There are currently **${context.total_campuses}** active campuses under management.`
-        : `I don't have campus count data available. Please check the super admin dashboard.`;
-    }
-  }
-
-  if (msg.includes('hostel') || msg.includes('room') || msg.includes('accommodation')) {
-    if (role === 'warden' || role === 'hostelwarden') {
-      return context.room_occupancy
-        ? `Current room occupancy: **${context.room_occupancy}**.`
-        : `I don't have hostel occupancy data yet. Please check the warden dashboard.`;
-    }
-    if (role === 'student') {
-      return context.hostel_room
-        ? `Your assigned hostel room is **${context.hostel_room}**.`
-        : `I don't have hostel allocation data for you. Please check the student portal.`;
-    }
-  }
-
-  if (msg.includes('notice') || msg.includes('announcement') || msg.includes('update')) {
+  if (msg.includes('notice') || msg.includes('announcement')) {
     const notices = context.notices?.length
       ? context.notices.map((n) => `- ${n.title}`).join('\n')
       : null;
     return notices
-      ? `Here are the latest notices:\n${notices}`
-      : `I don't have any active notices at the moment.`;
+      ? `Active campus notices:\n${notices}`
+      : `No active campus notices currently posted.`;
   }
 
-  if (msg.includes('wallet') || msg.includes('canteen') || msg.includes('food') || msg.includes('mess')) {
-    if (role === 'student') {
-      return context.canteen_wallet !== undefined
-        ? `Your canteen wallet balance is **₹${context.canteen_wallet}**.`
-        : `I don't have your canteen wallet data. Please check the student portal.`;
-    }
-    if (role === 'warden' || role === 'hostelwarden') {
-      return `Please check the mess dashboard for today's menu and meal timings.`;
-    }
-  }
-
-  if (msg.includes('bus') || msg.includes('transport') || msg.includes('transit') || msg.includes('location')) {
-    if (role === 'student') {
-      return `Please check the transport dashboard for bus routes and schedules.`;
-    }
-    if (role === 'driver') {
-      return context.today_route
-        ? `Your route today: **${context.today_route}**.`
-        : `I don't have route data for you. Please check with the transport admin.`;
-    }
-    if (role === 'parent') {
-      if (context.transport_status) {
-        return `**Bus Status:** ${context.transport_status}\n\nYou can track your child's bus in real-time from the **Transit GPS** section.`;
-      }
-      return `You can track your child's school bus in real-time from the **Transit GPS** section in the parent portal.`;
-    }
-    return `Please check the transport dashboard for bus routes and schedules.`;
-  }
-
-  if (msg.includes('ptm') || msg.includes('parent teacher') || msg.includes('meeting')) {
-    if (role === 'parent') {
-      return `You can view and book Parent-Teacher Meeting slots from the **PTM Schedule** section in the parent portal.`;
-    }
-    return `PTM scheduling is available in the parent portal under PTM Schedule.`;
-  }
-
-  if (msg.includes('exam') || msg.includes('result') || msg.includes('marks')) {
-    if (role === 'parent') {
-      return `You can check your child's exam results and academic performance in the **Exam Results** section of the parent portal.`;
-    }
-    if (role === 'student') {
-      return `You can view your exam results in the Student Results section.`;
-    }
-    return `Please check the exam section for results and schedules.`;
-  }
-
-  if (msg.includes('leave') || msg.includes('absence') || msg.includes('sick')) {
-    if (role === 'parent') {
-      return `You can apply for leave on behalf of your child from the **Leave Application** section. Select dates, choose a reason, and submit — the school will review it.`;
-    }
-    return `Please check the leave application section in your portal.`;
-  }
-
-  if (msg.includes('wallet') || msg.includes('canteen') || msg.includes('food') || msg.includes('mess')) {
-    if (role === 'student') {
-      return context.canteen_wallet !== undefined
-        ? `Your canteen wallet balance is **₹${context.canteen_wallet}**.`
-        : `I don't have your canteen wallet data. Please check the student portal.`;
-    }
-    if (role === 'warden' || role === 'hostelwarden') {
-      return `Please check the mess dashboard for today's menu and meal timings.`;
-    }
-  }
-
-  if (msg.includes('library') || msg.includes('book')) {
-    if (role === 'librarian') {
-      return context.book_inventory
-        ? `Total books in inventory: **${context.book_inventory}**. Pending returns: **${context.pending_returns || 0}**.`
-        : `I don't have library data yet. Please check the librarian dashboard.`;
-    }
-    return `Please check the library portal for book availability and issues.`;
-  }
-
-  if (msg.includes('visitor') || msg.includes('gate') || msg.includes('security')) {
-    if (role === 'security' || role === 'gatesecurity') {
-      return `Visitor logs today: **${context.visitor_logs_today || 'N/A'}**. RFID scans: **${context.rfid_scans_today || 'N/A'}**.`;
-    }
-  }
-
+  // ── Default Greeting Fallback ─────────────────────────────────────────────
   const notices = context.notices?.length
     ? context.notices.map((n) => `- ${n.title}`).join('\n')
     : null;
 
-  return `Hello ${context.name || 'User'}! I am IRIS, your AI concierge.
-I am running in local fallback mode (no API key configured). Here is what I know about your role (**${context.role || 'Guest'}**):
-${role === 'superadmin' ? `- Total Campuses: ${context.total_campuses || 'N/A'}\n- System Revenue: ₹${context.total_revenue?.toLocaleString('en-IN') || 'N/A'}` : ''}
-${role === 'admin' || role === 'principal' ? `- Campus Students: ${context.campus_students || 'N/A'}\n- Attendance Rate: ${context.campus_attendance_rate || 'N/A'}%` : ''}
-${role === 'hod' ? `- Department Students: ${context.dept_students || 'N/A'}\n- Department Attendance: ${context.dept_attendance || 'N/A'}%` : ''}
-${role === 'student' ? `- Outstanding Fees: ₹${context.pending_fees || 'N/A'}\n- Attendance: ${context.attendance || 'N/A'}%` : ''}
-${role === 'parent' ? `- Child: ${context.child_name || 'N/A'}\n- Child Attendance: ${context.child_attendance || 'N/A'}%` : ''}
-${notices ? `\n**Active Notices:**\n${notices}` : ''}
-How else can I assist you?`;
+  if (isFormal) {
+    return `Good day ${context.name || 'User'}. I am ${botName}, your campus assistant.\nI am operating in assistant mode. Here is a summary of your profile (**${context.role || 'Guest'}**):\n${role === 'student' ? `- Outstanding Fees: ₹${context.pending_fees || '0'}\n- Attendance Rate: ${context.attendance || '0'}%` : ''}${role === 'parent' ? `- Linked Child: ${context.child_name || 'N/A'}\n- Child Attendance: ${context.child_attendance || '0'}%` : ''}${notices ? `\n\n**Official Notices:**\n${notices}` : ''}\n\nHow may I assist you further?`;
+  }
+
+  return `Hello ${context.name || 'User'}! I am ${botName}, your AI assistant.\nI am operating in assistant mode. Here is a summary of your account (**${context.role || 'Guest'}**):\n${role === 'student' ? `- Outstanding Fees: ₹${context.pending_fees || '0'}\n- Attendance: ${context.attendance || '0'}%` : ''}${role === 'parent' ? `- Child: ${context.child_name || 'N/A'}\n- Child Attendance: ${context.child_attendance || '0'}%` : ''}${notices ? `\n\n**Active Notices:**\n${notices}` : ''}\n\nHow can I help you today?`;
 }

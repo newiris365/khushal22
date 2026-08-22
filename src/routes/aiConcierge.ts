@@ -34,9 +34,12 @@ import {
   getStudyPlan,
   updateStudyPlanProgress,
   analyzeSentiment,
-  getSentimentTrends
+  getSentimentTrends,
+  confirmBotAction,
+  getAiUsageStats
 } from '../controllers/aiConcierge';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { chatLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -45,10 +48,12 @@ router.get('/whatsapp/webhook', whatsappVerify);
 router.post('/whatsapp/webhook', whatsappWebhook);
 
 // ========== AUTHENTICATED AI CONCIERGE CHAT ==========
-router.post('/chat', authMiddleware, chatQuery);
+router.post('/chat', authMiddleware, chatLimiter, chatQuery);
+router.post('/actions/confirm', authMiddleware, confirmBotAction);
 router.get('/chat/history/:sessionId', authMiddleware, getConversationHistory);
 router.get('/sessions', authMiddleware, getUserSessions);
 router.post('/chat/:messageId/feedback', authMiddleware, submitFeedback);
+router.get('/stats', authMiddleware, getAiUsageStats);
 
 // ========== GLOBAL SMART SEARCH ==========
 router.get('/search', authMiddleware, searchGlobal);
@@ -61,7 +66,11 @@ router.put('/faq/:id', authMiddleware, requireRole(['Admin', 'SuperAdmin']), upd
 router.delete('/faq/:id', authMiddleware, requireRole(['Admin', 'SuperAdmin']), deleteFaq);
 router.get('/faq/suggestions', authMiddleware, requireRole(['Admin', 'SuperAdmin']), getFaqSuggestions);
 
+import { getEscalationConfig, saveEscalationConfig } from '../controllers/aiConfig';
+
 // ========== AI ESCALATIONS FLOW ==========
+router.get('/escalations/config', authMiddleware, getEscalationConfig);
+router.post('/escalations/config', authMiddleware, requireRole(['Admin', 'SuperAdmin']), saveEscalationConfig);
 router.get('/escalations', authMiddleware, requireRole(['Admin', 'SuperAdmin', 'Librarian']), getEscalations);
 router.put('/escalations/:id/resolve', authMiddleware, requireRole(['Admin', 'SuperAdmin', 'Librarian']), resolveEscalation);
 

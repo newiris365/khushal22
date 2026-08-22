@@ -13,6 +13,7 @@ import {
   getParentChildren,
   getParentComplaints,
   createParentComplaint,
+  reschedulePTM,
 } from '../controllers/parent';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { supabaseAdmin } from '../config/supabase';
@@ -61,6 +62,7 @@ router.get('/messages/:teacherId', requireRole(['Parent', 'Staff', 'Admin', 'Sup
 router.get('/ptm/teachers', requireRole(['Parent']), getPTMTeachers);
 router.get('/ptm/slots/:teacherId', requireRole(['Parent', 'Staff', 'Admin', 'SuperAdmin']), getPTMSlots);
 router.post('/ptm/book', requireRole(['Parent']), bookPTM);
+router.put('/ptm/:id', requireRole(['Parent']), reschedulePTM);
 router.get('/ptm/bookings', requireRole(['Parent']), getParentBookings);
 router.post('/ptm/cancel/:id', requireRole(['Parent']), cancelPTMBooking);
 

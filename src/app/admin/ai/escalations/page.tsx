@@ -19,6 +19,8 @@ interface Escalation {
   resolved_at: string | null;
   resolution: string | null;
   created_at: string;
+  ticket_number?: string;
+  needs_live_response?: boolean;
   users?: {
     name: string;
     email: string;
@@ -32,10 +34,27 @@ export default function AdminEscalationsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Escalation | null>(null);
   const [resolutionText, setResolutionText] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [escConfig, setEscConfig] = useState<{ escalation_mode: string; escalation_contact: string | null }>({
+    escalation_mode: 'ticket',
+    escalation_contact: null
+  });
 
   useEffect(() => {
     loadEscalations();
+    loadConfig();
   }, []);
+
+  const loadConfig = async () => {
+    try {
+      const res = await apiGet('/ai/escalations/config');
+      if (res.success) {
+        setEscConfig({
+          escalation_mode: res.escalation_mode || 'ticket',
+          escalation_contact: res.escalation_contact || null
+        });
+      }
+    } catch {}
+  };
 
   const loadEscalations = async () => {
     setLoading(true);
@@ -138,6 +157,48 @@ export default function AdminEscalationsPage() {
         </div>
       </div>
 
+      {/* Active Escalation Mode Banner */}
+      <div className="max-w-7xl mx-auto px-6 mt-6">
+        <div className={`p-4 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+          escConfig.escalation_mode === 'live_transfer'
+            ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+            : escConfig.escalation_mode === 'contact_info'
+            ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+            : 'bg-violet-600/10 border-violet-500/30 text-violet-200'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-white/10 border border-white/10">
+              <ShieldAlert className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-white capitalize">
+                  Active Handoff Mode: {escConfig.escalation_mode.replace('_', ' ')}
+                </span>
+                {escConfig.escalation_mode === 'live_transfer' && (
+                  <span className="text-[9px] uppercase font-mono px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse font-bold">
+                    ⚡ Immediate Response Needed
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-white/70 mt-0.5">
+                {escConfig.escalation_mode === 'live_transfer'
+                  ? 'Live Transfer Mode: Handoff requests are flagged for instant staff intervention.'
+                  : escConfig.escalation_mode === 'contact_info'
+                  ? `Contact Info Mode: Bot serves direct contact info (${escConfig.escalation_contact || 'Campus Phone/Email'}). Ticket queue inactive.`
+                  : 'Support Ticket Mode: Handoff requests create tickets in this queue for staff review.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/ai"
+            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all border border-white/10 whitespace-nowrap"
+          >
+            ⚙️ Configure Bot Branding & Handoff
+          </Link>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column: Tickets checklist */}
@@ -168,6 +229,11 @@ export default function AdminEscalationsPage() {
                     </span>
                     {getStatusBadge(esc.status)}
                   </div>
+                  {esc.needs_live_response && (
+                    <span className="text-[9px] font-bold text-rose-400 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                      ⚡ Immediate Live Response Needed
+                    </span>
+                  )}
                   <p className="text-[11px] opacity-75 truncate w-full">"{esc.query}"</p>
                   <span className="text-[8px] text-white/30 font-mono">
                     Raised: {new Date(esc.created_at).toLocaleString()}

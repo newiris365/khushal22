@@ -52,6 +52,22 @@ export const readLimiter = rateLimit({
   }
 });
 
+// Dedicated per-user rate limit for AI Concierge chat endpoint to prevent LLM bill spikes
+export const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 20, // max 20 requests per minute per user
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return (req as any).user?.id || req.ip;
+  },
+  message: {
+    success: false,
+    error: 'Rate limit exceeded: Maximum 20 AI queries per minute per user.',
+    response: '⏳ You have reached the rate limit of 20 queries per minute. Please pause for a moment before sending another query.'
+  }
+});
+
 // Global catch-all rate limiter
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

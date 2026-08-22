@@ -16,6 +16,7 @@ export function clearAuthToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(PROFILE_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem('iris_ai_session_id');
 }
 
 export function getRefreshToken(): string | null {
