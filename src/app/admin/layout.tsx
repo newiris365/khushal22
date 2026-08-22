@@ -187,8 +187,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     authorizedRef.current = true;
     applySidebar(role, instType);
 
+    const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : '';
     // Validate token with backend
-    fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+    fetch('/api/v1/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(deviceId ? { 'X-Client-Device-ID': deviceId } : {})
+      }
+    })
       .then(async r => {
         if (cancelled) return;
         if (r.status === 401 || r.status === 403) {

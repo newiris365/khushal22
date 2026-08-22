@@ -13,8 +13,8 @@ export default function PrincipalStaffPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await apiGet('campusCore/hr/staff');
-        if (res.success) setStaff(res.staff || []);
+        const res = await apiGet('/hr/employees');
+        if (res.success) setStaff(res.employees || res.data || []);
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };

@@ -99,7 +99,6 @@ export async function login(req: Request, res: Response) {
       email: userProfile.email,
       fingerprint: fingerprintHash,
       supabase_token: authData.session.access_token,
-      supabase_refresh_token: authData.session.refresh_token,
       institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
     };
 
@@ -218,7 +217,6 @@ export async function refresh(req: Request, res: Response) {
       email: userProfile.email,
       fingerprint: fingerprintHash,
       supabase_token: authData.session.access_token,
-      supabase_refresh_token: authData.session.refresh_token,
       institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
     };
 

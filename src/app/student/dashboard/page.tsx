@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 import Link from 'next/link';
+import { useAcademic } from '../AcademicContext';
 
 export default function StudentDashboard() {
-  const [profile, setProfile] = useState<any>(null);
+  const { studentProfile, loading: profileLoading } = useAcademic();
   const [markedStatus, setMarkedStatus] = useState<string | null>(null);
   const [gpsCoordinates, setGpsCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -36,28 +37,6 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     fetchLatestNotice();
-    // Load mock student profile from localStorage or create fallback
-    const savedProfile = localStorage.getItem('iris_user_profile');
-    if (savedProfile) {
-      try {
-        setProfile(JSON.parse(savedProfile));
-      } catch (e) {
-        console.error('Failed to parse saved profile:', e);
-        setProfile({
-          id: '',
-          name: 'Student',
-          roll_number: '',
-          email: ''
-        });
-      }
-    } else {
-      setProfile({
-        id: '',
-        name: 'Student',
-        roll_number: '',
-        email: ''
-      });
-    }
 
     // Cleanup camera stream on component unmount
     return () => {
@@ -138,20 +117,29 @@ export default function StudentDashboard() {
     }
   };
 
-  if (!profile) return <div className="p-8 text-center text-xs text-[#C4B5FD]">Loading session...</div>;
+  if (profileLoading || !studentProfile) {
+    return (
+      <div className="max-w-6xl mx-auto py-6 px-4 md:px-6 w-full space-y-6">
+        <div className="h-20 bg-white/5 rounded-3xl animate-pulse"></div>
+        <div className="h-10 bg-white/5 rounded-2xl animate-pulse"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 md:px-6 w-full flex flex-col gap-6 text-white">
       {/* Welcome Bar */}
-      <div className="bg-[#13102A]/80 backdrop-blur-md p-6 rounded-3xl border border-[#6C2BD9]/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-[#13102A]/80 backdrop-blur-md p-6 rounded-3xl border border-[#06B6D4]/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-[#A78BFA]" />
-            Welcome back, {profile.name}
+            <Sparkles className="w-6 h-6 text-[#22D3EE]" />
+            Welcome back, {studentProfile?.users?.name}
           </h2>
-          <p className="text-xs text-[#A78BFA]/60 mt-1">Roll Number: {profile.roll_number} | CS Department</p>
+          <p className="text-xs text-[#C4B5FD]/70 mt-1">
+            Roll Number: {studentProfile?.roll_number} | {studentProfile?.institutions?.type === 'school' ? `Grade ${studentProfile?.class_sections?.grade || studentProfile?.semester || ''}-${studentProfile?.class_sections?.section || ''}` : (studentProfile?.departments?.name || 'General')}
+          </p>
         </div>
-        <div className="text-xs bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+        <div className="text-xs bg-[#06B6D4]/20 border border-[#06B6D4]/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
           <ShieldCheck className="w-4 h-4 text-emerald-400" /> Verified student biometric token active
         </div>
       </div>
@@ -331,7 +319,7 @@ export default function StudentDashboard() {
               <div className="w-full bg-[#0D0A1A] rounded-full h-2 border border-white/5 mb-1.5">
                 <div className="bg-[#6C2BD9] h-full rounded-full" style={{ width: '45%' }}></div>
               </div>
-              <span className="text-[9px] text-[#C4B5FD]/40">Active period: Sem 4 Term Finals</span>
+              <span className="text-[9px] text-[#C4B5FD]/40">Active period: {studentProfile?.institutions?.type === 'school' ? `Grade ${studentProfile?.class_sections?.grade || studentProfile?.semester || ''} Term Finals` : 'Sem 4 Term Finals'}</span>
             </div>
           </div>
 

@@ -41,8 +41,12 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
         window.location.href = '/login';
         return;
       }
+      const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : '';
       const res = await fetch('/api/v1/parent/children', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          ...(deviceId ? { 'X-Client-Device-ID': deviceId } : {})
+        }
       });
       const data = await res.json();
       if (data.success && data.children) {

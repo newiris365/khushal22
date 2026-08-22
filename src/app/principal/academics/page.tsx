@@ -7,6 +7,7 @@ import { apiGet } from '../../../lib/api';
 export default function PrincipalAcademicsPage() {
   const [stats, setStats] = useState({ totalStudents: 0, departments: 0, avgAttendance: 0 });
   const [loading, setLoading] = useState(true);
+  const [isSchool, setIsSchool] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -18,6 +19,7 @@ export default function PrincipalAcademicsPage() {
             departments: res.departments?.length || 0,
             avgAttendance: res.avg_attendance_pct || 0,
           });
+          setIsSchool(res.institution_type === 'school');
         }
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
@@ -39,7 +41,7 @@ export default function PrincipalAcademicsPage() {
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: 'Total Students', value: stats.totalStudents, icon: Users, color: 'text-blue-400' },
-              { label: 'Departments', value: stats.departments, icon: BookOpen, color: 'text-emerald-400' },
+              { label: isSchool ? 'Grades' : 'Departments', value: stats.departments, icon: BookOpen, color: 'text-emerald-400' },
               { label: 'Avg Attendance', value: `${stats.avgAttendance}%`, icon: TrendingUp, color: 'text-violet-400' },
             ].map(s => (
               <div key={s.label} className="bg-white/5 rounded-xl p-4 border border-white/10">

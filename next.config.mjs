@@ -56,6 +56,11 @@ const nextConfig = {
     return config;
   },
 
+  // Tree-shake large icon/chart/animation libraries — only bundle used exports
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts', 'framer-motion'],
+  },
+
   async rewrites() {
     // NEXT_PUBLIC_API_URL may include /api/v1 suffix — strip it to get the bare host
     const raw = process.env.NEXT_PUBLIC_API_URL || process.env.API_HOST || 'http://localhost:4000';

@@ -2,7 +2,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+// Lazy-load framer-motion — ~80KB that doesn't need to block first paint
+const MotionDiv = dynamic(
+  () => import('framer-motion').then(mod => mod.motion.div) as any,
+  { ssr: false }
+) as any;
+const AnimatePresence = dynamic(
+  () => import('framer-motion').then(mod => mod.AnimatePresence) as any,
+  { ssr: false }
+) as any;
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { 
@@ -233,6 +243,7 @@ const WhyIrisSection: React.FC = () => {
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [liveLogs, setLiveLogs] = useState(MOCK_LOGS);
+  const [videoReady, setVideoReady] = useState(false);
   
   // FAQ States
   const [searchQuery, setSearchQuery] = useState("");
@@ -277,6 +288,12 @@ export default function LandingPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Defer heavy 16.5MB video load until after first paint
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setVideoReady(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
+
   // Filter FAQs
   const filteredFaqs = FAQ_DATA.filter((faq) => {
     const matchesCategory = selectedCategory === "All" || faq.category === selectedCategory;
@@ -288,15 +305,18 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#050010] text-white flex flex-col font-sans antialiased overflow-x-hidden relative">
-      {/* Ambient Background Video */}
-      <video 
-        autoPlay 
-        loop 
-        muted 
-        playsInline 
-        className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none opacity-40 mix-blend-screen"
-        src="/bg-video.mp4"
-      />
+      {/* Ambient Background Video — deferred to avoid blocking first paint */}
+      {videoReady && (
+        <video 
+          autoPlay 
+          loop 
+          muted 
+          playsInline
+          preload="none"
+          className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none opacity-40 mix-blend-screen"
+          src="/bg-video.mp4"
+        />
+      )}
 
       {/* Radial backdrop glows */}
       <div className="absolute w-[600px] h-[600px] rounded-full bg-[#6C2BD9]/10 blur-3xl -top-100 -left-100 pointer-events-none z-0"></div>
@@ -513,7 +533,7 @@ export default function LandingPage() {
                 filteredFaqs.map((faq) => {
                   const isExpanded = expandedFaqId === faq.id;
                   return (
-                    <motion.div
+                    <MotionDiv
                       key={faq.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -541,7 +561,7 @@ export default function LandingPage() {
 
                       <AnimatePresence initial={false}>
                         {isExpanded && (
-                          <motion.div
+                          <MotionDiv
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
@@ -550,10 +570,10 @@ export default function LandingPage() {
                             <div className="px-6 pb-6 text-xs text-[#C4B5FD]/75 leading-relaxed font-sans border-t border-white/5 pt-4">
                               {faq.answer}
                             </div>
-                          </motion.div>
+                          </MotionDiv>
                         )}
                       </AnimatePresence>
-                    </motion.div>
+                    </MotionDiv>
                   );
                 })
               ) : (

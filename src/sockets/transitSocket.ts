@@ -53,11 +53,28 @@ export function registerTransitSocket(io: Server) {
 
     // ── Legacy events (backward compat with existing web frontend) ──────────
 
-    socket.on('subscribe_bus', (busId: string) => {
-      socket.join(`bus:${busId}`);
-      // Also join the legacy room name for controllers that emit to bus_${busId}
-      socket.join(`bus_${busId}`);
-      logger.debug(`Socket ${socket.id} subscribed to bus:${busId}`);
+    socket.on('subscribe_bus', async (busId: string) => {
+      // Authorization Check: Verify the bus belongs to the user's institution
+      try {
+        const { data: bus } = await supabaseAdmin
+          .from('buses')
+          .select('institution_id')
+          .eq('id', busId)
+          .maybeSingle();
+
+        if (!bus || (role.toLowerCase() !== 'superadmin' && bus.institution_id !== institutionId)) {
+          socket.emit('error', { message: 'Unauthorized bus subscription' });
+          return;
+        }
+
+        socket.join(`bus:${busId}`);
+        // Also join the legacy room name for controllers that emit to bus_${busId}
+        socket.join(`bus_${busId}`);
+        logger.debug(`Socket ${socket.id} subscribed to bus:${busId}`);
+      } catch (err) {
+        logger.error('subscribe_bus verification failed', { err });
+        socket.emit('error', { message: 'Internal verification failure' });
+      }
     });
 
     socket.on('unsubscribe_bus', (busId: string) => {
@@ -66,6 +83,11 @@ export function registerTransitSocket(io: Server) {
     });
 
     socket.on('subscribe_admin', () => {
+      const allowedRoles = ['superadmin', 'admin', 'director', 'principal', 'staff'];
+      if (!allowedRoles.includes(role.toLowerCase())) {
+        socket.emit('error', { message: 'Unauthorized transit admin access' });
+        return;
+      }
       socket.join('admin:transit');
       logger.debug(`Socket ${socket.id} subscribed to admin:transit`);
     });
@@ -186,15 +208,20 @@ export function registerTransitSocket(io: Server) {
     // ── Student / Viewer Events ─────────────────────────────────────────────
 
     socket.on('student:watch', async ({ busId }: { busId: string }) => {
-      socket.join(`bus:${busId}`);
-      socket.join(`bus_${busId}`);
-
       try {
         const { data: bus } = await supabaseAdmin
           .from('buses')
-          .select('current_lat, current_lng, last_location_at, is_active, speed_kmh, vehicle_number')
+          .select('current_lat, current_lng, last_location_at, is_active, speed_kmh, vehicle_number, institution_id')
           .eq('id', busId)
           .single();
+
+        if (!bus || (role.toLowerCase() !== 'superadmin' && bus.institution_id !== institutionId)) {
+          socket.emit('error', { message: 'Unauthorized bus tracking subscription' });
+          return;
+        }
+
+        socket.join(`bus:${busId}`);
+        socket.join(`bus_${busId}`);
 
         // Send last known position if available
         if (bus?.current_lat) {

@@ -184,7 +184,7 @@ export default function ParentDashboardPage() {
     {
       label: 'Attendance',
       value: summary ? `${summary.attendance_pct}%` : '--',
-      sub: summary ? `${summary.attendance_present}/${summary.attendance_total} classes` : 'No data',
+      sub: summary ? `${summary.attendance_present}/${summary.attendance_total} ${child?.institute_type === 'school' ? 'days' : 'classes'}` : 'No data',
       color: (summary?.attendance_pct || 100) >= 75 ? 'text-sky-400' : (summary?.attendance_pct || 100) >= 60 ? 'text-yellow-400' : 'text-red-400',
       icon: CheckCircle,
     },
@@ -221,7 +221,7 @@ export default function ParentDashboardPage() {
             Parent Dashboard
           </h2>
           <p className="text-xs text-[#A78BFA]/60 mt-1">
-            Monitoring: <strong className="text-white">{child?.student_name}</strong> ({child?.course} Sem {child?.semester})
+            Monitoring: <strong className="text-white">{child?.student_name}</strong> {child?.institute_type === 'school' ? `(Grade ${child?.semester} - ${child?.class_section_name || ''})` : `(${child?.course} Sem ${child?.semester})`}
           </p>
         </div>
         <div className="flex gap-2">

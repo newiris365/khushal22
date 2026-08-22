@@ -37,28 +37,30 @@ export default function SecurityGuardDashboard() {
   useEffect(() => {
     loadDashboardData();
 
-    const socket = getSocket('/gate');
+    (async () => {
+      const socket = await getSocket('/gate');
 
-    socket.on('connect', () => {
-      socket.emit('subscribe_admin_gate');
-    });
-
-    socket.on('gate:entry_logged', (data: any) => {
-      // Prepend to live activity logs list
-      setLogs((prev) => [data, ...prev.slice(0, 49)]);
-      
-      // Reload occupancy statistics
-      loadOccupancyData();
-    });
-
-    socket.on('gate:occupancy_updated', (data: any) => {
-      setOccupancy({
-        students_inside: data.students_inside,
-        staff_inside: data.staff_inside,
-        visitors_inside: data.visitors_inside,
-        total_occupancy: data.students_inside + data.staff_inside + data.visitors_inside
+      socket.on('connect', () => {
+        socket.emit('subscribe_admin_gate');
       });
-    });
+
+      socket.on('gate:entry_logged', (data: any) => {
+        // Prepend to live activity logs list
+        setLogs((prev) => [data, ...prev.slice(0, 49)]);
+        
+        // Reload occupancy statistics
+        loadOccupancyData();
+      });
+
+      socket.on('gate:occupancy_updated', (data: any) => {
+        setOccupancy({
+          students_inside: data.students_inside,
+          staff_inside: data.staff_inside,
+          visitors_inside: data.visitors_inside,
+          total_occupancy: data.students_inside + data.staff_inside + data.visitors_inside
+        });
+      });
+    })();
 
     return () => {
     };

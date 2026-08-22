@@ -29,6 +29,7 @@ import {
   checkGateAccess,
   getStudents,
   createStudent,
+  getStudentMe,
   getStudentById,
   updateStudent,
   deleteStudent,
@@ -204,6 +205,8 @@ import {
   applyReEvaluation,
   getReEvaluationApplications,
   updateReEvaluationStatus,
+  getInstitutionSummary,
+  getAchievements,
 } from '../controllers/campusCore';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { requireFeature } from '../middleware/permissions';
@@ -265,6 +268,8 @@ router.get('/attendance/report/:departmentId', requireRole(['Staff', 'Admin', 'S
 router.post('/attendance/regularize', requireRole(['Student']), submitRegularize);
 router.put('/attendance/regularize/:id/approve', requireRole(['Staff', 'Admin', 'SuperAdmin']), approveRegularize);
 router.get('/attendance/fraud-logs', requireRole(['Staff', 'Admin', 'SuperAdmin']), getFraudLogs);
+router.get('/attendance/institution-summary', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Principal', 'HOD', 'Director']), getInstitutionSummary);
+router.get('/achievements', requireRole(['Staff', 'Teacher', 'Admin', 'SuperAdmin', 'Principal', 'HOD', 'Director', 'Student', 'Parent']), getAchievements);
 
 // =========================================================================
 // 1b. ATTENDANCE METHODS (enable/disable per institution)
@@ -293,6 +298,7 @@ router.post('/students', requireRole(['Admin', 'SuperAdmin']), createStudent);
 router.get('/students/health-scores/report', requireRole(['Staff', 'Admin', 'SuperAdmin']), getHealthScoresReport);
 router.post('/students/health-scores/calculate', requireRole(['Staff', 'Admin', 'SuperAdmin']), calculateHealthScores);
 router.get('/students/:id/health-score', getStudentHealthScore);
+router.get('/students/me', getStudentMe);
 router.get('/students/:id', getStudentById);
 router.put('/students/:id', requireRole(['Admin', 'SuperAdmin']), updateStudent);
 router.delete('/students/:id', requireRole(['Admin', 'SuperAdmin']), deleteStudent);

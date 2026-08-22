@@ -318,7 +318,6 @@ export async function GET(request: NextRequest) {
       email,
       // fingerprint intentionally omitted — computed on Vercel serverless IP/UA, never matches Render
       supabase_token: authSession.access_token,
-      supabase_refresh_token: authSession.refresh_token,
       institute_type: resolvedInstituteType
     };
 

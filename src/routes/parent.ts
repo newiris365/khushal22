@@ -11,6 +11,8 @@ import {
   getParentBookings,
   cancelPTMBooking,
   getParentChildren,
+  getParentComplaints,
+  createParentComplaint,
 } from '../controllers/parent';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { supabaseAdmin } from '../config/supabase';
@@ -61,6 +63,10 @@ router.get('/ptm/slots/:teacherId', requireRole(['Parent', 'Staff', 'Admin', 'Su
 router.post('/ptm/book', requireRole(['Parent']), bookPTM);
 router.get('/ptm/bookings', requireRole(['Parent']), getParentBookings);
 router.post('/ptm/cancel/:id', requireRole(['Parent']), cancelPTMBooking);
+
+// Complaints
+router.get('/complaints', requireRole(['Parent']), getParentComplaints);
+router.post('/complaints', requireRole(['Parent']), createParentComplaint);
 
 export default router;
 

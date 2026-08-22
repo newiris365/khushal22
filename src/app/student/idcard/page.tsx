@@ -1,26 +1,34 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Download, ShieldCheck, Sparkles, RefreshCw } from 'lucide-react';
+import { CreditCard, Download, ShieldCheck } from 'lucide-react';
+import { useAcademic } from '../AcademicContext';
 import { apiGet } from '../../../lib/api';
 
 export default function StudentIdCardPage() {
+  const { institutionType, studentProfile, loading: profileLoading } = useAcademic();
   const [cardData, setCardData] = useState<any | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedProfile = localStorage.getItem('iris_user_profile');
-    const profile = savedProfile ? JSON.parse(savedProfile) : null;
-    const studentId = profile?.student_id || profile?.id || '';
-
-    apiGet(`/core/idcards/generate/${studentId}`).then(res => {
+    if (!studentProfile?.id) return;
+    setIsLoading(true);
+    apiGet(`/core/idcards/generate/${studentProfile.id}`).then(res => {
       if (res.success) {
         setCardData(res.card);
       }
       setIsLoading(false);
     });
-  }, []);
+  }, [studentProfile]);
+
+  if (profileLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0D0A1A] text-white p-8 flex items-center justify-center">
+        <div className="text-center text-xs text-[#C4B5FD]/50 py-20">Compiling ID badge components...</div>
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-8 flex items-center justify-center">
@@ -28,7 +36,7 @@ export default function StudentIdCardPage() {
         
         {/* Header Section */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 flex items-center justify-center text-[#A78BFA]">
+          <div className="w-10 h-10 rounded-xl bg-[#06B6D4]/20 border border-[#06B6D4]/30 flex items-center justify-center text-[#22D3EE]">
             <CreditCard className="w-5 h-5" />
           </div>
           <div>
@@ -38,9 +46,7 @@ export default function StudentIdCardPage() {
         </div>
 
         {/* Double-sided card layout */}
-        {isLoading ? (
-          <div className="text-center text-xs text-[#C4B5FD]/50 py-20">Compiling ID badge components...</div>
-        ) : !cardData ? (
+        {!cardData ? (
           <div className="glass-panel rounded-2xl p-6 border border-white/5 text-center text-xs text-[#C4B5FD]/50">
             No active ID card template registered for your institution.
           </div>
@@ -60,22 +66,22 @@ export default function StudentIdCardPage() {
                 
                 {/* Front side */}
                 <div 
-                  style={{ backgroundColor: cardData.template?.secondaryColor || '#13102A', borderColor: cardData.template?.primaryColor || '#6C2BD9' }}
+                  style={{ backgroundColor: cardData.template?.secondaryColor || '#13102A', borderColor: cardData.template?.primaryColor || '#06B6D4' }}
                   className="w-full h-full rounded-2xl border-2 shadow-2xl overflow-hidden flex flex-col absolute backface-hidden"
                 >
                   <div 
-                    style={{ backgroundColor: cardData.template?.primaryColor || '#6C2BD9' }}
+                    style={{ backgroundColor: cardData.template?.primaryColor || '#06B6D4' }}
                     className="py-4 px-3 text-center border-b border-white/10"
                   >
                     <h4 className="font-heading font-extrabold text-[11px] text-white tracking-wider uppercase">
-                      {cardData.template?.institutionName || 'SIET JODHPUR'}
+                      {cardData.template?.institutionName || studentProfile?.institutions?.name || 'IRIS 365 CAMPUS'}
                     </h4>
                   </div>
 
                   <div className="flex justify-center mt-6">
-                    <div className="w-24 h-28 bg-[#1E1B4B] border-2 border-[#6C2BD9] rounded-xl flex items-center justify-center overflow-hidden">
+                    <div className="w-24 h-28 bg-[#1E1B4B] border-2 border-[#06B6D4] rounded-xl flex items-center justify-center overflow-hidden">
                       <img 
-                        src={cardData.student?.photo_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=256"} 
+                        src={studentProfile?.photo_url || cardData.student?.photo_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=256"} 
                         alt="Profile"
                         className="w-full h-full object-cover"
                       />
@@ -83,15 +89,27 @@ export default function StudentIdCardPage() {
                   </div>
 
                   <div className="text-center mt-5 flex-1 px-4">
-                    <h3 className="font-heading font-extrabold text-sm text-white">{cardData.student?.name || ''}</h3>
-                    <p className="text-[9px] text-[#C4B5FD]/70 font-mono mt-0.5">Roll: {cardData.student?.roll_number || 'CSE-2026-06'}</p>
-                    <p className="text-[10px] text-[#A78BFA] font-bold mt-2">{cardData.student?.department || 'B.Tech. Computer Science'}</p>
+                    <h3 className="font-heading font-extrabold text-sm text-white">{studentProfile?.users?.name || cardData.student?.name || ''}</h3>
+                    <p className="text-[9px] text-[#C4B5FD]/70 font-mono mt-0.5">Roll: {studentProfile?.roll_number || cardData.student?.roll_number || 'CSE-2026-06'}</p>
+                    
+                    {institutionType === 'school' ? (
+                      <div className="mt-2 space-y-1 text-center">
+                        <p className="text-[10px] text-[#22D3EE] font-bold">Grade: {studentProfile?.semester} - {studentProfile?.departments?.name || 'General'}</p>
+                        <p className="text-[9px] text-[#C4B5FD]/70">Parent: {studentProfile?.guardian_name || 'N/A'}</p>
+                        <p className="text-[9px] text-amber-400 font-bold">Emergency: {studentProfile?.guardian_phone || 'N/A'}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 space-y-1 text-center">
+                        <p className="text-[10px] text-[#22D3EE] font-bold">Dept: {studentProfile?.departments?.name || cardData.student?.department || 'B.Tech. Computer Science'}</p>
+                        <p className="text-[9px] text-[#C4B5FD]/70">Valid Upto: 30/06/2028</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pb-4 px-3 flex justify-between items-center bg-[#0D0A1A]/90 mt-auto border-t border-white/5 text-[8px]">
                     <div className="text-[7px] text-[#C4B5FD]/50">
-                      <div className="font-bold flex items-center gap-0.5 text-[#A78BFA]"><ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> SECURE BADGE</div>
-                      Click card to flip back
+                      <div className="font-bold flex items-center gap-0.5 text-[#22D3EE]"><ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> SECURE ID BADGE</div>
+                      Click card to flip
                     </div>
                     <div className="w-10 h-10 bg-white p-0.5 rounded flex items-center justify-center font-bold text-[8px] text-black">
                       QR
@@ -101,7 +119,7 @@ export default function StudentIdCardPage() {
 
                 {/* Back side */}
                 <div 
-                  style={{ backgroundColor: '#13102A', borderColor: cardData.template?.primaryColor || '#6C2BD9' }}
+                  style={{ backgroundColor: '#13102A', borderColor: cardData.template?.primaryColor || '#06B6D4' }}
                   className="w-full h-full rounded-2xl border-2 shadow-2xl overflow-hidden flex flex-col absolute backface-hidden rotate-y-180 p-5 text-[10px]"
                 >
                   <div className="border-b border-white/5 pb-3 mb-4">
@@ -116,10 +134,10 @@ export default function StudentIdCardPage() {
                   </ul>
 
                   <div className="mt-auto border-t border-white/5 pt-4 text-center">
-                    <span className="text-[8px] text-[#C4B5FD]/50 block">Registered Guardian: {cardData.student?.guardian_name || 'N/A'}</span>
-                    <span className="text-[8px] text-[#C4B5FD]/50 block mt-0.5">Phone: {cardData.student?.guardian_phone || ''}</span>
+                    <span className="text-[8px] text-[#C4B5FD]/50 block">Registered Guardian: {studentProfile?.guardian_name || cardData.student?.guardian_name || 'N/A'}</span>
+                    <span className="text-[8px] text-[#C4B5FD]/50 block mt-0.5">Phone: {studentProfile?.guardian_phone || cardData.student?.guardian_phone || ''}</span>
                     
-                    <span className="text-[9px] text-[#A78BFA] mt-4 font-bold block">FLIP BACK CARD</span>
+                    <span className="text-[9px] text-[#22D3EE] mt-4 font-bold block">FLIP BACK CARD</span>
                   </div>
                 </div>
 
@@ -128,7 +146,7 @@ export default function StudentIdCardPage() {
 
             <button 
               onClick={() => alert('Compiling digital signature badge... Downloading print-ready card PDF')}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-[#6C2BD9]/20 transition-all w-full justify-center"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#0891B2] hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-[#06B6D4]/20 transition-all w-full justify-center"
             >
               <Download className="w-4 h-4" /> Download Print-Ready Card (PDF)
             </button>

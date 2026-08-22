@@ -3,15 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { Award, FileText, CheckCircle2, ChevronRight, BarChart2 } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
+import { useAcademic } from '../AcademicContext';
 
 export default function StudentResultsPage() {
+  const { studentProfile, loading: profileLoading } = useAcademic();
   const [results, setResults] = useState<any[]>([]);
   const [activeExam, setActiveExam] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const studentId = '';
-    (studentId ? apiGet(`/core/exams/marksheet/${studentId}/a0000000-0000-0000-0000-000000000001`) : Promise.resolve({} as any)).then(res => {
+    if (profileLoading) return;
+    const studentId = studentProfile?.id || '';
+    if (!studentId) { setIsLoading(false); return; }
+    apiGet(`/core/exams/marksheet/${studentId}/a0000000-0000-0000-0000-000000000001`).then(res => {
       if (res?.success) {
         setResults(res.results || []);
         if (res.results?.length > 0) {
@@ -20,7 +24,7 @@ export default function StudentResultsPage() {
       }
       setIsLoading(false);
     });
-  }, []);
+  }, [profileLoading, studentProfile]);
 
   const calculateOverallGpa = () => {
     if (results.length === 0) return '0.0';

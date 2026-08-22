@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import PDFDocument from 'pdfkit';
 import { supabaseAdmin } from '../config/supabase';
-import { sendBulkReminders, FeeReminderEntry } from '../services/whatsapp';
+import { sendBulkReminders, FeeReminderEntry, sendTextMessage } from '../services/whatsapp';
 import { getRazorpayClient, isMockOrderId } from '../lib/razorpay';
 import { generateFeeReceiptPDF, uploadReportToSupabase } from '../services/pdfGenerator';
 import logger from '../config/logger';
@@ -529,10 +529,12 @@ const examSchema = z.object({
 const markEntrySchema = z.object({
   exam_id: z.string().uuid(),
   subject: z.string(),
+  is_grade_only: z.boolean().optional(),
   records: z.array(z.object({
     student_id: z.string().uuid(),
-    marks_obtained: z.number().min(0),
-    max_marks: z.number().positive(),
+    marks_obtained: z.number().min(0).optional().default(0),
+    max_marks: z.number().positive().optional().default(100),
+    grade: z.string().optional(),
     remarks: z.string().optional()
   }))
 });
@@ -1870,6 +1872,24 @@ export async function createStudent(req: Request, res: Response) {
   }
 }
 
+export async function getStudentMe(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const { data, error } = await supabaseAdmin
+      .from('students')
+      .select('*, users(*), departments(name), institutions(*), class_sections(grade, section)')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) return res.status(404).json({ success: false, error: 'Student profile not found.' });
+    return res.status(200).json({ success: true, student: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 export async function getStudentById(req: Request, res: Response) {
   try {
     const { id } = req.params;
@@ -2181,16 +2201,29 @@ export async function getStudentTimetable(req: Request, res: Response) {
     const { studentId } = req.params;
     const { data: student, error: stdErr } = await supabaseAdmin
       .from('students')
-      .select('department_id')
+      .select('department_id, class_section_id, institutions(type)')
       .eq('id', studentId)
       .single();
 
-    if (stdErr || !student) return res.status(404).json({ success: false, error: 'Student department mapping missing.' });
+    if (stdErr || !student) return res.status(404).json({ success: false, error: 'Student mapping details missing.' });
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('timetable')
-      .select('*, staff(*, users(*))')
-      .eq('department_id', student.department_id);
+      .select('*, staff(*, users(*))');
+
+    if ((student.institutions as any)?.type === 'school') {
+      if (!student.class_section_id) {
+        return res.status(400).json({ success: false, error: 'Student class section mapping missing.' });
+      }
+      query = query.eq('class_section_id', student.class_section_id);
+    } else {
+      if (!student.department_id) {
+        return res.status(400).json({ success: false, error: 'Student department mapping missing.' });
+      }
+      query = query.eq('department_id', student.department_id);
+    }
+
+    const { data, error } = await query;
 
     if (error) return res.status(500).json({ success: false, error: error.message });
 
@@ -2750,17 +2783,20 @@ export async function enterResults(req: Request, res: Response) {
   try {
     const parse = markEntrySchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
-    const { exam_id, subject, records } = parse.data;
+    const { exam_id, subject, is_grade_only, records } = parse.data;
 
     const grades = records.map(rec => {
-      const grade = calculateGrade(rec.marks_obtained, rec.max_marks);
+      const grade = is_grade_only && rec.grade
+        ? rec.grade
+        : calculateGrade(rec.marks_obtained || 0, rec.max_marks || 100);
+
       return {
         institution_id: req.user?.institution_id,
         exam_id,
         student_id: rec.student_id,
         subject,
-        marks_obtained: rec.marks_obtained,
-        max_marks: rec.max_marks,
+        marks_obtained: is_grade_only ? 0 : rec.marks_obtained,
+        max_marks: is_grade_only ? 0 : rec.max_marks,
         grade,
         remarks: rec.remarks || ''
       };
@@ -5094,6 +5130,31 @@ export async function rejectLeaveFaculty(req: Request, res: Response) {
 
 export async function getTeacherTimetable(req: Request, res: Response) {
   try {
+    const isSchool = req.user?.institute_type === 'school';
+    const { schedule_type } = req.query;
+
+    if (isSchool && schedule_type === 'home') {
+      // Find managed class section
+      const { data: section, error: secErr } = await supabaseAdmin
+        .from('class_sections')
+        .select('id')
+        .eq('class_teacher_id', req.user?.id)
+        .maybeSingle();
+
+      if (secErr || !section) {
+        return res.status(200).json({ success: true, timetable: [], message: 'No home class section assigned.' });
+      }
+
+      // Query timetable table for this class section
+      const { data, error } = await supabaseAdmin
+        .from('timetable')
+        .select('*, staff(*, users(*))')
+        .eq('class_section_id', section.id);
+
+      if (error) throw error;
+      return res.status(200).json({ success: true, timetable: data || [] });
+    }
+
     const { data, error } = await supabaseAdmin.rpc('get_teacher_timetable', {
       p_teacher_id: req.user?.id,
     });
@@ -8031,6 +8092,230 @@ export async function updateReEvaluationStatus(req: Request, res: Response) {
     return res.status(200).json({ success: true, request: updatedRequest });
   } catch (err: any) {
     logger.error('updateReEvaluationStatus error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function markSchoolDailyRegister(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'No institution context.' });
+
+    const { class_section_id, date, records } = req.body;
+    if (!class_section_id || !date || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ success: false, error: 'class_section_id, date, and records list are required.' });
+    }
+
+    // 1. If teacher, verify that this is their home class section
+    if (req.user?.role === 'Teacher') {
+      const { data: section, error: secErr } = await supabaseAdmin
+        .from('class_sections')
+        .select('class_teacher_id')
+        .eq('id', class_section_id)
+        .maybeSingle();
+
+      if (secErr || !section || section.class_teacher_id !== req.user.id) {
+        return res.status(403).json({ success: false, error: 'Only the assigned Class Teacher can mark attendance for this section.' });
+      }
+    }
+
+    // 2. Fetch student details to map IDs to Names, roll numbers, guardian phone numbers
+    const studentIds = records.map((r: any) => r.student_id);
+    const { data: students, error: studErr } = await supabaseAdmin
+      .from('students')
+      .select('id, name, guardian_phone, guardian_name')
+      .in('id', studentIds)
+      .eq('institution_id', institutionId);
+
+    if (studErr) throw studErr;
+
+    const studentMap = new Map<string, any>();
+    students?.forEach((s: any) => {
+      studentMap.set(s.id, s);
+    });
+
+    // 3. Construct attendance records
+    const attendanceRecords = records.map((rec: any) => ({
+      institution_id: institutionId,
+      student_id: rec.student_id,
+      date,
+      status: rec.status, // Present, Absent, Half-Day, Leave
+      remarks: rec.remarks || ''
+    }));
+
+    // 4. Batch upsert
+    const { data: dbRecords, error: upsertErr } = await supabaseAdmin
+      .from('school_attendance')
+      .upsert(attendanceRecords, { onConflict: 'student_id,date' })
+      .select();
+
+    if (upsertErr) throw upsertErr;
+
+    // 5. Automatically trigger WhatsApp "Absent" notifications to parents
+    const absentRecords = records.filter((r: any) => r.status === 'Absent');
+    let notifiedCount = 0;
+
+    for (const record of absentRecords) {
+      const student = studentMap.get(record.student_id);
+      if (student && student.guardian_phone) {
+        const guardianPhone = student.guardian_phone;
+        const msg = `Dear ${student.guardian_name || 'Parent'}, your child ${student.name || 'Student'} has been marked ABSENT today (${date}) in the morning register. Please provide a leave application if this was unplanned. - IRIS 365`;
+        const sent = await sendTextMessage(guardianPhone, msg, 'attendance_alert');
+        if (sent) notifiedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: dbRecords?.length || 0,
+      notifiedAbsentCount: notifiedCount
+    });
+  } catch (err: any) {
+    logger.error('[markSchoolDailyRegister] Error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// INSTITUTION SUMMARY (Principal / VP Dashboard)
+// =========================================================================
+
+export async function getInstitutionSummary(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const { data: inst } = await supabaseAdmin
+      .from('institutions')
+      .select('type')
+      .eq('id', institutionId)
+      .single();
+
+    const isSchool = inst?.type === 'school';
+
+    const { count: totalStudents } = await supabaseAdmin
+      .from('students')
+      .select('id', { count: 'exact', head: true })
+      .eq('institution_id', institutionId);
+
+    let departments: any[] = [];
+    let lowAttendanceCount = 0;
+    let criticalCount = 0;
+    let avgAttendancePct = 0;
+
+    if (isSchool) {
+      const { data: sections } = await supabaseAdmin
+        .from('class_sections')
+        .select('id, grade, section')
+        .eq('institution_id', institutionId);
+      
+      const { data: studentsList } = await supabaseAdmin
+        .from('students')
+        .select('id, semester')
+        .eq('institution_id', institutionId);
+
+      const { data: schoolAtt } = await supabaseAdmin
+        .from('school_attendance')
+        .select('student_id, status')
+        .eq('institution_id', institutionId);
+
+      const totalLogs = schoolAtt?.length || 0;
+      const presentLogs = schoolAtt?.filter((a: any) => ['Present', 'Half-Day'].includes(a.status)).length || 0;
+      avgAttendancePct = totalLogs > 0 ? Math.round((presentLogs / totalLogs) * 100) : 0;
+
+      const studentMap: Record<string, { total: number; present: number }> = {};
+      (schoolAtt || []).forEach((a: any) => {
+        if (!studentMap[a.student_id]) studentMap[a.student_id] = { total: 0, present: 0 };
+        studentMap[a.student_id].total += 1;
+        if (['Present', 'Half-Day'].includes(a.status)) {
+          studentMap[a.student_id].present += 1;
+        }
+      });
+
+      Object.values(studentMap).forEach((st) => {
+        const pct = st.total > 0 ? (st.present / st.total) * 100 : 100;
+        if (pct < 75) lowAttendanceCount++;
+        if (pct < 60) criticalCount++;
+      });
+
+      const gradeSet = new Set((sections || []).map((s: any) => String(s.grade)));
+      departments = Array.from(gradeSet).map(g => {
+        const gradeStudents = (studentsList || []).filter((st: any) => String(st.semester) === g);
+        let gTotal = 0;
+        let gPresent = 0;
+        gradeStudents.forEach((st: any) => {
+          if (studentMap[st.id]) {
+            gTotal += studentMap[st.id].total;
+            gPresent += studentMap[st.id].present;
+          }
+        });
+        const gPct = gTotal > 0 ? Math.round((gPresent / gTotal) * 100) : 0;
+        return {
+          name: `Grade ${g}`,
+          student_count: gradeStudents.length,
+          avg_attendance: gPct
+        };
+      });
+    } else {
+      const { data: depts } = await supabaseAdmin
+        .from('departments')
+        .select('id, name')
+        .eq('institution_id', institutionId);
+      departments = (depts || []).map(d => ({ name: d.name, student_count: 0, avg_attendance: 0 }));
+
+      const { data: att } = await supabaseAdmin
+        .from('attendance')
+        .select('status')
+        .eq('institution_id', institutionId);
+      const total = att?.length || 0;
+      const present = att?.filter((a: any) => ['present', 'late'].includes(a.status)).length || 0;
+      avgAttendancePct = total > 0 ? Math.round((present / total) * 100) : 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+      total_students: totalStudents || 0,
+      departments,
+      avg_attendance_pct: avgAttendancePct,
+      low_attendance_count: lowAttendanceCount,
+      critical_count: criticalCount,
+      institution_type: inst?.type || 'college'
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// ACHIEVEMENTS ENDPOINT
+// =========================================================================
+
+export async function getAchievements(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const { data: achievements, error } = await supabaseAdmin
+      .from('student_achievements')
+      .select('*, students(*, users(*))')
+      .eq('institution_id', institutionId)
+      .order('created_at', { ascending: false });
+
+    if (error || !achievements) {
+      return res.status(200).json({ success: true, achievements: [] });
+    }
+
+    const formatted = achievements.map((a: any) => ({
+      id: a.id,
+      title: a.title || a.achievement_title || 'Student Achievement',
+      description: a.description || a.details || '',
+      category: a.category || 'Academic',
+      student_name: a.students?.users?.full_name || a.student_name || 'Student',
+      created_at: a.created_at || new Date().toISOString()
+    }));
+
+    return res.status(200).json({ success: true, achievements: formatted });
+  } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }

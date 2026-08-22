@@ -26,10 +26,20 @@ export default function NewComplaintPage() {
 
   const loadAllocation = async () => {
     try {
-      // Force demo student ID so the seeded data always shows up for testing
-      const studentId = '';
+      let studentId = '';
+      if (typeof window !== 'undefined') {
+        const u = localStorage.getItem('iris_user_profile');
+        if (u) {
+          try { studentId = JSON.parse(u).id || ''; } catch {}
+        }
+      }
+      if (!studentId) {
+        const profileRes = await apiGet('/core/students/me');
+        if (profileRes.success && profileRes.student) studentId = profileRes.student.id;
+      }
 
-      const res = await apiGet(`/hostel/allocations?studentId=${studentId}&t=${Date.now()}`);
+      const url = studentId ? `/hostel/allocations?studentId=${studentId}&t=${Date.now()}` : `/hostel/allocations?t=${Date.now()}`;
+      const res = await apiGet(url);
       if (res.success) {
         if (res.allocations?.length > 0) {
           setAllocation(res.allocations[0]);

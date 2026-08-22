@@ -51,10 +51,12 @@ export default function PrincipalReportsPage() {
             ))}
           </div>
 
-          {/* Department Breakdown */}
+          {/* Department / Grade Breakdown */}
           {summary.departments && summary.departments.length > 0 && (
             <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Department Breakdown</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">
+                {summary.institution_type === 'school' ? 'Grade Breakdown' : 'Department Breakdown'}
+              </h2>
               <div className="space-y-3">
                 {summary.departments.map((d: any) => (
                   <div key={d.name} className="flex items-center justify-between bg-white/5 rounded-lg p-3">

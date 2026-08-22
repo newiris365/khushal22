@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
+import { AcademicProvider } from './AcademicContext';
 import {
   QrCode, Calendar, CalendarDays, CreditCard, ShoppingBag, Home, BookOpen,
   Award, Dumbbell, Bus, MessageCircle, FileText, Bell, User, CheckCircle, Briefcase,
@@ -83,12 +84,6 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (instType === 'school') {
-      alert('Student portal is not available for school-type institutes. Parents can access student details through the Parent Portal.');
-      window.location.href = '/login';
-      return;
-    }
-
     if (role !== 'Student') {
       window.location.href = '/login';
       return;
@@ -98,8 +93,14 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
     setAuthorized(true);
     authorizedRef.current = true;
 
+    const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : '';
     // Validate token with backend
-    fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+    fetch('/api/v1/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(deviceId ? { 'X-Client-Device-ID': deviceId } : {})
+      }
+    })
       .then(async r => {
         if (cancelled) return;
         if (r.status === 401 || r.status === 403) {
@@ -151,14 +152,16 @@ function StudentLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PortalShell
-      portalName="Student Portal"
-      portalBadge="Student"
-      sidebarLinks={studentLinks}
-      accentColor="#06B6D4"
-    >
-      {children}
-    </PortalShell>
+    <AcademicProvider>
+      <PortalShell
+        portalName="Student Portal"
+        portalBadge="Student"
+        sidebarLinks={studentLinks}
+        accentColor="#06B6D4"
+      >
+        {children}
+      </PortalShell>
+    </AcademicProvider>
   );
 }
 

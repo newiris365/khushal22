@@ -30,24 +30,26 @@ export default function DirectorDashboard() {
   useEffect(() => {
     loadDashboard();
 
-    const socket = getSocket('/director');
+    (async () => {
+      const socket = await getSocket('/director');
 
-    socket.on('connect', () => {
-      socket.emit('subscribe_director_kpis');
-    });
+      socket.on('connect', () => {
+        socket.emit('subscribe_director_kpis');
+      });
 
-    socket.on('director:kpis_updated', (data: any) => {
-      setKpis((prev) => ({
-        ...prev,
-        attendance_rate: data.attendance_rate,
-        fee_collected_today: data.fee_collected_today,
-        students_on_campus: data.students_on_campus
-      }));
-    });
+      socket.on('director:kpis_updated', (data: any) => {
+        setKpis((prev) => ({
+          ...prev,
+          attendance_rate: data.attendance_rate,
+          fee_collected_today: data.fee_collected_today,
+          students_on_campus: data.students_on_campus
+        }));
+      });
 
-    socket.on('director:alert_triggered', (data: any) => {
-      setAlerts((prev) => [data, ...prev]);
-    });
+      socket.on('director:alert_triggered', (data: any) => {
+        setAlerts((prev) => [data, ...prev]);
+      });
+    })();
 
     return () => {
     };

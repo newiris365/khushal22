@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { BookOpen, HelpCircle, Sparkles, AlertCircle, Layers, CheckSquare, BarChart, Plus, Send, RefreshCw } from 'lucide-react';
 
+import { apiGet, apiPost } from '../../../../lib/api';
+
 interface Course {
   id: string;
   course_code: string;
@@ -37,19 +39,11 @@ export default function TeacherObeCourses() {
     program_id: 'a0000000-0000-0000-0000-000000000001'
   });
 
-  const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
-  });
-
   const loadCourses = async () => {
     setLoading(true);
     try {
       // Fetch courses for the default program
-      const res = await fetch('/api/obe/courses/a0000000-0000-0000-0000-000000000001', {
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
+      const data = await apiGet('/obe/courses/a0000000-0000-0000-0000-000000000001');
       if (data.success && data.courses && data.courses.length > 0) {
         setCourses(data.courses);
       } else {
@@ -80,12 +74,7 @@ export default function TeacherObeCourses() {
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/obe/courses', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(newCourse)
-      });
-      const data = await res.json();
+      const data = await apiPost('/obe/courses', newCourse);
       if (data.success) {
         setShowAddCourse(false);
         loadCourses();

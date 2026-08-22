@@ -17,10 +17,20 @@ export default function StudentComplaintsPage() {
 
   const loadComplaints = async () => {
     try {
-      // Force demo student ID so the seeded data always shows up for testing
-      const studentId = '';
+      let studentId = '';
+      if (typeof window !== 'undefined') {
+        const u = localStorage.getItem('iris_user_profile');
+        if (u) {
+          try { studentId = JSON.parse(u).id || ''; } catch {}
+        }
+      }
+      if (!studentId) {
+        const profileRes = await apiGet('/core/students/me');
+        if (profileRes.success && profileRes.student) studentId = profileRes.student.id;
+      }
 
-      const res = await apiGet(`/hostel/complaints?studentId=${studentId}&t=${Date.now()}`);
+      const url = studentId ? `/hostel/complaints?studentId=${studentId}&t=${Date.now()}` : `/hostel/complaints?t=${Date.now()}`;
+      const res = await apiGet(url);
       if (res.success) {
         setComplaints(res.complaints || []);
       } else {

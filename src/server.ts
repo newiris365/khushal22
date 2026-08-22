@@ -63,8 +63,8 @@ const io = new SocketServer(httpServer, {
   }
 });
 
-// Enforce authentication on all Socket.io connections
-io.use((socket, next) => {
+// Reusable Socket.io authentication middleware function
+const authenticateSocket = (socket: any, next: (err?: Error) => void) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
   if (!token) {
     logger.warn('Socket connection rejected: Authentication token missing', { socketId: socket.id });
@@ -72,13 +72,16 @@ io.use((socket, next) => {
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    (socket as any).user = decoded;
+    socket.user = decoded;
     next();
   } catch (err) {
     logger.warn('Socket connection rejected: Invalid authentication token', { socketId: socket.id });
     return next(new Error('Authentication error: Invalid token'));
   }
-});
+};
+
+// Enforce authentication on all Socket.io connections
+io.use(authenticateSocket);
 
 // Socket.io namespace: Transit GPS telemetry (real driver GPS via modular handler)
 import { registerTransitSocket } from './sockets/transitSocket';
@@ -86,6 +89,8 @@ const transitNs = registerTransitSocket(io);
 
 // Socket.io namespace: Live notifications
 const notificationsNs = io.of('/notifications');
+notificationsNs.use(authenticateSocket);
+
 notificationsNs.on('connection', (socket) => {
   logger.info('Notifications client connected', { socketId: socket.id });
 
@@ -96,7 +101,14 @@ notificationsNs.on('connection', (socket) => {
   }
 
   socket.on('join_institution', (institutionId: string) => {
-    socket.join(`institution_${institutionId}`);
+    const user = (socket as any).user;
+    if (user && (user.institution_id === institutionId || user.role === 'SuperAdmin')) {
+      socket.join(`institution_${institutionId}`);
+      logger.info(`Socket ${socket.id} joined institution_${institutionId}`);
+    } else {
+      logger.warn(`Unauthorized join_institution attempt by user ${user?.id} for institution ${institutionId}`);
+      socket.emit('error', { message: 'Unauthorized: Institution mismatch' });
+    }
   });
 
   socket.on('disconnect', () => {
@@ -106,17 +118,33 @@ notificationsNs.on('connection', (socket) => {
 
 // Socket.io namespace: Live gate activity feed
 const gateNs = io.of('/gate');
+gateNs.use(authenticateSocket);
+
 gateNs.on('connection', (socket) => {
   logger.info('Gate client connected', { socketId: socket.id });
 
   socket.on('subscribe_admin_gate', () => {
-    socket.join('admin:gate');
-    logger.debug(`Socket ${socket.id} joined admin:gate`);
+    const user = (socket as any).user;
+    const allowedRoles = ['SuperAdmin', 'Admin', 'Director', 'Principal', 'Security'];
+    if (user && allowedRoles.includes(user.role)) {
+      socket.join('admin:gate');
+      logger.debug(`Socket ${socket.id} joined admin:gate`);
+    } else {
+      logger.warn(`Unauthorized subscribe_admin_gate attempt by user ${user?.id}`);
+      socket.emit('error', { message: 'Unauthorized role' });
+    }
   });
 
   socket.on('subscribe_security', () => {
-    socket.join('admin:security');
-    logger.debug(`Socket ${socket.id} joined admin:security`);
+    const user = (socket as any).user;
+    const allowedRoles = ['SuperAdmin', 'Admin', 'Director', 'Principal', 'Security'];
+    if (user && allowedRoles.includes(user.role)) {
+      socket.join('admin:security');
+      logger.debug(`Socket ${socket.id} joined admin:security`);
+    } else {
+      logger.warn(`Unauthorized subscribe_security attempt by user ${user?.id}`);
+      socket.emit('error', { message: 'Unauthorized role' });
+    }
   });
 
   socket.on('disconnect', () => {
@@ -126,20 +154,83 @@ gateNs.on('connection', (socket) => {
 
 // Socket.io namespace: Canteen live order tracking
 const canteenNs = io.of('/canteen');
+canteenNs.use(authenticateSocket);
+
 canteenNs.on('connection', (socket) => {
   logger.info('Canteen client connected', { socketId: socket.id });
 
   socket.on('join_kitchen', (institutionId: string) => {
-    socket.join(`kitchen_${institutionId}`);
-    logger.debug(`Socket ${socket.id} joined kitchen_${institutionId}`);
+    const user = (socket as any).user;
+    const allowedRoles = ['SuperAdmin', 'Admin', 'Vendor'];
+    if (user && user.institution_id === institutionId && allowedRoles.includes(user.role)) {
+      socket.join(`kitchen_${institutionId}`);
+      logger.debug(`Socket ${socket.id} joined kitchen_${institutionId}`);
+    } else {
+      logger.warn(`Unauthorized join_kitchen attempt by user ${user?.id} for institution ${institutionId}`);
+      socket.emit('error', { message: 'Unauthorized kitchen subscription' });
+    }
   });
 
-  socket.on('track_order', (orderId: string) => {
-    socket.join(`order_${orderId}`);
-    logger.debug(`Socket ${socket.id} tracking order_${orderId}`);
+  socket.on('track_order', async (orderId: string) => {
+    const user = (socket as any).user;
+    if (!user) {
+      socket.emit('error', { message: 'Unauthenticated' });
+      return;
+    }
+
+    try {
+      // Validate that user is allowed to track this order
+      // Vendors and Admins from the same institution can track, otherwise the student who placed it.
+      const isPrivileged = ['SuperAdmin', 'Admin', 'Vendor'].includes(user.role);
+      
+      const query = supabaseAdmin
+        .from('canteen_orders')
+        .select('id, student_id, institution_id')
+        .eq('id', orderId);
+        
+      const { data: order, error } = await query.maybeSingle();
+
+      if (error || !order) {
+        socket.emit('error', { message: 'Order not found' });
+        return;
+      }
+
+      if (isPrivileged) {
+        if (user.role !== 'SuperAdmin' && order.institution_id !== user.institution_id) {
+          socket.emit('error', { message: 'Unauthorized order tracking across institutions' });
+          return;
+        }
+      } else {
+        // Find corresponding student record to compare user id
+        const { data: student } = await supabaseAdmin
+          .from('students')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!student || order.student_id !== student.id) {
+          socket.emit('error', { message: 'Unauthorized: You do not own this order' });
+          return;
+        }
+      }
+
+      socket.join(`order_${orderId}`);
+      logger.debug(`Socket ${socket.id} tracking order_${orderId}`);
+    } catch (err) {
+      logger.error('Error verifying order tracking authorization:', err);
+      socket.emit('error', { message: 'Internal validation error' });
+    }
   });
 
-  socket.on('order_status_update', (data: { orderId: string; status: string; institutionId: string }) => {
+  socket.on('order_status_update', async (data: { orderId: string; status: string; institutionId: string }) => {
+    const user = (socket as any).user;
+    const allowedRoles = ['SuperAdmin', 'Admin', 'Vendor'];
+    if (!user || !allowedRoles.includes(user.role) || (user.role !== 'SuperAdmin' && user.institution_id !== data.institutionId)) {
+      logger.warn(`Unauthorized order_status_update attempt by user ${user?.id}`);
+      socket.emit('error', { message: 'Unauthorized status update action' });
+      return;
+    }
+    
     // Broadcast to the specific order room and kitchen
     canteenNs.to(`order_${data.orderId}`).emit('status_changed', data);
     canteenNs.to(`kitchen_${data.institutionId}`).emit('queue_updated', data);
@@ -152,12 +243,21 @@ canteenNs.on('connection', (socket) => {
 
 // Socket.io namespace: Director Dashboard telemetry
 const directorNs = io.of('/director');
+directorNs.use(authenticateSocket);
+
 directorNs.on('connection', (socket) => {
   logger.info('Director client connected', { socketId: socket.id });
 
   socket.on('subscribe_director_kpis', () => {
-    socket.join('director:dashboard');
-    logger.debug(`Socket ${socket.id} joined director:dashboard`);
+    const user = (socket as any).user;
+    const allowedRoles = ['SuperAdmin', 'Admin', 'Director'];
+    if (user && allowedRoles.includes(user.role)) {
+      socket.join('director:dashboard');
+      logger.debug(`Socket ${socket.id} joined director:dashboard`);
+    } else {
+      logger.warn(`Unauthorized subscribe_director_kpis attempt by user ${user?.id}`);
+      socket.emit('error', { message: 'Unauthorized director subscription' });
+    }
   });
 
   socket.on('disconnect', () => {
@@ -167,12 +267,41 @@ directorNs.on('connection', (socket) => {
 
 // Socket.io namespace: Live Event Interactive Panel
 const eventsNs = io.of('/events-live');
+eventsNs.use(authenticateSocket);
+
 eventsNs.on('connection', (socket) => {
   logger.info('Live Event client connected', { socketId: socket.id });
 
-  socket.on('join_event', (eventId: string) => {
-    socket.join(`event_${eventId}`);
-    logger.debug(`Socket ${socket.id} joined event_${eventId}`);
+  socket.on('join_event', async (eventId: string) => {
+    const user = (socket as any).user;
+    if (!user) {
+      socket.emit('error', { message: 'Unauthenticated' });
+      return;
+    }
+
+    try {
+      const { data: event, error } = await supabaseAdmin
+        .from('events')
+        .select('institution_id')
+        .eq('id', eventId)
+        .maybeSingle();
+
+      if (error || !event) {
+        socket.emit('error', { message: 'Event not found' });
+        return;
+      }
+
+      if (user.role !== 'SuperAdmin' && event.institution_id !== user.institution_id) {
+        socket.emit('error', { message: 'Unauthorized event subscription across institutions' });
+        return;
+      }
+
+      socket.join(`event_${eventId}`);
+      logger.debug(`Socket ${socket.id} joined event_${eventId}`);
+    } catch (err) {
+      logger.error('Error verifying event subscription authorization:', err);
+      socket.emit('error', { message: 'Internal validation error' });
+    }
   });
 
   socket.on('disconnect', () => {
@@ -245,10 +374,23 @@ app.set('trust proxy', 1);
 
 // Security and CORS middleware configuration
 app.use(helmet());
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
+
 app.use(cors({
-  origin: '*', // Whitelisted domains should be configured here in production
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(new Error('Blocked by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Device-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Device-ID'],
+  credentials: true
 }));
 
 app.use(express.json({
@@ -276,23 +418,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Stale-while-revalidate cache headers for read-only GET endpoints
-const CACHEABLE_PATHS = [
-  '/api/v1/director/overview',
-  '/api/v1/director/activity-feed',
-  '/api/v1/director/alerts',
-  '/api/v1/transit/routes',
-  '/api/v1/transit/buses',
-  '/api/v1/hostel',
-  '/api/v1/library',
-  '/api/v1/events',
-  '/api/v1/obe',
-  '/api/v1/naac',
-];
+// Stale-while-revalidate cache headers disabled for authenticated endpoints. Enforce no-cache to prevent CDN caching leakage.
 app.use((req, res, next) => {
-  if (req.method === 'GET' && CACHEABLE_PATHS.some(p => req.path.startsWith(p))) {
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-  }
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   next();
 });
 

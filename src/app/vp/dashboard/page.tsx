@@ -19,7 +19,7 @@ export default function VicePrincipalDashboard() {
         if (summaryRes.success) {
           setStats(s => ({
             ...s,
-            dailyAttendanceRate: summaryRes.total_students ? 94 : 92,
+            dailyAttendanceRate: summaryRes.avg_attendance_pct || s.dailyAttendanceRate,
           }));
         }
         if (noticesRes.success) setRecentNotices((noticesRes.notices || []).slice(0, 5));

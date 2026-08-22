@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { IndianRupee, CreditCard, CheckCircle2, AlertCircle, FileDown, Clock, AlertTriangle, Wallet, Building, Smartphone, Banknote } from 'lucide-react';
+import { IndianRupee, CreditCard, CheckCircle2, FileDown, Clock, AlertTriangle, Wallet, Building, Smartphone, Banknote } from 'lucide-react';
+import { useAcademic } from '../AcademicContext';
 import { apiGet, apiPost } from '../../../lib/api';
 import { supabase } from '../../../lib/supabase';
 import { exportToPDF } from '../../../lib/exportUtils';
 
 export default function StudentFeesPage() {
+  const { institutionType, studentProfile, loading: profileLoading } = useAcademic();
   const [structures, setStructures] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [concessions, setConcessions] = useState<any[]>([]);
@@ -19,9 +21,6 @@ export default function StudentFeesPage() {
   const [studentId, setStudentId] = useState('');
 
   useEffect(() => {
-    const profile = JSON.parse(localStorage.getItem('iris_user_profile') || '{}');
-    if (profile.id) setStudentId(profile.id);
-
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
@@ -30,8 +29,14 @@ export default function StudentFeesPage() {
   }, []);
 
   useEffect(() => {
+    if (studentProfile?.id) {
+      setStudentId(studentProfile.id);
+    }
+  }, [studentProfile]);
+
+  useEffect(() => {
     if (studentId) loadData();
-  }, [studentId]);
+  }, [studentId, institutionType]);
 
   const loadData = async () => {
     try {
@@ -41,7 +46,20 @@ export default function StudentFeesPage() {
       ]);
 
       if (feesRes.success) {
-        setStructures(feesRes.structures || []);
+        let mapped = feesRes.structures || [];
+        if (institutionType === 'school') {
+          mapped = mapped.map((st: any) => {
+            let schoolName = st.name;
+            if (st.name.toLowerCase().includes('tuition')) schoolName = 'Annual Tuition Fee';
+            else if (st.name.toLowerCase().includes('hostel')) schoolName = 'Term 1 Hostel & Mess Fee';
+            else if (st.name.toLowerCase().includes('transit') || st.name.toLowerCase().includes('bus')) schoolName = 'Term 1 Bus Fee';
+            else if (st.name.toLowerCase().includes('gym') || st.name.toLowerCase().includes('sport')) schoolName = 'Annual Uniform Fee';
+            else if (st.name.toLowerCase().includes('exam')) schoolName = 'Annual Exam Fee';
+            else schoolName = `${st.name} (School Term)`;
+            return { ...st, name: schoolName };
+          });
+        }
+        setStructures(mapped);
         setPayments(feesRes.payments || []);
         setConcessions(feesRes.concessions || []);
       }
@@ -52,8 +70,7 @@ export default function StudentFeesPage() {
 
       // Load payment config
       try {
-        const profile = JSON.parse(localStorage.getItem('iris_user_profile') || '{}');
-        const instId = profile.institution_id;
+        const instId = studentProfile?.institution_id;
         if (instId) {
           const { data } = await supabase
             .from('payment_config')
@@ -167,7 +184,6 @@ export default function StudentFeesPage() {
             const rzp = new (window as any).Razorpay(options);
             rzp.open();
           } else {
-            // Razorpay SDK not loaded, mock it
             throw new Error('mock');
           }
         } else {
@@ -186,38 +202,49 @@ export default function StudentFeesPage() {
           }
         }
       } else if (method === 'bank_transfer') {
-        // Show bank details
         alert(`Bank Transfer Details:\n\nBank: ${paymentConfig?.bank_name || 'N/A'}\nAccount: ${paymentConfig?.bank_account_number || 'N/A'}\nIFSC: ${paymentConfig?.bank_ifsc || 'N/A'}\nHolder: ${paymentConfig?.bank_holder_name || 'N/A'}\n\nAmount: ₹${structure.amount.toLocaleString()}\n\nPlease transfer and notify the admin.`);
       } else if (method === 'upi') {
         alert(`UPI Payment:\n\nUPI ID: ${paymentConfig?.upi_id || 'N/A'}\nAmount: ₹${structure.amount.toLocaleString()}\n\nScan QR or pay using any UPI app.`);
       }
     } catch (err) {
-      // Mock fallback
       const simulatedPayment = {
         id: `pay-${Math.random()}`,
         fee_structure_id: structure.id,
         amount_paid: structure.amount,
         payment_date: new Date().toISOString(),
-        transaction_id: `pay_rzp_${Math.random().toString(36).substring(2, 10)}`,
+        transaction_id: `rzp_mock_${Math.random().toString(36).substring(2, 10)}`,
         status: 'Completed',
         receipt_url: '#',
+        method: 'Mock Online',
       };
       setPayments([...payments, simulatedPayment]);
-      alert('Payment processed successfully!');
+      alert('Mock payment successful!');
     } finally {
       setIsPaying(null);
     }
   };
 
-  const getPaidStatus = (structureId: string) => {
-    return payments.find(p => p.fee_structure_id === structureId && p.status === 'Completed');
+  const getPaidStatus = (structId: string) => {
+    return payments.find(p => p.fee_structure_id === structId && p.status === 'Completed');
   };
 
-  const getAppliedConcession = (structureId: string) => {
-    return concessions.find(c => c.fee_structure_id === structureId);
+  const getAppliedConcession = (structId: string) => {
+    return concessions.find(c => c.fee_structure_id === structId);
   };
 
   const methods = paymentConfig?.enabled_methods || ['razorpay'];
+
+  if (profileLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0D0A1A] text-white p-8">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="h-12 bg-white/5 rounded-2xl animate-pulse"></div>
+          <div className="h-40 bg-white/5 rounded-2xl animate-pulse"></div>
+          <div className="h-64 bg-white/5 rounded-2xl animate-pulse"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-8">
@@ -225,17 +252,17 @@ export default function StudentFeesPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 flex items-center justify-center text-[#A78BFA]">
+          <div className="w-10 h-10 rounded-xl bg-[#06B6D4]/20 border border-[#06B6D4]/30 flex items-center justify-center text-[#22D3EE]">
             <IndianRupee className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-heading font-extrabold text-2xl text-white">Fee Payments</h1>
-            <p className="text-xs text-[#C4B5FD]/70 font-light">Pay your institute fees using your preferred payment method.</p>
+            <h1 className="font-heading font-extrabold text-2xl text-white">Fee Ledger</h1>
+            <p className="text-xs text-[#C4B5FD]/70 font-light">Pay your fees and manage concessions dynamically.</p>
           </div>
         </div>
 
         {/* IRIS Balance Card */}
-        <div className="glass-panel rounded-2xl p-6 border border-[#6C2BD9]/30 flex items-center justify-between">
+        <div className="glass-panel rounded-2xl p-6 border border-[#06B6D4]/30 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400">
               <Wallet className="w-5 h-5" />
@@ -256,8 +283,10 @@ export default function StudentFeesPage() {
         <div className="flex flex-col gap-4">
           <h3 className="font-heading font-bold text-lg text-white">Outstanding Invoices</h3>
 
-          {isLoading ? (
-            <div className="text-center text-xs text-[#C4B5FD]/50 py-10">Loading...</div>
+          {structures.length === 0 ? (
+            <div className="text-center text-[#C4B5FD]/50 py-10 border border-white/5 bg-[#13102A]/40 rounded-2xl italic">
+              No outstanding invoices found. All settled!
+            </div>
           ) : (
             <div className="space-y-4">
               {structures.map((st) => {
@@ -279,7 +308,7 @@ export default function StudentFeesPage() {
                     isCritical ? 'border-red-500/30 bg-red-500/5' :
                     isOverdue ? 'border-orange-500/30 bg-orange-500/5' :
                     isDueSoon ? 'border-yellow-500/30 bg-yellow-500/5' :
-                    'border-white/5 hover:border-[#6C2BD9]/30'
+                    'border-white/5 hover:border-[#06B6D4]/30'
                   }`}>
                     <div className="flex flex-wrap justify-between items-center gap-4">
                       <div className="flex-1">
@@ -331,7 +360,7 @@ export default function StudentFeesPage() {
                               className={`px-5 py-2.5 rounded-xl disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all ${
                                 isCritical
                                   ? 'bg-gradient-to-r from-red-600 to-red-500 hover:brightness-110 shadow-red-600/20'
-                                  : 'bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 shadow-[#6C2BD9]/20'
+                                  : 'bg-gradient-to-r from-[#06B6D4] to-[#0891B2] hover:brightness-110 shadow-[#06B6D4]/20'
                               }`}
                             >
                               <CreditCard className="w-4 h-4" /> {isPaying === st.id ? "Processing..." : "Pay Now"}

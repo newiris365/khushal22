@@ -13,6 +13,9 @@ function decodeToken(token) {
 
   // Handle mock sandbox tokens: mock-sandbox-jwt-token-value.<base64payload>
   if (token.startsWith('mock-sandbox-jwt-token-value.')) {
+    if (process.env.NODE_ENV === 'production') {
+      return null;
+    }
     try {
       const base64Part = token.replace('mock-sandbox-jwt-token-value.', '');
       return JSON.parse(Buffer.from(base64Part, 'base64').toString());

@@ -4,27 +4,35 @@ import React, { useState, useEffect } from 'react';
 import { Award, Check, RefreshCw, Layers } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 
+const LETTER_GRADES = ['A+', 'A', 'B+', 'B', 'C', 'D', 'E', 'F'];
+
 export default function TeacherResultsPage() {
   const [exams, setExams] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedExam, setSelectedExam] = useState<any | null>(null);
-  const [subject, setSubject] = useState('Compiler Design');
+  const [subject, setSubject] = useState('');
   const [records, setRecords] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSchool, setIsSchool] = useState(false);
 
   useEffect(() => {
-    // Fetch exams and students
+    // Fetch exams and teacher's assigned students (not all students)
     Promise.all([
       apiGet('/core/exams'),
-      apiGet('/core/students')
+      apiGet('/campusCore/faculty/students')
     ]).then(([examRes, studentRes]) => {
       if (examRes.success) setExams(examRes.exams || []);
       if (studentRes.success) {
-        setStudents(studentRes.students || []);
+        const sList = studentRes.students || [];
+        setStudents(sList);
+        // Detect school mode from first student's institution
+        if (sList.length > 0 && sList[0].institutions?.type === 'school') {
+          setIsSchool(true);
+        }
         if (examRes.exams?.length > 0) {
           setSelectedExam(examRes.exams[0]);
-          initializeGradesSheet(studentRes.students || [], examRes.exams[0].id);
+          initializeGradesSheet(sList, examRes.exams[0].id);
         }
       }
       setIsLoading(false);
@@ -34,9 +42,10 @@ export default function TeacherResultsPage() {
   const initializeGradesSheet = (studentsList: any[], examId: string) => {
     setRecords(studentsList.map(s => ({
       student_id: s.id,
-      name: s.name,
+      name: s.name || s.users?.full_name || '',
       roll_number: s.roll_number,
       marks_obtained: '',
+      letter_grade: '',
       max_marks: '100',
       remarks: 'Good'
     })));
@@ -63,8 +72,9 @@ export default function TeacherResultsPage() {
         subject,
         records: records.map(r => ({
           student_id: r.student_id,
-          marks_obtained: Number(r.marks_obtained) || 0,
-          max_marks: Number(r.max_marks) || 100,
+          marks_obtained: isSchool ? 0 : (Number(r.marks_obtained) || 0),
+          max_marks: isSchool ? 0 : (Number(r.max_marks) || 100),
+          letter_grade: isSchool ? (r.letter_grade || 'F') : undefined,
           remarks: r.remarks
         }))
       };
@@ -91,7 +101,9 @@ export default function TeacherResultsPage() {
           </div>
           <div>
             <h1 className="font-heading font-extrabold text-2xl text-white">Academic Gradesheet Console</h1>
-            <p className="text-xs text-[#C4B5FD]/70 font-light">Enter exam grades, assign remarks, and publish class marksheets.</p>
+            <p className="text-xs text-[#C4B5FD]/70 font-light">
+              {isSchool ? 'Assign letter grades (CCE) and remarks for your class students.' : 'Enter exam grades, assign remarks, and publish class marksheets.'}
+            </p>
           </div>
         </div>
 
@@ -129,47 +141,68 @@ export default function TeacherResultsPage() {
                 <tr className="bg-white/5 text-[#C4B5FD] font-semibold border-b border-white/5">
                   <th className="p-3">Roll Number</th>
                   <th className="p-3">Student Name</th>
-                  <th className="p-3">Marks Obtained</th>
-                  <th className="p-3">Max Marks</th>
-                  <th className="p-3">Letter Grade</th>
+                  {isSchool ? (
+                    <th className="p-3">Letter Grade</th>
+                  ) : (
+                    <>
+                      <th className="p-3">Marks Obtained</th>
+                      <th className="p-3">Max Marks</th>
+                      <th className="p-3">Letter Grade</th>
+                    </>
+                  )}
                   <th className="p-3">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#C4B5FD]">Loading class rolls...</td>
+                    <td colSpan={isSchool ? 4 : 6} className="p-8 text-center text-[#C4B5FD]">Loading class rolls...</td>
                   </tr>
                 ) : records.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#C4B5FD]/50">No students found for this department.</td>
+                    <td colSpan={isSchool ? 4 : 6} className="p-8 text-center text-[#C4B5FD]/50">No students found for your assigned classes.</td>
                   </tr>
                 ) : (
                   records.map((row) => {
                     const score = Number(row.marks_obtained) || 0;
                     const max = Number(row.max_marks) || 100;
                     const pct = max > 0 ? (score / max) * 100 : 0;
-                    const letter = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
+                    const autoLetter = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
 
                     return (
                       <tr key={row.student_id} className="hover:bg-white/5 transition-colors">
                         <td className="p-3 font-mono font-bold text-white">{row.roll_number}</td>
                         <td className="p-3 font-semibold text-white">{row.name}</td>
-                        <td className="p-3">
-                          <input 
-                            type="number"
-                            value={row.marks_obtained}
-                            onChange={(e) => handleGradeChange(row.student_id, 'marks_obtained', e.target.value)}
-                            className="w-16 bg-black/40 border border-[#6C2BD9]/30 px-2 py-1.5 rounded-lg text-white text-center"
-                            placeholder="85"
-                          />
-                        </td>
-                        <td className="p-3 font-semibold text-[#C4B5FD]/60">{row.max_marks}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded font-bold ${
-                            letter === 'F' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
-                          }`}>{letter}</span>
-                        </td>
+                        {isSchool ? (
+                          <td className="p-3">
+                            <select
+                              value={row.letter_grade || ''}
+                              onChange={(e) => handleGradeChange(row.student_id, 'letter_grade', e.target.value)}
+                              className="bg-black/40 border border-[#6C2BD9]/30 px-2 py-1.5 rounded-lg text-white"
+                            >
+                              <option value="">Select</option>
+                              {LETTER_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                          </td>
+                        ) : (
+                          <>
+                            <td className="p-3">
+                              <input 
+                                type="number"
+                                value={row.marks_obtained}
+                                onChange={(e) => handleGradeChange(row.student_id, 'marks_obtained', e.target.value)}
+                                className="w-16 bg-black/40 border border-[#6C2BD9]/30 px-2 py-1.5 rounded-lg text-white text-center"
+                                placeholder="85"
+                              />
+                            </td>
+                            <td className="p-3 font-semibold text-[#C4B5FD]/60">{row.max_marks}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded font-bold ${
+                                autoLetter === 'F' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
+                              }`}>{autoLetter}</span>
+                            </td>
+                          </>
+                        )}
                         <td className="p-3">
                           <input 
                             type="text"

@@ -25,65 +25,69 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
 
   useEffect(() => {
     loadRouteDetails();
+    let socketRef: any = null;
 
-    const socket = getSocket('/transit');
+    (async () => {
+      const socket = await getSocket('/transit');
+      socketRef = socket;
 
-    socket.on('connect', () => {
-      setConnectionStatus('connected');
-      // Emit both legacy and new events for compatibility
-      socket.emit('subscribe_bus', params.busId);
-      socket.emit('student:watch', { busId: params.busId });
-    });
+      socket.on('connect', () => {
+        setConnectionStatus('connected');
+        // Emit both legacy and new events for compatibility
+        socket.emit('subscribe_bus', params.busId);
+        socket.emit('student:watch', { busId: params.busId });
+      });
 
-    // New real GPS event from driver
-    socket.on('bus:location', (data: any) => {
-      if (data && (data.busId === params.busId || !data.busId)) {
-        setTelemetry(prev => ({
-          ...prev,
-          latitude: data.lat ?? data.latitude ?? prev.latitude,
-          longitude: data.lng ?? data.longitude ?? prev.longitude,
-          speed: data.speed_kmh ?? data.speed ?? prev.speed,
-          heading: data.heading ?? prev.heading,
-        }));
-        if (data.isLastKnown) {
-          setConnectionStatus('connected');
+      // New real GPS event from driver
+      socket.on('bus:location', (data: any) => {
+        if (data && (data.busId === params.busId || !data.busId)) {
+          setTelemetry(prev => ({
+            ...prev,
+            latitude: data.lat ?? data.latitude ?? prev.latitude,
+            longitude: data.lng ?? data.longitude ?? prev.longitude,
+            speed: data.speed_kmh ?? data.speed ?? prev.speed,
+            heading: data.heading ?? prev.heading,
+          }));
+          if (data.isLastKnown) {
+            setConnectionStatus('connected');
+          }
         }
-      }
-    });
+      });
 
-    // Legacy event from existing updateBusLocation controller
-    socket.on('bus:location_updated', (data: any) => {
-      if (data && data.bus_id === params.busId) {
-        setTelemetry(prev => ({
-          ...prev,
-          latitude: data.latitude ?? prev.latitude,
-          longitude: data.longitude ?? prev.longitude,
-          speed: data.speed ?? prev.speed,
-          heading: data.heading ?? prev.heading,
-          vehicle_number: data.vehicle_number || prev.vehicle_number
-        }));
-        if (data.etas) {
-          setEtas(data.etas);
+      // Legacy event from existing updateBusLocation controller
+      socket.on('bus:location_updated', (data: any) => {
+        if (data && data.bus_id === params.busId) {
+          setTelemetry(prev => ({
+            ...prev,
+            latitude: data.latitude ?? prev.latitude,
+            longitude: data.longitude ?? prev.longitude,
+            speed: data.speed ?? prev.speed,
+            heading: data.heading ?? prev.heading,
+            vehicle_number: data.vehicle_number || prev.vehicle_number
+          }));
+          if (data.etas) {
+            setEtas(data.etas);
+          }
         }
-      }
-    });
+      });
 
-    // Bus online/offline status
-    socket.on('bus:status', (data: any) => {
-      if (data.busId === params.busId) {
-        setConnectionStatus(data.isActive ? 'connected' : 'offline');
-      }
-    });
+      // Bus online/offline status
+      socket.on('bus:status', (data: any) => {
+        if (data.busId === params.busId) {
+          setConnectionStatus(data.isActive ? 'connected' : 'offline');
+        }
+      });
 
-    socket.on('bus:offline', (data: any) => {
-      if (data.busId === params.busId) {
+      socket.on('bus:offline', (data: any) => {
+        if (data.busId === params.busId) {
+          setConnectionStatus('offline');
+        }
+      });
+
+      socket.on('disconnect', () => {
         setConnectionStatus('offline');
-      }
-    });
-
-    socket.on('disconnect', () => {
-      setConnectionStatus('offline');
-    });
+      });
+    })();
 
     return () => {};
   }, [params.busId]);

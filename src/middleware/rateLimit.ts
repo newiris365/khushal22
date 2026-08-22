@@ -12,6 +12,22 @@ export const authLimiter = rateLimit({
   }
 });
 
+// Dedicated rate limit for SMS/WhatsApp OTP generation to block flood/brute attacks
+export const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // max 3 OTP requests per 15 minutes per IP/number
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Limit by phone number if present in request body, fallback to IP
+    return (req.body && req.body.phone) ? String(req.body.phone) : req.ip;
+  },
+  message: {
+    success: false,
+    error: 'Too many OTP requests. Please try again after 15 minutes.'
+  }
+});
+
 // Standard rate limit for write/mutation endpoints
 export const writeLimiter = rateLimit({
   windowMs: 60 * 1000,

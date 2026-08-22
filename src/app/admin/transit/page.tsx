@@ -23,42 +23,46 @@ export default function AdminFleetDashboard() {
 
   useEffect(() => {
     loadFleetData();
+    let socketRef: any = null;
 
-    const socket = getSocket('/transit');
+    (async () => {
+      const socket = await getSocket('/transit');
+      socketRef = socket;
 
-    socket.on('connect', () => {
-      socket.emit('subscribe_admin');
-    });
+      socket.on('connect', () => {
+        socket.emit('subscribe_admin');
+      });
 
-    socket.on('bus:location_updated', (data: any) => {
-      if (data && data.bus_id) {
-        setPositions((prev: any[]) => {
-          const idx = prev.findIndex(p => p.bus_id === data.bus_id);
-          if (idx >= 0) {
-            const copy = [...prev];
-            copy[idx] = {
-              ...copy[idx],
-              latitude: data.latitude,
-              longitude: data.longitude,
-              speed: data.speed,
-              heading: data.heading,
-              timestamp: data.timestamp
-            };
-            return copy;
-          } else {
-            return [...prev, {
-              bus_id: data.bus_id,
-              vehicle_number: data.vehicle_number,
-              latitude: data.latitude,
-              longitude: data.longitude,
-              speed: data.speed,
-              heading: data.heading,
-              timestamp: data.timestamp
-            }];
-          }
-        });
-      }
-    });
+      socket.on('bus:location_updated', (data: any) => {
+        if (data && data.bus_id) {
+          setPositions((prev: any[]) => {
+            const idx = prev.findIndex(p => p.bus_id === data.bus_id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = {
+                ...copy[idx],
+                latitude: data.latitude,
+                longitude: data.longitude,
+                speed: data.speed,
+                heading: data.heading,
+                timestamp: data.timestamp
+              };
+              return copy;
+            } else {
+              return [...prev, {
+                bus_id: data.bus_id,
+                vehicle_number: data.vehicle_number,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                speed: data.speed,
+                heading: data.heading,
+                timestamp: data.timestamp
+              }];
+            }
+          });
+        }
+      });
+    })();
 
     // Mock drift coords fallbacks
     const mockInterval = setInterval(() => {
@@ -74,7 +78,7 @@ export default function AdminFleetDashboard() {
     }, 12000);
 
     return () => {
-      socket.emit('unsubscribe_admin');
+      socketRef?.emit('unsubscribe_admin');
       clearInterval(mockInterval);
     };
   }, []);

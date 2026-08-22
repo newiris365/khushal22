@@ -38,6 +38,7 @@ function getAuthHeaders(): Record<string, string> {
   // If no real token exists in production, we send no Authorization header — the backend
   // returns 401 and handleAuthError() redirects to /login correctly.
   const isProduction =
+    process.env.NODE_ENV === 'production' ||
     process.env.NEXT_PUBLIC_ENV === 'production' ||
     process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
 
@@ -168,7 +169,6 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
     const response = await request(url.toString(), {
       method: 'GET',
       headers,
-      cache: 'no-store', // Disable browser caching to ensure fresh data
     });
 
     const json = await response.json();

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth';
-import { supabaseServiceRole } from '../config/supabase';
+import { supabaseAdmin } from '../config/supabase';
 
 const router = Router();
 router.use(authMiddleware);
@@ -38,7 +38,7 @@ router.get('/features/:institutionId', requireRole(['SuperAdmin', 'Admin']), asy
       return res.status(403).json({ success: false, error: 'Access denied to this institution.' });
     }
 
-    const { data: existing, error: fetchErr } = await supabaseServiceRole
+    const { data: existing, error: fetchErr } = await supabaseAdmin
       .from('institution_features')
       .select('feature_key, enabled')
       .eq('institution_id', institutionId);
@@ -79,7 +79,7 @@ router.post('/features', requireRole(['SuperAdmin']), async (req: Request, res: 
       enabled: f.enabled
     }));
 
-    const { error: upsertErr } = await supabaseServiceRole
+    const { error: upsertErr } = await supabaseAdmin
       .from('institution_features')
       .upsert(rows, { onConflict: 'institution_id,feature_key' });
 
@@ -103,7 +103,7 @@ router.get('/roles/:institutionId', requireRole(['SuperAdmin', 'Admin']), async 
       return res.status(403).json({ success: false, error: 'Access denied to this institution.' });
     }
 
-    const { data: permissions, error: fetchErr } = await supabaseServiceRole
+    const { data: permissions, error: fetchErr } = await supabaseAdmin
       .from('module_permissions')
       .select('role, module, can_read, can_write, can_delete')
       .eq('institution_id', institutionId);
@@ -143,7 +143,7 @@ router.post('/roles', requireRole(['SuperAdmin']), async (req: Request, res: Res
       can_delete: p.can_delete ?? false
     }));
 
-    const { error: upsertErr } = await supabaseServiceRole
+    const { error: upsertErr } = await supabaseAdmin
       .from('module_permissions')
       .upsert(rows, { onConflict: 'institution_id,role,module' });
 
@@ -179,13 +179,13 @@ router.get('/my', async (req: Request, res: Response) => {
     }
 
     // Fetch features
-    const { data: features } = await supabaseServiceRole
+    const { data: features } = await supabaseAdmin
       .from('institution_features')
       .select('feature_key, enabled')
       .eq('institution_id', institutionId);
 
     // Fetch role permissions
-    const { data: perms } = await supabaseServiceRole
+    const { data: perms } = await supabaseAdmin
       .from('module_permissions')
       .select('module, can_read, can_write, can_delete')
       .eq('institution_id', institutionId)
@@ -234,7 +234,7 @@ router.post('/seed', requireRole(['SuperAdmin']), async (req: Request, res: Resp
       enabled: true
     }));
 
-    const { error: featureErr } = await supabaseServiceRole
+    const { error: featureErr } = await supabaseAdmin
       .from('institution_features')
       .upsert(featureRows, { onConflict: 'institution_id,feature_key' });
 
@@ -285,7 +285,7 @@ router.post('/seed', requireRole(['SuperAdmin']), async (req: Request, res: Resp
       }
     }
 
-    const { error: permErr } = await supabaseServiceRole
+    const { error: permErr } = await supabaseAdmin
       .from('module_permissions')
       .upsert(permRows, { onConflict: 'institution_id,role,module' });
 

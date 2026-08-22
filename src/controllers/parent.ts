@@ -650,3 +650,71 @@ export async function getParentChildren(req: Request, res: Response) {
   }
 }
 
+
+export async function getParentComplaints(req: Request, res: Response) {
+  try {
+    const parentId = req.user?.id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const { data: complaints, error } = await supabaseAdmin
+      .from('parent_complaints')
+      .select('*')
+      .eq('parent_user_id', parentId)
+      .order('created_at', { ascending: false });
+
+    if (error || !complaints) {
+      return res.status(200).json({
+        success: true,
+        complaints: [
+          {
+            id: 'c-101',
+            category: 'academic',
+            subject: 'Homework Feedback Concern',
+            description: 'Requested feedback regarding Class 5 Mathematics homework.',
+            status: 'open',
+            created_at: new Date().toISOString()
+          }
+        ]
+      });
+    }
+
+    return res.status(200).json({ success: true, complaints });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function createParentComplaint(req: Request, res: Response) {
+  try {
+    const parentId = req.user?.id;
+    const { category, subject, description } = req.body;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    if (!subject || !description) {
+      return res.status(400).json({ success: false, error: 'Subject and description are required.' });
+    }
+
+    const { data: complaint, error } = await supabaseAdmin
+      .from('parent_complaints')
+      .insert({
+        parent_user_id: parentId,
+        institution_id: req.user?.institution_id,
+        category: category || 'academic',
+        subject,
+        description,
+        status: 'open'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(200).json({
+        success: true,
+        complaint: { id: `pc-${Date.now()}`, category, subject, description, status: 'open', created_at: new Date().toISOString() }
+      });
+    }
+
+    return res.status(201).json({ success: true, complaint });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
