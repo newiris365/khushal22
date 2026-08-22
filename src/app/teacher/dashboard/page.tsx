@@ -78,10 +78,17 @@ export default function TeacherDashboard() {
         setStats(s => ({ ...s, totalStudents: studentsRes.students.length }));
       }
 
-      // 4. Fetch Class Teacher overview details
-      const overviewRes = await apiGet('/school/teacher/my-class-overview');
+      const overviewRes: any = await apiGet('/school/teacher/my-class-overview');
       if (overviewRes.success) {
-        setClassOverview(overviewRes);
+        setClassOverview({
+          hasClass: overviewRes.hasClass || false,
+          class_section_id: overviewRes.class_section_id,
+          grade: overviewRes.grade,
+          section: overviewRes.section,
+          attendanceStatus: overviewRes.attendanceStatus,
+          pendingLeavesCount: overviewRes.pendingLeavesCount,
+          activeSlaCount: overviewRes.activeSlaCount
+        });
       }
     } catch (err) {
       console.error('Failed to load teacher dashboard:', err);

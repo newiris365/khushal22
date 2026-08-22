@@ -8,6 +8,8 @@ import {
   seedPermissions,
   type FeatureToggle, type ModulePermission 
 } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 const ALL_FEATURES = [
   'dashboard', 'admissions', 'new_admission', 'students', 'users_roles',
@@ -95,6 +97,7 @@ FROM (VALUES
 ON CONFLICT (institution_id, role, module) DO NOTHING;`;
 
 export default function AdminSettingsPage() {
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [institutionId, setInstitutionId] = useState('');
   const [userRole, setUserRole] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('features');
@@ -174,12 +177,12 @@ export default function AdminSettingsPage() {
     try {
       const result = await setFeatureToggles(institutionId, features);
       if (result.success) {
-        alert('Module toggles saved successfully.');
+        setToast({ msg: 'Module toggles saved successfully.', type: 'success' });
       } else {
-        alert('Failed to save: ' + (result.error || 'Unknown error'));
+        setToast({ msg: 'Failed to save: ' + (result.error || 'Unknown error'), type: 'error' });
       }
     } catch {
-      alert('Failed to save. Make sure the backend server is running.');
+      setToast({ msg: 'Failed to save. Make sure the backend server is running.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -206,12 +209,12 @@ export default function AdminSettingsPage() {
     try {
       const result = await setRolePermissions(institutionId, rolePerms);
       if (result.success) {
-        alert('Permissions updated successfully.');
+        setToast({ msg: 'Permissions updated successfully.', type: 'success' });
       } else {
-        alert('Failed to save: ' + (result.error || 'Unknown error'));
+        setToast({ msg: 'Failed to save: ' + (result.error || 'Unknown error'), type: 'error' });
       }
     } catch {
-      alert('Failed to save. Make sure the backend server is running.');
+      setToast({ msg: 'Failed to save. Make sure the backend server is running.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -223,13 +226,13 @@ export default function AdminSettingsPage() {
     try {
       const result = await seedPermissions(institutionId);
       if (result.success) {
-        alert('Defaults seeded! All modules enabled, Admin has full access.');
+        setToast({ msg: 'Defaults seeded! All modules enabled, Admin has full access.', type: 'success' });
         await loadAll();
       } else {
-        alert('Failed to seed: ' + (result.error || 'Unknown error'));
+        setToast({ msg: 'Failed to seed: ' + (result.error || 'Unknown error'), type: 'error' });
       }
     } catch {
-      alert('Failed to seed. Make sure the backend server is running.');
+      setToast({ msg: 'Failed to seed. Make sure the backend server is running.', type: 'error' });
     } finally {
       setIsSeeding(false);
     }
@@ -514,7 +517,7 @@ export default function AdminSettingsPage() {
               </pre>
               <button onClick={() => {
                 navigator.clipboard.writeText(SEED_SQL.replace(/YOUR_INSTITUTION_ID/g, institutionId || 'YOUR_INSTITUTION_ID'));
-                alert('SQL copied to clipboard!');
+                setToast({ msg: 'SQL copied to clipboard!', type: 'success' });
               }} className="mt-4 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-colors">
                 Copy SQL to Clipboard
               </button>
@@ -522,6 +525,8 @@ export default function AdminSettingsPage() {
           </div>
         )}
       </div>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

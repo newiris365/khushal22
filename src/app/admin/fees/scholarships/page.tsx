@@ -85,6 +85,7 @@ export default function ScholarshipsPage() {
           'Authorization': `Bearer ${token}`
         }
       });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
       if (data.success) {
         setEligibilityList(data.eligible);

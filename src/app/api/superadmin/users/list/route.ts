@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifySuperAdminAuth } from '@/lib/superadminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 const PAGE_SIZE = 1000;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
+
   try {
     let allUsers: any[] = [];
     let from = 0;

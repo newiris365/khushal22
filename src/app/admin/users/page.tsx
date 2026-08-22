@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../lib/api';
 import { getRoleLabel } from '../../../lib/roleLabels';
+import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
 
 const ALL_ROLES = [
   { value: 'SuperAdmin', label: 'SuperAdmin', color: 'text-rose-400 bg-rose-500/20', collegeOnly: true },
@@ -43,6 +44,13 @@ function getVisibleRoles(instituteType: string) {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -113,15 +121,15 @@ export default function AdminUsersPage() {
       if (addForm.employee_id) body.employee_id = addForm.employee_id;
       const res = await apiPost('campusCore/users', body);
       if (res.success) {
-        alert(res.message || 'User created!');
+        setToast({ msg: res.message || 'User created successfully!', type: 'success' });
         setShowAddModal(false);
         setAddForm({ name: '', email: '', phone: '', role: 'Teacher', employee_id: '', password: 'password123' });
         fetchUsers();
         fetchStats();
       } else {
-        alert('Failed: ' + (res.error || 'Unknown error'));
+        setToast({ msg: 'Failed: ' + (res.error || 'Unknown error'), type: 'error' });
       }
-    } catch (err: any) { alert('Error: ' + err.message); }
+    } catch (err: any) { setToast({ msg: 'Error: ' + err.message, type: 'error' }); }
     finally { setSaving(false); }
   };
 
@@ -134,33 +142,42 @@ export default function AdminUsersPage() {
       if (editForm.employee_id) body.employee_id = editForm.employee_id;
       const res = await apiPut(`campusCore/users/${selectedUser.id}`, body);
       if (res.success) {
-        alert('User updated!');
+        setToast({ msg: 'User updated successfully!', type: 'success' });
         setShowEditModal(false);
         setSelectedUser(null);
         fetchUsers();
         fetchStats();
       } else {
-        alert('Failed: ' + (res.error || 'Unknown error'));
+        setToast({ msg: 'Failed: ' + (res.error || 'Unknown error'), type: 'error' });
       }
-    } catch (err: any) { alert('Error: ' + err.message); }
+    } catch (err: any) { setToast({ msg: 'Error: ' + err.message, type: 'error' }); }
     finally { setSaving(false); }
   };
 
   const handleDeactivate = async (userId: string) => {
-    if (!confirm('Deactivate this user?')) return;
-    try {
-      await apiPost(`campusCore/users/${userId}/deactivate`, {});
-      fetchUsers();
-      fetchStats();
-    } catch (err: any) { alert(err.message); }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Deactivate User',
+      message: 'Are you sure you want to deactivate this user account?',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          await apiPost(`campusCore/users/${userId}/deactivate`, {});
+          setToast({ msg: 'User deactivated.', type: 'info' });
+          fetchUsers();
+          fetchStats();
+        } catch (err: any) { setToast({ msg: err.message || 'Deactivation failed', type: 'error' }); }
+      }
+    });
   };
 
   const handleReactivate = async (userId: string) => {
     try {
       await apiPost(`campusCore/users/${userId}/reactivate`, {});
+      setToast({ msg: 'User reactivated.', type: 'success' });
       fetchUsers();
       fetchStats();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) { setToast({ msg: err.message || 'Reactivation failed', type: 'error' }); }
   };
 
   const handleResetPassword = async () => {
@@ -169,14 +186,14 @@ export default function AdminUsersPage() {
     try {
       const res = await apiPost(`campusCore/users/${selectedUser.id}/reset-password`, { password: resetPassword });
       if (res.success) {
-        alert('Password reset!');
+        setToast({ msg: 'Password reset successfully!', type: 'success' });
         setShowPasswordModal(false);
         setSelectedUser(null);
         setResetPassword('');
       } else {
-        alert('Failed: ' + (res.error || 'Unknown error'));
+        setToast({ msg: 'Failed: ' + (res.error || 'Unknown error'), type: 'error' });
       }
-    } catch (err: any) { alert('Error: ' + err.message); }
+    } catch (err: any) { setToast({ msg: 'Error: ' + err.message, type: 'error' }); }
     finally { setSaving(false); }
   };
 
@@ -482,6 +499,16 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDanger={true}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

@@ -10,8 +10,13 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
+import { verifySuperAdminAuth } from '@/lib/superadminAuth';
+
 // PATCH - Update a user (role, is_active, etc.)
 export async function PATCH(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const body = await req.json();
     const { userId, updates } = body;
@@ -37,6 +42,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE - Delete a user
 export async function DELETE(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');

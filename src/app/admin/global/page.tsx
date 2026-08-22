@@ -247,7 +247,29 @@ export default function SuperAdminConsole() {
     }
   };
 
-  useEffect(() => { loadSystemData(); }, []);
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
+    const savedProfile = typeof window !== 'undefined' ? localStorage.getItem('iris_user_profile') : null;
+
+    if (!token || !savedProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(savedProfile);
+      const role = (parsed.role || '').toLowerCase();
+      if (role !== 'superadmin') {
+        window.location.href = '/admin/dashboard';
+        return;
+      }
+    } catch {
+      window.location.href = '/login';
+      return;
+    }
+
+    loadSystemData();
+  }, []);
 
   // Notification CRUD
   const loadNotifications = async () => {

@@ -24,8 +24,13 @@ function calculateSubscriptionEndDate(startDateStr: string, period: string): str
   return endDate.toISOString();
 }
 
+import { verifySuperAdminAuth } from '@/lib/superadminAuth';
+
 // GET - List all institutions
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const { data, error } = await supabaseAdmin
       .from('institutions')
@@ -48,6 +53,8 @@ export async function GET() {
 
 // POST - Create a new institution
 export async function POST(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
   try {
     const body = await req.json();
     const { name, type, email, phone, plan_tier, is_active, address, city, state, subscription_period, password, institute_type } = body;
@@ -129,6 +136,9 @@ export async function POST(req: NextRequest) {
 
 // PATCH - Update an institution
 export async function PATCH(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const body = await req.json();
     const { id, ...updates } = body;
@@ -217,6 +227,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE - Delete an institution
 export async function DELETE(req: NextRequest) {
+  const auth = verifySuperAdminAuth(req);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

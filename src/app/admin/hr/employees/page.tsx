@@ -39,6 +39,7 @@ export default function AdminEmployeeDirectory() {
       const res = await fetch('/api/v1/hr/employees', {
         headers: getAuthHeaders()
       });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
       if (data.success && data.employees && data.employees.length > 0) {
         setEmployees(data.employees);
@@ -67,6 +68,7 @@ export default function AdminEmployeeDirectory() {
         headers: getAuthHeaders(),
         body: JSON.stringify(formData)
       });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
       if (data.success) {
         setShowAdd(false);

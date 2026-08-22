@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, GraduationCap, TrendingUp, AlertTriangle, 
   Calendar, CheckCircle2, XCircle, Clock, Send, Plus, Trash2, 
-  Edit3, Building2, MessageSquare, AlertCircle, FileSpreadsheet, Sparkles 
+  Edit3, Building2, MessageSquare, AlertCircle, FileSpreadsheet, Sparkles, IndianRupee 
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../lib/api';
 
@@ -110,8 +110,15 @@ export default function PrincipalDashboard() {
           });
         }
       } else if (activeTab === 'engagement') {
-        const res = await apiGet('/school/analytics/parent-engagement');
-        if (res.success) setParentEngagement(res);
+        const res: any = await apiGet('/school/analytics/parent-engagement');
+        if (res.success) {
+          setParentEngagement({
+            ptmStats: res.ptmStats || null,
+            pendingResponsesCount: res.pendingResponsesCount || 0,
+            slaBreachedCount: res.slaBreachedCount || 0,
+            teacherSlaStats: res.teacherSlaStats || []
+          });
+        }
       } else if (activeTab === 'infrastructure') {
         const [secRes, teachRes] = await Promise.all([
           apiGet('/school/classes'),

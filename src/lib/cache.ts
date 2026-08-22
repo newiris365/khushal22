@@ -35,7 +35,7 @@ export class TTLCache<V = any> {
   }
 
   invalidatePrefix(prefix: string): void {
-    for (const key of this.cache.keys()) {
+    for (const key of Array.from(this.cache.keys())) {
       if (key.startsWith(prefix)) {
         this.cache.delete(key);
       }
@@ -48,7 +48,7 @@ export class TTLCache<V = any> {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of Array.from(this.cache.entries())) {
       if (now > entry.expiresAt) {
         this.cache.delete(key);
       }

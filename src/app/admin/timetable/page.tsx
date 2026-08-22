@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarDays, Plus, Trash2, Cpu, Settings, GripVertical, X } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../../lib/api';
+import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
 
 interface ClassSection { id: string; grade: number; section: string; }
 interface Teacher { id: string; name: string; email: string; }
@@ -43,6 +44,13 @@ const defaultSubjects: SubjectRow[] = [
 ];
 
 export default function AdminTimetablePage() {
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [timetable, setTimetable] = useState<any[]>([]);
   const [selectedDept, setSelectedDept] = useState('a0000000-0000-0000-0000-000000000001');
   const [selectedClassSection, setSelectedClassSection] = useState('');
@@ -133,19 +141,29 @@ export default function AdminTimetablePage() {
       const payload: any = { day_of_week: formData.day_of_week, time_slot: formData.time_slot, subject: formData.subject, teacher_id: formData.teacher_id, room: formData.room };
       if (!isSchool) payload.department_id = selectedDept;
       const res = await apiPost('/core/timetable', payload);
-      if (res.success) { setShowAddForm(false); setFormData({ day_of_week: 'Monday', time_slot: timeSlots[0] || '', subject: '', teacher_id: '', room: '' }); fetchTimetable(); alert('Block scheduled!'); }
-      else alert(res.error || 'Clash detected.');
-    } catch (err: any) { alert('Error: ' + (err?.message || 'Unknown')); }
+      if (res.success) { setShowAddForm(false); setFormData({ day_of_week: 'Monday', time_slot: timeSlots[0] || '', subject: '', teacher_id: '', room: '' }); fetchTimetable(); setToast({ msg: 'Block scheduled!', type: 'success' }); }
+      else setToast({ msg: res.error || 'Clash detected.', type: 'error' });
+    } catch (err: any) { setToast({ msg: 'Error: ' + (err?.message || 'Unknown'), type: 'error' }); }
   };
 
   const handleDeleteBlock = async (id: string) => {
-    if (!confirm('Remove this slot?')) return;
-    try { const res = await apiDelete(`/core/timetable/${id}`); if (res.success) { fetchTimetable(); alert('Deleted.'); } } catch (err) { alert('Delete failed.'); }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Timetable Slot',
+      message: 'Are you sure you want to remove this timetable slot?',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await apiDelete(`/core/timetable/${id}`);
+          if (res.success) { fetchTimetable(); setToast({ msg: 'Slot deleted.', type: 'info' }); }
+        } catch (err) { setToast({ msg: 'Delete failed.', type: 'error' }); }
+      }
+    });
   };
 
   const handleAutoSchedule = async () => {
     const validSubjects = subjects.filter(s => s.name && s.teacher_id);
-    if (validSubjects.length === 0) { alert('Add at least one subject with a teacher assigned.'); return; }
+    if (validSubjects.length === 0) { setToast({ msg: 'Add at least one subject with a teacher assigned.', type: 'info' }); return; }
     try {
       const payload: any = {
         subjects: validSubjects.map(s => ({
@@ -163,17 +181,12 @@ export default function AdminTimetablePage() {
       if (res.success) {
         setShowSetup(false);
         fetchTimetable();
-        const msg = `Scheduled ${res.count} lessons.\n${res.conflict_count > 0 ? `${res.conflict_count} conflicts.` : 'No conflicts!'}`;
-        if (res.conflict_count > 0) {
-          const conflictList = res.conflicts?.slice(0, 5).map((c: any) => `• ${c.subject}: ${c.reason}`).join('\n') || '';
-          alert(msg + '\n\nConflicts:\n' + conflictList);
-        } else {
-          alert(msg);
-        }
+        const msg = `Scheduled ${res.count} lessons. ${res.conflict_count > 0 ? `${res.conflict_count} conflicts detected.` : 'No conflicts!'}`;
+        setToast({ msg, type: res.conflict_count > 0 ? 'info' : 'success' });
       } else {
-        alert(res.error || 'Scheduler failed.');
+        setToast({ msg: res.error || 'Scheduler failed.', type: 'error' });
       }
-    } catch (err: any) { alert('Scheduler failed: ' + (err?.message || 'Unknown')); }
+    } catch (err: any) { setToast({ msg: 'Scheduler failed: ' + (err?.message || 'Unknown'), type: 'error' }); }
   };
 
   const addSubjectRow = () => setSubjects([...subjects, { name: '', teacher_id: '', classes_per_week: 3, room: 'Room 1' }]);
@@ -439,6 +452,16 @@ export default function AdminTimetablePage() {
           </div>
         </div>
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDanger={true}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </main>
   );
 }

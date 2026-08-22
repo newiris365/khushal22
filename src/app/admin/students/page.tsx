@@ -3,8 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { Users, PlusCircle, Search, Trash2, Edit3, ArrowUpRight, Upload } from 'lucide-react';
 import { apiGet, apiPost, apiDelete, apiPut } from '../../../lib/api';
+import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
 
 export default function AdminStudentsPage() {
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const [students, setStudents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,12 +83,12 @@ export default function AdminStudentsPage() {
       if (res.success) {
         setShowAddModal(false);
         fetchStudents();
-        alert('Student registered successfully!');
+        setToast({ msg: 'Student registered successfully!', type: 'success' });
       } else {
-        alert(res.error || 'Failed to enroll student.');
+        setToast({ msg: res.error || 'Failed to enroll student.', type: 'error' });
       }
     } catch (err) {
-      alert('Error connecting to enrollment server.');
+      setToast({ msg: 'Error connecting to enrollment server.', type: 'error' });
     }
   };
 
@@ -114,26 +122,33 @@ export default function AdminStudentsPage() {
         setShowAddModal(false);
         setEditingStudent(null);
         fetchStudents();
-        alert('Student updated successfully!');
+        setToast({ msg: 'Student updated successfully!', type: 'success' });
       } else {
-        alert(res.error || 'Failed to update student.');
+        setToast({ msg: res.error || 'Failed to update student.', type: 'error' });
       }
     } catch (err) {
-      alert('Error connecting to server.');
+      setToast({ msg: 'Error connecting to server.', type: 'error' });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this student and their authentication profile?')) return;
-    try {
-      const res = await apiDelete(`/core/students/${id}`);
-      if (res.success) {
-        fetchStudents();
-        alert('Student profile removed.');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Student',
+      message: 'Are you sure you want to remove this student and their authentication profile?',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await apiDelete(`/core/students/${id}`);
+          if (res.success) {
+            fetchStudents();
+            setToast({ msg: 'Student profile removed.', type: 'info' });
+          }
+        } catch (err) {
+          setToast({ msg: 'Delete operation failed.', type: 'error' });
+        }
       }
-    } catch (err) {
-      alert('Delete operation failed.');
-    }
+    });
   };
 
   const handleBulkImportMock = async () => {
@@ -166,10 +181,10 @@ export default function AdminStudentsPage() {
       const res = await apiPost('/core/students/import', mockStudents);
       if (res.success) {
         fetchStudents();
-        alert(`Successfully imported ${res.count} student profiles in sandbox mode!`);
+        setToast({ msg: `Successfully imported ${res.count} student profiles in sandbox mode!`, type: 'success' });
       }
     } catch (err) {
-      alert('Import failed.');
+      setToast({ msg: 'Import failed.', type: 'error' });
     }
   };
 
@@ -426,6 +441,16 @@ export default function AdminStudentsPage() {
           </div>
         </div>
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDanger={true}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </main>
   );
 }

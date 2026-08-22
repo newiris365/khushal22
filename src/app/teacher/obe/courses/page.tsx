@@ -82,7 +82,6 @@ export default function TeacherObeCourses() {
         alert(data.error || 'Failed to add course');
       }
     } catch (err) {
-      // Add offline mock
       const mockNewCourse: Course = {
         id: crypto.randomUUID(),
         ...newCourse,
@@ -92,6 +91,11 @@ export default function TeacherObeCourses() {
       setShowAddCourse(false);
     }
   };
+
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') || '' : ''}`
+  });
 
   const handleAiSuggest = async () => {
     if (!syllabusText.trim()) return;

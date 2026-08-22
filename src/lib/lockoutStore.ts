@@ -63,7 +63,7 @@ class LockoutStore {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [email, entry] of this.attempts.entries()) {
+    for (const [email, entry] of Array.from(this.attempts.entries())) {
       if (entry.lockUntil < now && now - entry.lastAttempt > 30 * 60 * 1000) {
         this.attempts.delete(email);
       }

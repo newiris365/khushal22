@@ -30,7 +30,7 @@ class TokenDenylist {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [token, expiresAt] of this.denylist.entries()) {
+    for (const [token, expiresAt] of Array.from(this.denylist.entries())) {
       if (now > expiresAt) {
         this.denylist.delete(token);
       }
