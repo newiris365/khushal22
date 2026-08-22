@@ -15,18 +15,7 @@ const CATEGORIES = [
   { id: 'Desserts', name: 'Desserts', icon: '🍨' },
 ];
 
-const MOCK_MENU = [
-  { id: '1', item_name: 'Masala Dosa', category: 'Meals', price: 80, is_veg: true, is_available: true, calories: 350, prep_time_mins: 12, spice_level: 2, rating_avg: 4.5, description: 'Crispy rice crepe with spiced potato filling, served with sambar & chutney', is_daily_special: true, allergens: ['gluten', 'dairy'] },
-  { id: '2', item_name: 'Cold Coffee', category: 'Beverages', price: 60, is_veg: true, is_available: true, calories: 180, prep_time_mins: 5, spice_level: 0, rating_avg: 4.7, description: 'Chilled coffee blended with creamy ice cream', is_daily_special: false, allergens: ['dairy'] },
-  { id: '3', item_name: 'Veg Biryani', category: 'Meals', price: 130, is_veg: true, is_available: true, calories: 520, prep_time_mins: 20, spice_level: 2, rating_avg: 4.2, description: 'Fragrant basmati rice with fresh vegetables and aromatic spices', is_daily_special: false, allergens: [] },
-  { id: '4', item_name: 'Samosa (2pc)', category: 'Snacks', price: 30, is_veg: true, is_available: true, calories: 260, prep_time_mins: 3, spice_level: 1, rating_avg: 4.8, description: 'Crispy fried pastry with spiced potato-pea filling', is_daily_special: false, allergens: ['gluten'] },
-  { id: '5', item_name: 'Paneer Tikka Roll', category: 'Snacks', price: 120, is_veg: true, is_available: true, calories: 380, prep_time_mins: 10, spice_level: 2, rating_avg: 4.4, description: 'Grilled paneer wrapped in rumali roti with mint chutney', is_daily_special: false, allergens: ['dairy', 'gluten'] },
-  { id: '6', item_name: 'Chicken Biryani', category: 'Meals', price: 180, is_veg: false, is_available: true, calories: 620, prep_time_mins: 25, spice_level: 3, rating_avg: 4.6, description: 'Dum-cooked aromatic rice with tender chicken pieces', is_daily_special: false, allergens: [] },
-  { id: '7', item_name: 'Gulab Jamun', category: 'Desserts', price: 50, is_veg: true, is_available: true, calories: 290, prep_time_mins: 2, spice_level: 0, rating_avg: 4.3, description: 'Warm milk dumplings soaked in rose-flavored sugar syrup', is_daily_special: false, allergens: ['dairy', 'nuts'] },
-  { id: '8', item_name: 'Mango Lassi', category: 'Beverages', price: 50, is_veg: true, is_available: true, calories: 200, prep_time_mins: 3, spice_level: 0, rating_avg: 4.6, description: 'Creamy yogurt blended with fresh Alphonso mangoes', is_daily_special: false, allergens: ['dairy'] },
-  { id: '9', item_name: 'Pav Bhaji', category: 'Meals', price: 90, is_veg: true, is_available: true, calories: 410, prep_time_mins: 15, spice_level: 2, rating_avg: 4.5, description: 'Spiced vegetable mash served with buttery toasted pav', is_daily_special: false, allergens: ['gluten'] },
-  { id: '10', item_name: 'French Fries', category: 'Snacks', price: 60, is_veg: true, is_available: true, calories: 320, prep_time_mins: 8, spice_level: 1, rating_avg: 4.1, description: 'Golden crispy fries with peri-peri seasoning', is_daily_special: false, allergens: [] },
-];
+
 
 const spiceLabels = ['', '🌶️', '🌶️🌶️', '🌶️🌶️🌶️'];
 
@@ -38,7 +27,9 @@ interface CartItem {
 }
 
 export default function StudentCanteenMenu() {
-  const [menu, setMenu] = useState(MOCK_MENU);
+  const [menu, setMenu] = useState<any[]>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [vegOnly, setVegOnly] = useState(false);
@@ -72,10 +63,24 @@ export default function StudentCanteenMenu() {
   };
 
   const loadMenu = async () => {
+    setMenuLoading(true);
+    setFetchError(false);
     try {
       const res = await apiGet('/canteen/menu');
-      if (res.success && res.menu?.length > 0) setMenu(res.menu);
-    } catch (err) { console.log('Using mock menu'); }
+      if (res.success && Array.isArray(res.menu)) {
+        setMenu(res.menu);
+      } else if (res.success && Array.isArray(res.data)) {
+        setMenu(res.data);
+      } else {
+        setFetchError(true);
+        setMenu([]);
+      }
+    } catch (err) {
+      setFetchError(true);
+      setMenu([]);
+    } finally {
+      setMenuLoading(false);
+    }
   };
 
   const ALLERGEN_OPTIONS = ['dairy', 'gluten', 'nuts', 'soy', 'eggs', 'shellfish'];
@@ -211,6 +216,15 @@ export default function StudentCanteenMenu() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6">
+
+        {fetchError && (
+          <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between mt-4 mb-2">
+            <p className="text-xs text-red-400">Couldn't load canteen menu — the server may be unreachable.</p>
+            <button onClick={loadMenu} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* ── Category Tabs + Veg Toggle ─────────────────────── */}
         <div className="flex items-center justify-between gap-4 mb-6 sticky top-0 z-20 bg-[#0D0A1A]/90 backdrop-blur-lg py-3 -mx-6 px-6">

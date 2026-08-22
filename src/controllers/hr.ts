@@ -104,6 +104,14 @@ export const appraisalHodReviewSchema = z.object({
   promotion_recommended: z.boolean().default(false)
 });
 
+export const appraisalVpReviewSchema = z.object({
+  vp_score: z.number().min(1).max(5).optional(),
+  vp_rating: z.number().min(1).max(5).optional(),
+  vp_comments: z.string().optional(),
+  increment_recommended: z.number().nonnegative().optional(),
+  promotion_recommended: z.boolean().optional()
+});
+
 export const appraisalFinalizeSchema = z.object({
   principal_score: z.number().min(1).max(5),
   principal_comments: z.string().optional(),
@@ -718,6 +726,31 @@ export async function getAppraisalCycles(req: Request, res: Response) {
   }
 }
 
+export async function getAppraisalCount(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    let query = supabaseAdmin
+      .from('performance_appraisals')
+      .select('id', { count: 'exact', head: true });
+
+    if (institutionId) {
+      query = query.eq('institution_id', institutionId);
+    }
+
+    if (req.query.status) {
+      query = query.eq('status', req.query.status as string);
+    } else {
+      query = query.in('status', ['pending', 'submitted', 'pending_hod', 'pending_principal']);
+    }
+
+    const { count, error } = await query;
+    if (error) throw error;
+    return res.status(200).json({ success: true, count: count || 0 });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 export async function createAppraisalCycle(req: Request, res: Response) {
   try {
     const parse = appraisalCycleSchema.safeParse(req.body);
@@ -764,14 +797,30 @@ export async function selfSubmitAppraisal(req: Request, res: Response) {
       }
     }
 
+    // Determine initial status based on institution type
+    let instType = req.user?.institute_type || (req.user as any)?.institution_type;
+    if (!instType && req.user?.institution_id) {
+      const { data: inst } = await supabaseAdmin
+        .from('institutions')
+        .select('type')
+        .eq('id', req.user.institution_id)
+        .maybeSingle();
+      if (inst) {
+        instType = inst.type;
+      }
+    }
+
+    const initialStatus = instType === 'school' ? 'pending_vp' : 'pending_hod';
+
     const { data: appraisal, error } = await supabaseAdmin
       .from('performance_appraisals')
       .insert({
         cycle_id: parse.data.cycle_id,
         employee_id: employeeId,
+        institution_id: req.user?.institution_id,
         self_score: parse.data.self_score,
         self_comments: parse.data.self_comments,
-        status: 'pending_hod'
+        status: initialStatus
       })
       .select()
       .single();
@@ -811,12 +860,58 @@ export async function hodReviewAppraisal(req: Request, res: Response) {
   }
 }
 
+export async function vpReviewAppraisal(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const parse = appraisalVpReviewSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    }
+
+    const vpScore = parse.data.vp_rating ?? parse.data.vp_score ?? 4;
+
+    const { data: appraisal, error } = await supabaseAdmin
+      .from('performance_appraisals')
+      .update({
+        vp_score: vpScore,
+        vp_rating: vpScore,
+        vp_comments: parse.data.vp_comments,
+        increment_recommended: parse.data.increment_recommended ?? 0,
+        promotion_recommended: parse.data.promotion_recommended ?? false,
+        status: 'pending_principal'
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, appraisal });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 export async function finalizeAppraisal(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const parse = appraisalFinalizeSchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    }
+
+    // Check status guard
+    const { data: existing } = await supabaseAdmin
+      .from('performance_appraisals')
+      .select('status')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Appraisal record not found.' });
+    }
+
+    if (existing.status !== 'pending_principal') {
+      return res.status(400).json({ success: false, error: 'Appraisal can only be finalized when in pending_principal status.' });
     }
 
     const { data: appraisal, error } = await supabaseAdmin

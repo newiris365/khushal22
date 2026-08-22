@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search, ShoppingCart, Plus, Minus, Trash2, X, Filter,
   UtensilsCrossed, Coffee, Salad, IceCreamCone, ChevronRight,
   Tag, CheckCircle
 } from 'lucide-react';
-import { apiPost } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../lib/api';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: '🍽️' },
@@ -14,24 +14,6 @@ const CATEGORIES = [
   { id: 'Beverages', name: 'Beverages', icon: '☕' },
   { id: 'Meals', name: 'Meals', icon: '🍛' },
   { id: 'Desserts', name: 'Desserts', icon: '🍨' },
-];
-
-const MOCK_MENU = [
-  { id: '1', item_name: 'Vada Pav', category: 'Snacks', price: 30, is_veg: true, is_available: true, description: 'Mumbai-style spiced potato fritter in a soft bun with green chutney', allergens: ['gluten'] },
-  { id: '2', item_name: 'Samosa', category: 'Snacks', price: 25, is_veg: true, is_available: true, description: 'Crispy golden pastry filled with spiced potato and peas', allergens: ['gluten'] },
-  { id: '3', item_name: 'Pakora', category: 'Snacks', price: 40, is_veg: true, is_available: true, description: 'Assorted vegetable fritters deep-fried to perfection', allergens: ['gluten'] },
-  { id: '4', item_name: 'Sandwich', category: 'Snacks', price: 50, is_veg: true, is_available: true, description: 'Grilled triple-layer sandwich with cheese, tomato, and chutney', allergens: ['gluten', 'dairy'] },
-  { id: '5', item_name: 'Chai', category: 'Beverages', price: 10, is_veg: true, is_available: true, description: 'Classic Indian masala chai brewed with cardamom and ginger', allergens: [] },
-  { id: '6', item_name: 'Coffee', category: 'Beverages', price: 20, is_veg: true, is_available: true, description: 'Freshly brewed filter coffee with a rich, bold aroma', allergens: [] },
-  { id: '7', item_name: 'Cold Drink', category: 'Beverages', price: 25, is_veg: true, is_available: true, description: 'Chilled carbonated soft drink – choice of cola or lemon', allergens: [] },
-  { id: '8', item_name: 'Fresh Juice', category: 'Beverages', price: 40, is_veg: true, is_available: true, description: 'Seasonal fruit juice freshly squeezed to order', allergens: [] },
-  { id: '9', item_name: 'Thali', category: 'Meals', price: 80, is_veg: true, is_available: true, description: 'Complete meal with roti, rice, dal, sabzi, curd, and pickle', allergens: ['gluten', 'dairy'] },
-  { id: '10', item_name: 'Biryani', category: 'Meals', price: 90, is_veg: false, is_available: true, description: 'Aromatic basmati rice slow-cooked with tender chicken and spices', allergens: [] },
-  { id: '11', item_name: 'Fried Rice', category: 'Meals', price: 70, is_veg: true, is_available: true, description: 'Wok-tossed rice with mixed vegetables and soy sauce', allergens: ['soy', 'gluten'] },
-  { id: '12', item_name: 'Dal Rice', category: 'Meals', price: 60, is_veg: true, is_available: true, description: 'Comforting lentil curry served with steamed basmati rice', allergens: [] },
-  { id: '13', item_name: 'Gulab Jamun', category: 'Desserts', price: 30, is_veg: true, is_available: true, description: 'Warm milk-solid dumplings soaked in rose-cardamom syrup', allergens: ['dairy'] },
-  { id: '14', item_name: 'Ice Cream', category: 'Desserts', price: 35, is_veg: true, is_available: true, description: 'Creamy scoop of vanilla, chocolate, or strawberry', allergens: ['dairy'] },
-  { id: '15', item_name: 'Rasgulla', category: 'Desserts', price: 25, is_veg: true, is_available: true, description: 'Soft spongy cheese balls soaked in light sugar syrup', allergens: ['dairy'] },
 ];
 
 const ALLERGEN_OPTIONS = ['dairy', 'gluten', 'nuts', 'soy', 'eggs', 'shellfish'];
@@ -44,7 +26,9 @@ interface CartItem {
 }
 
 export default function TeacherCanteenPage() {
-  const [menu, setMenu] = useState(MOCK_MENU);
+  const [menu, setMenu] = useState<any[]>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [vegOnly, setVegOnly] = useState(false);
@@ -56,6 +40,31 @@ export default function TeacherCanteenPage() {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+  useEffect(() => { loadMenu(); }, []);
+
+  const loadMenu = async () => {
+    setMenuLoading(true);
+    setFetchError(false);
+    try {
+      const res = await apiGet('/canteen/menu');
+      if (res.success && res.menu) {
+        setMenu(res.menu);
+      } else if (res.success && Array.isArray(res.data)) {
+        setMenu(res.data);
+      } else if (Array.isArray(res)) {
+        setMenu(res);
+      } else {
+        setFetchError(true);
+        setMenu([]);
+      }
+    } catch {
+      setFetchError(true);
+      setMenu([]);
+    } finally {
+      setMenuLoading(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     return menu.filter(item => {
@@ -278,6 +287,24 @@ export default function TeacherCanteenPage() {
         )}
 
         {/* ── Section Headers + Menu Grid ──────────────────────── */}
+        {fetchError && (
+          <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between mb-4">
+            <p className="text-xs text-red-400">Couldn't load canteen menu — the server may be unreachable.</p>
+            <button onClick={loadMenu} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+              Retry
+            </button>
+          </div>
+        )}
+        {menuLoading ? (
+          <div className="flex items-center justify-center py-32">
+            <div className="w-10 h-10 border-2 border-[#6C2BD9] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : menu.length === 0 && !fetchError ? (
+          <div className="text-center py-32 text-[#C4B5FD]/40 text-sm">
+            No menu items available right now.
+          </div>
+        ) : (
+          <>
         {CATEGORIES.filter(c => c.id !== 'all').map(cat => {
           const items = filtered.filter(i => i.category === cat.id);
           if (activeCategory !== 'all' && activeCategory !== cat.id) return null;
@@ -406,6 +433,8 @@ export default function TeacherCanteenPage() {
               Clear all filters
             </button>
           </div>
+        )}
+          </>
         )}
       </div>
 

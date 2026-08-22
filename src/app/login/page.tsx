@@ -38,7 +38,6 @@ const getRedirectPath = (role: string): string => {
     case 'Admissions Officer': return '/officer';
     case 'TPO': return '/tpo';
     case 'Staff': return '/faculty';
-    case 'Applicant': return '/applicant';
     default: return '/dashboard';
   }
 };
@@ -286,17 +285,6 @@ const getMockProfile = (email: string, role: string) => {
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
-      };
-    case 'Applicant':
-      return {
-        id: isSchool ? 'b0000000-0000-0000-0000-000000000041' : 'b0000000-0000-0000-0000-000000000029',
-        name: isSchool ? 'School Applicant' : 'Applicant User',
-        email: email,
-        role: 'Applicant',
-        institution_id: instId,
-        institution_name: instName,
-        plan_tier: 'University',
-        institute_type: instType
       };
     default:
       return {
@@ -758,7 +746,6 @@ export default function LoginPage() {
                 { email: 'gym@sin.education', role: 'Gym Trainer', label: 'Gym Trainer', bg: 'bg-red-400/10', border: 'border-red-400/25', hoverBorder: 'hover:border-red-400', hoverBg: 'hover:bg-red-400/20', text: 'text-red-300', hoverText: 'hover:text-red-200' },
                 { email: 'hr@siet.edu.in', role: 'HR Admin', label: 'HR Admin', bg: 'bg-violet-400/10', border: 'border-violet-400/25', hoverBorder: 'hover:border-violet-400', hoverBg: 'hover:bg-violet-400/20', text: 'text-violet-300', hoverText: 'hover:text-violet-200' },
                 { email: 'companyhr@siet.edu.in', role: 'Company HR', label: 'Company HR', bg: 'bg-sky-500/10', border: 'border-sky-500/25', hoverBorder: 'hover:border-sky-500', hoverBg: 'hover:bg-sky-500/20', text: 'text-sky-400', hoverText: 'hover:text-sky-300' },
-                { email: 'applicant@sin.education', role: 'Applicant', label: 'Applicant', bg: 'bg-gray-400/10', border: 'border-gray-400/25', hoverBorder: 'hover:border-gray-400', hoverBg: 'hover:bg-gray-400/20', text: 'text-gray-300', hoverText: 'hover:text-gray-200' },
               ].map((item) => (
                 <button
                   key={`college-${item.role}`}
@@ -791,7 +778,6 @@ export default function LoginPage() {
                 { email: 'security@school.edu.in', role: 'Security', label: 'Security', bg: 'bg-slate-500/10', border: 'border-slate-500/25', hoverBorder: 'hover:border-slate-500', hoverBg: 'hover:bg-slate-500/20', text: 'text-slate-400', hoverText: 'hover:text-slate-300' },
                 { email: 'canteen@school.edu.in', role: 'Vendor', label: 'Vendor', bg: 'bg-lime-500/10', border: 'border-lime-500/25', hoverBorder: 'hover:border-lime-500', hoverBg: 'hover:bg-lime-500/20', text: 'text-lime-400', hoverText: 'hover:text-lime-300' },
                 { email: 'driver@school.edu.in', role: 'Driver', label: 'Driver', bg: 'bg-orange-500/10', border: 'border-orange-500/25', hoverBorder: 'hover:border-orange-500', hoverBg: 'hover:bg-orange-500/20', text: 'text-orange-400', hoverText: 'hover:text-orange-300' },
-                { email: 'applicant@school.edu.in', role: 'Applicant', label: 'Applicant', bg: 'bg-gray-400/10', border: 'border-gray-400/25', hoverBorder: 'hover:border-gray-400', hoverBg: 'hover:bg-gray-400/20', text: 'text-gray-300', hoverText: 'hover:text-gray-200' },
                 { email: 'admissions@school.edu.in', role: 'Admissions Officer', label: 'Admissions', bg: 'bg-rose-400/10', border: 'border-rose-400/25', hoverBorder: 'hover:border-rose-400', hoverBg: 'hover:bg-rose-400/20', text: 'text-rose-300', hoverText: 'hover:text-rose-200' },
               ].map((item) => (
                 <button

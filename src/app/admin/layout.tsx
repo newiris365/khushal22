@@ -9,7 +9,7 @@ import {
   Home, Bell, Award, FileText, UserCheck, Settings,
   Package, AlertTriangle, Calendar, BarChart3, UserCircle, MessageSquare,
   Sliders, UserPlus, BedDouble, School, BookMarked, UtensilsCrossed, Tag,
-  Building2
+  Building2, Upload, HeartPulse
 } from 'lucide-react';
 
 const collegeAdminLinks: SidebarLink[] = [
@@ -26,8 +26,8 @@ const collegeAdminLinks: SidebarLink[] = [
   { label: 'Fees & Finance', href: '/admin/fees', icon: CreditCard },
   { label: 'Fee Escalation', href: '/admin/fees/escalation', icon: AlertTriangle },
   { label: 'Exams & Results', href: '/admin/exams', icon: FileText },
-  { label: 'Exam Seating', href: '/admin/exam/seating', icon: ClipboardList },
-  { label: 'Exam Enrollment', href: '/admin/exam/enrollment', icon: ClipboardList },
+  { label: 'Exam Seating', href: '/admin/exams/seating', icon: ClipboardList },
+  { label: 'Exam Enrollment', href: '/admin/exams/enrollment', icon: ClipboardList },
   { label: 'Academic Calendar', href: '/admin/calendar', icon: Calendar },
   { label: 'Defaulter Report', href: '/admin/reports/defaulters', icon: BarChart3 },
   { label: 'Canteen', href: '/admin/canteen', icon: ShoppingBag },
@@ -56,6 +56,8 @@ const collegeAdminLinks: SidebarLink[] = [
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
   { label: 'Service Pricing', href: '/admin/pricing', icon: Tag },
   { label: 'Payment Settings', href: '/admin/payment-settings', icon: CreditCard },
+  { label: 'Bulk Import', href: '/admin/import', icon: Upload },
+  { label: 'Health Scores', href: '/admin/health-scores', icon: HeartPulse },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
@@ -83,10 +85,15 @@ const schoolAdminLinks: SidebarLink[] = [
   { label: 'Lost & Found', href: '/admin/lost-found', icon: Package },
   { label: 'ID Cards', href: '/admin/idcards', icon: Users },
   { label: 'AI Concierge', href: '/admin/ai', icon: BrainCircuit, badge: 'AI' },
+  { label: 'Security Portal', href: '/security/dashboard', icon: Shield },
+  { label: 'Driver Portal', href: '/driver/dashboard', icon: Bus },
+  { label: 'Vendor Portal', href: '/vendor/dashboard', icon: ShoppingBag },
   { label: 'WhatsApp API', href: '/admin/whatsapp', icon: MessageSquare },
   { label: 'Service Pricing', href: '/admin/pricing', icon: Tag },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
   { label: 'Permissions', href: '/admin/permissions', icon: Sliders },
+  { label: 'Bulk Import', href: '/admin/import', icon: Upload },
+  { label: 'Health Scores', href: '/admin/health-scores', icon: HeartPulse },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
@@ -96,6 +103,8 @@ import { getRoleLabel } from '../../lib/roleLabels';
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
   SuperAdmin: '/admin/global',
   Admin: '/admin/dashboard',
+  Principal: '/principal/dashboard',
+  'Vice Principal': '/vp/dashboard',
   Director: '/director/dashboard',
   HOD: '/hod/dashboard',
   Teacher: '/teacher/timetable',

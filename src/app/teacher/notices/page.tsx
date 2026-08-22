@@ -4,72 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Search, ChevronDown, ChevronRight, AlertTriangle, Info, CheckCircle, Clock, Filter } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 
-const MOCK_NOTICES = [
-  {
-    id: '1',
-    title: 'Mid-Semester Exam Schedule Released',
-    content: 'The mid-semester examination schedule for all departments has been finalized. Please review the timetable and coordinate with your department HOD for any scheduling conflicts. Labs must be rescheduled accordingly.',
-    category: 'Academic',
-    published_at: '2026-06-10T09:00:00Z',
-    isRead: false,
-  },
-  {
-    id: '2',
-    title: 'Annual Tech Fest - Volunteer Registration Open',
-    content: 'The annual technical festival "TechVision 2026" is scheduled for July 15-17. Faculty coordinators are requested to encourage student participation. Volunteer registration closes on June 25.',
-    category: 'Events',
-    published_at: '2026-06-09T14:30:00Z',
-    isRead: true,
-  },
-  {
-    id: '3',
-    title: 'Campus Emergency Drill - June 20',
-    content: 'A mandatory campus-wide emergency evacuation drill will be conducted on June 20 at 11:00 AM. All faculty and staff must participate. Department heads should ensure complete compliance.',
-    category: 'Emergency',
-    published_at: '2026-06-08T08:00:00Z',
-    isRead: false,
-  },
-  {
-    id: '4',
-    title: 'Updated Attendance Policy for Faculty',
-    content: 'The administration has revised the faculty attendance policy effective immediately. Minimum 90% attendance is now mandatory for appraisal evaluation. Biometric registration has been updated.',
-    category: 'Admin',
-    published_at: '2026-06-07T11:00:00Z',
-    isRead: true,
-  },
-  {
-    id: '5',
-    title: 'Research Paper Submission Deadline Extended',
-    content: 'The deadline for submitting research papers to the International Journal of Engineering has been extended to July 30. Faculty members are encouraged to submit their latest research work.',
-    category: 'General',
-    published_at: '2026-06-06T16:00:00Z',
-    isRead: false,
-  },
-  {
-    id: '6',
-    title: 'New Lab Equipment Installation - Block C',
-    content: 'State-of-the-art lab equipment for the Electronics and Communication department has been installed in Block C, Room 305. Faculty members are requested to familiarize themselves with the new apparatus.',
-    category: 'Academic',
-    published_at: '2026-06-05T10:00:00Z',
-    isRead: true,
-  },
-  {
-    id: '7',
-    title: 'Faculty Development Program - AI & ML Workshop',
-    content: 'A 5-day Faculty Development Program on "Artificial Intelligence and Machine Learning Applications in Engineering" will be held from July 1-5. Registration is free for all departments.',
-    category: 'Events',
-    published_at: '2026-06-04T13:00:00Z',
-    isRead: false,
-  },
-  {
-    id: '8',
-    title: 'Water Supply Disruption - East Wing',
-    content: 'Due to maintenance of the overhead water tank, water supply to the east wing buildings will be disrupted on June 12 from 10:00 AM to 4:00 PM. Please plan accordingly.',
-    category: 'Emergency',
-    published_at: '2026-06-03T07:30:00Z',
-    isRead: false,
-  },
-];
+
 
 const CATEGORIES = ['All', 'Academic', 'Events', 'General', 'Emergency', 'Admin'];
 
@@ -92,6 +27,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 export default function TeacherNoticesPage() {
   const [notices, setNotices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -103,16 +39,19 @@ export default function TeacherNoticesPage() {
 
   const fetchNotices = async () => {
     setIsLoading(true);
+    setFetchError(false);
     try {
       const res = await apiGet('/core/notices');
       if (res.success) {
         setNotices(res.notices || []);
       } else {
-        setNotices(MOCK_NOTICES);
+        setFetchError(true);
+        setNotices([]);
       }
     } catch (err) {
       console.error(err);
-      setNotices(MOCK_NOTICES);
+      setFetchError(true);
+      setNotices([]);
     } finally {
       setIsLoading(false);
     }
@@ -235,11 +174,19 @@ export default function TeacherNoticesPage() {
 
         {/* Notices List */}
         <div className="flex flex-col gap-3">
+          {fetchError && (
+            <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between">
+              <p className="text-xs text-red-400">Couldn't load notices — the server may be unreachable.</p>
+              <button onClick={fetchNotices} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+                Retry
+              </button>
+            </div>
+          )}
           {isLoading ? (
             <div className="text-center text-xs text-[#C4B5FD]/50 py-16">
               Loading notices...
             </div>
-          ) : filteredNotices.length === 0 ? (
+          ) : filteredNotices.length === 0 && !fetchError ? (
             <div className="glass-panel rounded-2xl p-8 border border-white/5 text-center text-xs text-[#C4B5FD]/50 italic">
               No notices found matching your criteria.
             </div>

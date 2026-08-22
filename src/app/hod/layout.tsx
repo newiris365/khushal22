@@ -1,6 +1,8 @@
 "use client";
 
+import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 import {
   LayoutDashboard, GraduationCap, BarChart3, Target, Users, UserCircle,
   Wand2, ClipboardList, BookOpen, UserCheck, CalendarDays, FileText,
@@ -32,12 +34,29 @@ const hodLinks: SidebarLink[] = [
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
+// OBE is college-only; hide these links for school-type institutes
+const OBE_LABELS = new Set(['OBE Programs', 'CO-PO Attainment', 'Gap Analysis', 'NAAC Compliance']);
+
 export default function HodLayout({ children }: { children: React.ReactNode }) {
+  const { authorized, instituteType } = usePortalAuth(['HOD', 'SuperAdmin']);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-violet-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
+
+  const visibleLinks = instituteType === 'school'
+    ? hodLinks.filter(l => !OBE_LABELS.has(l.label))
+    : hodLinks;
+
   return (
     <PortalShell
       portalName="HOD Portal"
       portalBadge="HOD"
-      sidebarLinks={hodLinks}
+      sidebarLinks={visibleLinks}
       accentColor="#0891B2"
     >
       {children}

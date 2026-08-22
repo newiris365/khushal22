@@ -1,13 +1,15 @@
 "use client";
 
+import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, CalendarDays, Dumbbell, FileText, ClipboardList, GraduationCap, UserCircle,
   UtensilsCrossed, Bell, MessageSquare, BookOpen, Calendar, FileUp,
   Award, Search, Settings
 } from 'lucide-react';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
-const teacherLinks: SidebarLink[] = [
+const rawTeacherLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/teacher/dashboard', icon: LayoutDashboard },
   { label: 'Attendance', href: '/teacher/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/teacher/timetable', icon: ClipboardList },
@@ -25,11 +27,25 @@ const teacherLinks: SidebarLink[] = [
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+  const { authorized, instituteType } = usePortalAuth(['Teacher', 'SuperAdmin']);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-violet-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
+
+  const sidebarLinks = instituteType === 'school'
+    ? rawTeacherLinks.filter(l => l.label !== 'OBE Setup')
+    : rawTeacherLinks;
+
   return (
     <PortalShell
       portalName="Faculty Portal"
       portalBadge="Teacher"
-      sidebarLinks={teacherLinks}
+      sidebarLinks={sidebarLinks}
       accentColor="#8B5CF6"
     >
       {children}

@@ -229,6 +229,22 @@ export async function apiDelete<T = any>(endpoint: string): Promise<ApiResponse<
   }
 }
 
+export async function apiPatch<T = any>(endpoint: string, body: any = {}): Promise<ApiResponse<T>> {
+  try {
+    const response = await request(getFormattedUrl(endpoint), {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    return await response.json();
+  } catch (err: any) {
+    console.error(`apiPatch failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
+    return { success: false, error: 'Connection failed. Please check if backend is running.' };
+  }
+}
+
 /**
  * Fetch a binary blob (e.g. PDF report download)
  */

@@ -902,6 +902,9 @@ function createMockBuilder(tableName: string) {
     insertedData: null as any,
     updatedData: null as any,
     eqFilters: {} as Record<string, any>,
+    inFilters: {} as Record<string, any[]>,
+    lteFilters: {} as Record<string, any>,
+    gteFilters: {} as Record<string, any>,
     then(onfulfilled: any, onrejected: any) {
       const isSingle = this.chain.includes('single') || this.chain.includes('maybeSingle');
       
@@ -1125,6 +1128,36 @@ function createMockBuilder(tableName: string) {
             return true;
           });
         }
+        if (Object.keys(this.inFilters).length > 0) {
+          resolvedData = resolvedData.filter((item: any) => {
+            for (const [key, values] of Object.entries(this.inFilters)) {
+              if (item[key] !== undefined && (!Array.isArray(values) || !values.includes(item[key]))) {
+                return false;
+              }
+            }
+            return true;
+          });
+        }
+        if (Object.keys(this.lteFilters).length > 0) {
+          resolvedData = resolvedData.filter((item: any) => {
+            for (const [key, val] of Object.entries(this.lteFilters)) {
+              if (item[key] !== undefined && item[key] > val) {
+                return false;
+              }
+            }
+            return true;
+          });
+        }
+        if (Object.keys(this.gteFilters).length > 0) {
+          resolvedData = resolvedData.filter((item: any) => {
+            for (const [key, val] of Object.entries(this.gteFilters)) {
+              if (item[key] !== undefined && item[key] < val) {
+                return false;
+              }
+            }
+            return true;
+          });
+        }
       }
 
       if (isSingle) {
@@ -1155,6 +1188,15 @@ function createMockBuilder(tableName: string) {
           }
           if (prop === 'eq' && args[0] && args[1] !== undefined) {
             target.eqFilters[args[0]] = args[1];
+          }
+          if (prop === 'in' && args[0] && Array.isArray(args[1])) {
+            target.inFilters[args[0]] = args[1];
+          }
+          if (prop === 'lte' && args[0] && args[1] !== undefined) {
+            target.lteFilters[args[0]] = args[1];
+          }
+          if (prop === 'gte' && args[0] && args[1] !== undefined) {
+            target.gteFilters[args[0]] = args[1];
           }
         }
         return proxy;

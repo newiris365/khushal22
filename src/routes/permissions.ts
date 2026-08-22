@@ -23,7 +23,7 @@ const ALL_ROLES = [
   'Warden', 'Security', 'Vendor', 'Driver', 'Director',
   'TPO', 'HOD', 'Librarian', 'Gym Trainer', 'IQAC Coordinator',
   'Admissions Officer', 'Principal', 'HR Admin', 'Company HR',
-  'Vice Principal', 'Applicant'
+  'Vice Principal'
 ];
 
 // =========================================================================
@@ -260,7 +260,7 @@ router.post('/seed', requireRole(['SuperAdmin']), async (req: Request, res: Resp
       'Admissions Officer': ['admissions', 'new_admission'],
       'HR Admin': ['hr'],
       'Company HR': [],
-      'Vice Principal': ['dashboard', 'students', 'attendance', 'timetable', 'exams', 'notices', 'complaints'],
+      'Vice Principal': ['dashboard', 'classes', 'discipline', 'substitutes', 'exams', 'faculty', 'appraisals', 'notices', 'attendance', 'timetable'],
       Applicant: [],
     };
 

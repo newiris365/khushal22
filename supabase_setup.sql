@@ -14100,3 +14100,62 @@ CREATE POLICY "Teachers can insert behavior logs in their institution" ON studen
     FOR INSERT WITH CHECK (
         institution_id = (SELECT institution_id FROM users WHERE id = auth.uid())
     );
+
+
+-- ==========================================================
+-- MIGRATION: 20260822000000_discipline_incidents.sql
+-- ==========================================================
+
+-- Migration: Add discipline_incidents table for Vice Principal / School Discipline
+-- Date: 2026-08-22
+
+CREATE TABLE IF NOT EXISTS discipline_incidents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    reported_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    incident_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    category TEXT NOT NULL DEFAULT 'Behavioral',
+    severity TEXT NOT NULL DEFAULT 'Minor' CHECK (severity IN ('Minor', 'Major', 'Severe')),
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Open' CHECK (status IN ('Open', 'Resolved')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enable Row Level Security
+ALTER TABLE discipline_incidents ENABLE ROW LEVEL SECURITY;
+
+-- Add RLS Policies
+CREATE POLICY "Users can select discipline incidents in their institution" ON discipline_incidents
+    FOR SELECT USING (
+        institution_id = (SELECT institution_id FROM users WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Authorized staff can insert discipline incidents" ON discipline_incidents
+    FOR INSERT WITH CHECK (
+        institution_id = (SELECT institution_id FROM users WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Authorized staff can update discipline incidents" ON discipline_incidents
+    FOR UPDATE USING (
+        institution_id = (SELECT institution_id FROM users WHERE id = auth.uid())
+    );
+
+
+-- ==========================================================
+-- MIGRATION: 20260822010000_school_appraisal_status_migration.sql
+-- ==========================================================
+
+-- Migration: Update orphaned school performance appraisals from pending_hod to pending_vp
+UPDATE performance_appraisals
+SET status = 'pending_vp'
+WHERE status = 'pending_hod'
+  AND (
+    institution_id IN (SELECT id FROM institutions WHERE type = 'school')
+    OR cycle_id IN (
+      SELECT pc.id FROM performance_cycles pc
+      JOIN institutions i ON pc.institution_id = i.id
+      WHERE i.type = 'school'
+    )
+  );

@@ -25,9 +25,11 @@ import {
   regularizeAttendance,
   approveRegularize,
   getAppraisalCycles,
+  getAppraisalCount,
   createAppraisalCycle,
   selfSubmitAppraisal,
   hodReviewAppraisal,
+  vpReviewAppraisal,
   finalizeAppraisal,
   aiAppraisalAnalysis,
   submitTdsDeclaration,
@@ -46,9 +48,9 @@ const router = Router();
 router.use(authMiddleware);
 
 // ──── EMPLOYEES ────────────────────────────────────────────────
-router.get('/employees', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Principal', 'HOD']), getEmployees);
+router.get('/employees', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Principal', 'HOD', 'Vice Principal']), getEmployees);
 router.post('/employees', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), createEmployee);
-router.get('/employees/:id', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'HOD', 'Staff', 'Principal']), getEmployee);
+router.get('/employees/:id', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'HOD', 'Staff', 'Principal', 'Vice Principal']), getEmployee);
 router.put('/employees/:id', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff']), updateEmployee);
 router.post('/employees/:id/documents', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff']), uploadEmployeeDocument);
 router.get('/org-chart', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'HOD', 'Staff', 'Principal']), getOrgChart);
@@ -78,10 +80,12 @@ router.post('/attendance/regularize', requireRole(['Staff', 'HOD']), regularizeA
 router.put('/attendance/regularize/:id/approve', requireRole(['Admin', 'SuperAdmin', 'HOD', 'Principal']), approveRegularize);
 
 // ──── APPRAISAL ────────────────────────────────────────────────
-router.get('/appraisal/cycles', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff', 'HOD', 'Principal']), getAppraisalCycles);
+router.get('/appraisal/cycles', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff', 'HOD', 'Principal', 'Vice Principal']), getAppraisalCycles);
+router.get('/appraisal/count', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff', 'HOD', 'Principal', 'Vice Principal']), getAppraisalCount);
 router.post('/appraisal/cycles', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), createAppraisalCycle);
 router.post('/appraisal/self-submit', requireRole(['Staff', 'HOD']), selfSubmitAppraisal);
 router.put('/appraisal/:id/hod-review', requireRole(['Admin', 'SuperAdmin', 'HOD']), hodReviewAppraisal);
+router.put('/appraisal/:id/vp-review', requireRole(['Admin', 'SuperAdmin', 'Vice Principal']), vpReviewAppraisal);
 router.put('/appraisal/:id/finalize', requireRole(['Admin', 'SuperAdmin', 'Principal']), finalizeAppraisal);
 router.get('/appraisal/ai-analysis/:employeeId', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Principal']), aiAppraisalAnalysis);
 

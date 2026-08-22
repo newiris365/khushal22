@@ -13,7 +13,7 @@ const ALL_ROLES = [
   'SuperAdmin', 'Admin', 'Director', 'Principal', 'HOD', 'Teacher', 'Staff',
   'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver',
   'TPO', 'Librarian', 'Gym Trainer', 'IQAC Coordinator', 'Admissions Officer',
-  'HR Admin', 'Company HR', 'Vice Principal', 'Applicant'
+  'HR Admin', 'Company HR', 'Vice Principal'
 ];
 
 const COLLEGE_ONLY_ROLES = new Set(['HOD', 'TPO', 'IQAC Coordinator']);

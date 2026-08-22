@@ -37,81 +37,15 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: React.Rea
   rejected: { label: 'Rejected', color: 'text-red-400 bg-red-500/20 border-red-500/30', icon: <XCircle className="w-3 h-3" /> },
 };
 
-const MOCK_LEAVES: LeaveApplication[] = [
-  {
-    id: '1',
-    leave_type: 'medical',
-    from_date: '2026-06-01',
-    to_date: '2026-06-03',
-    reason: 'Fever and cold - visiting family doctor for treatment.',
-    status: 'approved',
-    faculty_remarks: '',
-    hod_remarks: 'Approved. Take care.',
-    admin_remarks: '',
-    created_at: '2026-05-29',
-  },
-  {
-    id: '2',
-    leave_type: 'od',
-    from_date: '2026-06-10',
-    to_date: '2026-06-10',
-    reason: 'Attending national-level faculty development workshop at IIT Delhi.',
-    status: 'approved',
-    faculty_remarks: '',
-    hod_remarks: 'Approved. Share the workshop report upon return.',
-    admin_remarks: '',
-    created_at: '2026-06-05',
-  },
-  {
-    id: '3',
-    leave_type: 'personal',
-    from_date: '2026-06-15',
-    to_date: '2026-06-16',
-    reason: 'Family function - sister\'s wedding.',
-    status: 'pending',
-    faculty_remarks: '',
-    hod_remarks: '',
-    admin_remarks: '',
-    created_at: '2026-06-10',
-  },
-  {
-    id: '4',
-    leave_type: 'emergency',
-    from_date: '2026-06-08',
-    to_date: '2026-06-08',
-    reason: 'Medical emergency in family - rushed to hospital.',
-    status: 'rejected',
-    faculty_remarks: '',
-    hod_remarks: 'Rejected due to insufficient documentation. Please reapply with medical certificate.',
-    admin_remarks: '',
-    created_at: '2026-06-08',
-  },
-  {
-    id: '5',
-    leave_type: 'half_day',
-    from_date: '2026-06-12',
-    to_date: '2026-06-12',
-    reason: 'Bank work - need to visit branch for account-related formalities.',
-    status: 'approved',
-    faculty_remarks: '',
-    hod_remarks: 'Approved. Adjust your remaining lectures.',
-    admin_remarks: '',
-    created_at: '2026-06-11',
-  },
-];
 
-const MOCK_BALANCE: LeaveBalance = {
-  casual: { total: 12, used: 4, remaining: 8 },
-  medical: { total: 10, used: 3, remaining: 7 },
-  earned: { total: 15, used: 6, remaining: 9 },
-};
 
 const DAYS_IN_MONTH = 30;
 
 export default function TeacherLeavePage() {
   const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
-  const [balance, setBalance] = useState<LeaveBalance>(MOCK_BALANCE);
+  const [balance, setBalance] = useState<LeaveBalance>({ casual: { total: 0, used: 0, remaining: 0 }, medical: { total: 0, used: 0, remaining: 0 }, earned: { total: 0, used: 0, remaining: 0 } });
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [form, setForm] = useState({ leave_type: 'personal', from_date: '', to_date: '', reason: '' });
@@ -125,15 +59,18 @@ export default function TeacherLeavePage() {
 
   const loadLeaves = async () => {
     setLoading(true);
+    setFetchError(false);
     try {
       const res = await apiGet('/core/leaves/my');
-      if (res.success && res.leaves?.length > 0) {
-        setLeaves(res.leaves);
+      if (res.success) {
+        setLeaves(res.leaves || []);
       } else {
-        setLeaves(MOCK_LEAVES);
+        setFetchError(true);
+        setLeaves([]);
       }
     } catch {
-      setLeaves(MOCK_LEAVES);
+      setFetchError(true);
+      setLeaves([]);
     } finally {
       setLoading(false);
     }
@@ -146,7 +83,7 @@ export default function TeacherLeavePage() {
         setBalance(res.balance);
       }
     } catch {
-      setBalance(MOCK_BALANCE);
+      // Balance stays at zero defaults
     }
   };
 
@@ -439,11 +376,20 @@ export default function TeacherLeavePage() {
               </div>
             </div>
 
+            {fetchError && (
+              <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between mb-3">
+                <p className="text-xs text-red-400">Couldn't load leave data — the server may be unreachable.</p>
+                <button onClick={loadLeaves} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+                  Retry
+                </button>
+              </div>
+            )}
+
             {loading ? (
               <div className="glass-panel rounded-2xl p-8 text-center text-[#C4B5FD]/40 text-xs">
                 <Clock className="w-5 h-5 mx-auto mb-2 animate-spin" /> Loading leaves...
               </div>
-            ) : filteredLeaves.length === 0 ? (
+            ) : filteredLeaves.length === 0 && !fetchError ? (
               <div className="glass-panel rounded-2xl p-8 text-center text-[#C4B5FD]/40 text-xs">
                 No leave applications found.
               </div>

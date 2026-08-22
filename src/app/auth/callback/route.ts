@@ -79,7 +79,6 @@ const getRedirectPath = (role: string): string => {
     case 'Admissions Officer': return '/officer';
     case 'TPO': return '/tpo';
     case 'Staff': return '/faculty';
-    case 'Applicant': return '/applicant';
     default: return '/dashboard';
   }
 };

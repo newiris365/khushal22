@@ -6,125 +6,13 @@ import { apiGet } from '../../../lib/api';
 
 const CATEGORIES = ['All', 'Tech', 'Cultural', 'Sports', 'Academic', 'Social', 'Workshop'];
 
-const MOCK_EVENTS = [
-  {
-    id: '1',
-    title: 'AI in Education — Faculty Summit',
-    category: 'Tech',
-    description: 'Explore the transformative role of artificial intelligence in modern education. Sessions on AI-powered grading, personalized learning paths, and ethical considerations for educators.',
-    venue: 'Seminar Hall A',
-    organizer: 'Dept. of Computer Science',
-    start_datetime: '2026-06-20T10:00:00Z',
-    end_datetime: '2026-06-20T16:00:00Z',
-    max_participants: 120,
-    attendees: 87,
-    is_paid: false,
-    ticket_price: 0,
-    status: 'Scheduled',
-    tags: ['AI', 'EdTech', 'Faculty']
-  },
-  {
-    id: '2',
-    title: 'Annual Cultural Fest — Rangoli',
-    category: 'Cultural',
-    description: 'The flagship cultural celebration featuring faculty performances, art exhibitions, and cross-departmental competitions. Open to all faculty and staff.',
-    venue: 'Open Air Theatre',
-    organizer: 'Cultural Committee',
-    start_datetime: '2026-06-25T17:00:00Z',
-    end_datetime: '2026-06-25T22:00:00Z',
-    max_participants: 300,
-    attendees: 214,
-    is_paid: false,
-    ticket_price: 0,
-    status: 'Scheduled',
-    tags: ['Culture', 'Performance', 'Community']
-  },
-  {
-    id: '3',
-    title: 'Research Methodology Workshop',
-    category: 'Workshop',
-    description: 'Intensive three-day workshop on advanced research methodologies, grant writing, and publishing strategies for mid-career faculty members.',
-    venue: 'Conference Room 201',
-    organizer: 'Research Cell',
-    start_datetime: '2026-07-02T09:00:00Z',
-    end_datetime: '2026-07-04T17:00:00Z',
-    max_participants: 60,
-    attendees: 52,
-    is_paid: true,
-    ticket_price: 499,
-    status: 'Scheduled',
-    tags: ['Research', 'Publishing', 'Grants']
-  },
-  {
-    id: '4',
-    title: 'Faculty Cricket League 2026',
-    category: 'Sports',
-    description: 'Inter-department cricket tournament for faculty members. Teams of 11, round-robin format with semi-finals and grand final.',
-    venue: 'College Cricket Ground',
-    organizer: 'Sports Council',
-    start_datetime: '2026-07-10T07:00:00Z',
-    end_datetime: '2026-07-12T18:00:00Z',
-    max_participants: 100,
-    attendees: 88,
-    is_paid: true,
-    ticket_price: 199,
-    status: 'Scheduled',
-    tags: ['Cricket', 'Tournament', 'Team Building']
-  },
-  {
-    id: '5',
-    title: 'Pedagogy Innovation Symposium',
-    category: 'Academic',
-    description: 'Showcase of innovative teaching practices. Faculty present case studies on flipped classrooms, gamification, and blended learning models.',
-    venue: 'Main Auditorium',
-    organizer: 'Academic Affairs',
-    start_datetime: '2026-07-18T10:00:00Z',
-    end_datetime: '2026-07-18T17:00:00Z',
-    max_participants: 200,
-    attendees: 156,
-    is_paid: false,
-    ticket_price: 0,
-    status: 'Scheduled',
-    tags: ['Teaching', 'Innovation', 'Pedagogy']
-  },
-  {
-    id: '6',
-    title: 'Faculty Wellness Retreat',
-    category: 'Social',
-    description: 'A day-long retreat focused on mental health, stress management, and work-life balance. Includes yoga sessions, mindfulness workshops, and group activities.',
-    venue: 'Campus Green & Wellness Center',
-    organizer: 'HR & Wellness Cell',
-    start_datetime: '2026-07-25T08:00:00Z',
-    end_datetime: '2026-07-25T17:00:00Z',
-    max_participants: 150,
-    attendees: 112,
-    is_paid: false,
-    ticket_price: 0,
-    status: 'Scheduled',
-    tags: ['Wellness', 'Mental Health', 'Yoga']
-  },
-  {
-    id: '7',
-    title: 'Industry-Academia Collaborative Summit',
-    category: 'Academic',
-    description: 'Bridge the gap between industry and academia. Panel discussions with corporate leaders, internship coordination strategies, and curriculum alignment.',
-    venue: 'Management Block Hall',
-    organizer: 'Placement Cell & Industry Relations',
-    start_datetime: '2026-08-01T09:30:00Z',
-    end_datetime: '2026-08-01T16:30:00Z',
-    max_participants: 180,
-    attendees: 95,
-    is_paid: true,
-    ticket_price: 349,
-    status: 'Scheduled',
-    tags: ['Industry', 'Collaboration', 'Placements']
-  }
-];
+
 
 export default function TeacherEventsPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
@@ -151,6 +39,7 @@ export default function TeacherEventsPage() {
   }, [events, activeCategory, searchQuery]);
 
   const loadEvents = async () => {
+    setFetchError(false);
     try {
       const res = await apiGet('/events/events?upcoming=true');
       if (res.success && res.events) {
@@ -159,7 +48,8 @@ export default function TeacherEventsPage() {
         throw new Error('API error');
       }
     } catch {
-      setEvents(MOCK_EVENTS);
+      setFetchError(true);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -274,11 +164,20 @@ export default function TeacherEventsPage() {
           ))}
         </div>
 
+        {fetchError && (
+          <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between mb-4">
+            <p className="text-xs text-red-400">Couldn't load events — the server may be unreachable.</p>
+            <button onClick={loadEvents} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+              Retry
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-32">
             <div className="w-10 h-10 border-2 border-[#6C2BD9] border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filteredEvents.length === 0 ? (
+        ) : filteredEvents.length === 0 && !fetchError ? (
           <div className="text-center py-32 text-[#C4B5FD]/40 text-sm">
             No events found matching your criteria.
           </div>

@@ -24,41 +24,12 @@ interface Drive {
   };
 }
 
-const MOCK_DRIVES: Drive[] = [
-  {
-    id: 'drive-1',
-    title: 'Graduate Engineer Trainee',
-    role: 'Software Engineer',
-    status: 'open',
-    job_type: 'full_time',
-    location: ['Bangalore', 'Pune'],
-    ctc_display: '₹12.5 LPA',
-    min_cgpa: 7.5,
-    application_deadline: new Date(Date.now() + 172800000).toISOString(),
-    companies: {
-      name: 'Google India',
-      industry: 'Technology'
-    }
-  },
-  {
-    id: 'drive-2',
-    title: 'Decision Analytics Associate',
-    role: 'Data Analyst',
-    status: 'open',
-    job_type: 'full_time',
-    location: ['Gurgaon'],
-    ctc_display: '₹8.4 LPA',
-    min_cgpa: 7.0,
-    application_deadline: new Date(Date.now() + 345600000).toISOString(),
-    companies: {
-      name: 'ZS Associates',
-      industry: 'Consulting'
-    }
-  }
-];
+
 
 export default function StudentPlacementsDashboard() {
-  const [drives, setDrives] = useState<Drive[]>(MOCK_DRIVES);
+  const [drives, setDrives] = useState<Drive[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState<any>({
     total_eligible: 320,
@@ -72,6 +43,8 @@ export default function StudentPlacementsDashboard() {
   }, []);
 
   const loadPlacementsData = async () => {
+    setLoading(true);
+    setFetchError(false);
     try {
       const localProfile = localStorage.getItem('iris_user_profile');
       const user = localProfile ? JSON.parse(localProfile) : null;
@@ -82,8 +55,11 @@ export default function StudentPlacementsDashboard() {
         user ? apiGet(`/placements/offers/student/${user.id}`) : Promise.resolve({ success: false } as any),
       ]);
 
-      if (driveRes.success && driveRes.drives?.length > 0) {
+      if (driveRes.success && driveRes.drives) {
         setDrives(driveRes.drives);
+      } else {
+        setFetchError(true);
+        setDrives([]);
       }
 
       if (statsRes.success && statsRes.dashboard) {
@@ -96,7 +72,10 @@ export default function StudentPlacementsDashboard() {
         setProfile({ is_placed: false });
       }
     } catch (err) {
-      console.log('Using fallback mock data');
+      setFetchError(true);
+      setDrives([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,12 +87,13 @@ export default function StudentPlacementsDashboard() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="font-extrabold text-3xl text-white tracking-tight flex items-center gap-3">
-              <Briefcase className="w-8 h-8 text-[#A78BFA]" />
-              Placement Cell
+              Placement Cell <Briefcase className="w-8 h-8 text-[#6C2BD9]" />
             </h1>
-            <p className="text-sm text-[#C4B5FD]/70">Explore job opportunities, optimize your resume, prepare for interviews, and connect with mentors.</p>
+            <p className="text-xs text-[#C4B5FD]/70 mt-1">
+              Explore campus recruitment drives, interview preparation tools, and job offers.
+            </p>
           </div>
-          
+
           {/* Quick Stats Grid */}
           <div className="flex gap-4">
             <div className="px-4 py-2.5 rounded-2xl bg-[#13102A]/85 border border-[#6C2BD9]/25 flex flex-col items-center">
@@ -126,6 +106,15 @@ export default function StudentPlacementsDashboard() {
             </div>
           </div>
         </div>
+
+        {fetchError && (
+          <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between">
+            <p className="text-xs text-red-400">Couldn't load placement drives — the server may be unreachable.</p>
+            <button onClick={loadPlacementsData} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Banner: Placement Status */}
         {profile?.is_placed ? (

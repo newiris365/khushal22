@@ -155,11 +155,14 @@ export default function PrincipalDashboard() {
         message_template: customMessage
       });
       if (res.success) {
-        alert(res.message);
+        alert(res.message || 'WhatsApp broadcast triggered successfully!');
         setSelectedDefaulters([]);
+      } else {
+        alert(res.error || 'Failed to send WhatsApp broadcast.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err.message || 'Network error triggering WhatsApp broadcast.');
     } finally {
       setSendingBroadcast(false);
     }

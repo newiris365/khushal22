@@ -54,7 +54,7 @@ const ALL_ROLES = [
   'Warden', 'Security', 'Vendor', 'Driver', 'Director',
   'TPO', 'HOD', 'Librarian', 'Gym Trainer', 'IQAC Coordinator',
   'Admissions Officer', 'Principal', 'HR Admin', 'Company HR',
-  'Vice Principal', 'Applicant'
+  'Vice Principal'
 ];
 
 function decodeJWT(token: string): Record<string, any> | null {

@@ -31,7 +31,6 @@ const ALL_ROLES = [
   { value: 'Driver', label: 'Driver', color: 'text-orange-400 bg-orange-500/20' },
   { value: 'HR Admin', label: 'HR Admin', color: 'text-violet-400 bg-violet-500/20', collegeOnly: true },
   { value: 'Company HR', label: 'Company HR', color: 'text-sky-400 bg-sky-500/20', collegeOnly: true },
-  { value: 'Applicant', label: 'Applicant', color: 'text-gray-400 bg-gray-500/20' },
 ];
 
 function getVisibleRoles(instituteType: string) {

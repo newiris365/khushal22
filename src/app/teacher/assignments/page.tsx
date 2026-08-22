@@ -13,114 +13,7 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; 
   Expired: { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30', icon: <Clock className="w-3 h-3" /> },
 };
 
-const MOCK_ASSIGNMENTS = [
-  {
-    id: '1',
-    title: 'Binary Search Tree Implementation',
-    subject: 'Data Structures',
-    description: 'Implement a self-balancing BST with insert, delete, search, and traversal operations. Include time complexity analysis for each operation.',
-    due_date: '2026-06-18T23:59:00Z',
-    max_marks: 100,
-    status: 'Active',
-    submissions_count: 18,
-    total_students: 42,
-    attachments: ['bst_reference.pdf'],
-    created_at: '2026-06-10T09:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Process Scheduling Simulator',
-    subject: 'Operating Systems',
-    description: 'Build a CPU scheduling simulator that implements FCFS, SJF, Round Robin, and Priority scheduling algorithms. Compare performance metrics across all algorithms.',
-    due_date: '2026-06-15T23:59:00Z',
-    max_marks: 100,
-    status: 'Due Soon',
-    submissions_count: 35,
-    total_students: 40,
-    attachments: ['scheduling_guidelines.pdf', 'sample_output.txt'],
-    created_at: '2026-06-05T14:00:00Z',
-  },
-  {
-    id: '3',
-    title: 'TCP Client-Server Chat Application',
-    subject: 'Computer Networks',
-    description: 'Develop a multi-threaded TCP chat server supporting private messaging, broadcast, and file transfer. Use socket programming in Python or Java.',
-    due_date: '2026-06-12T23:59:00Z',
-    max_marks: 100,
-    status: 'Graded',
-    submissions_count: 38,
-    total_students: 38,
-    attachments: [],
-    created_at: '2026-05-28T10:00:00Z',
-  },
-  {
-    id: '4',
-    title: 'Library Management System ER Diagram',
-    subject: 'Database Management',
-    description: 'Design a complete ER diagram for a library management system. Include all entities, relationships, cardinalities, and convert to normalized relational schema.',
-    due_date: '2026-06-08T23:59:00Z',
-    max_marks: 50,
-    status: 'Expired',
-    submissions_count: 28,
-    total_students: 45,
-    attachments: ['er_templates.pdf'],
-    created_at: '2026-05-20T08:00:00Z',
-  },
-  {
-    id: '5',
-    title: 'Graph Algorithms Analysis Report',
-    subject: 'Algorithms',
-    description: 'Implement Dijkstra, Bellman-Ford, and Floyd-Warshall algorithms. Analyze performance on various graph densities and provide benchmark results.',
-    due_date: '2026-06-22T23:59:00Z',
-    max_marks: 100,
-    status: 'Active',
-    submissions_count: 5,
-    total_students: 36,
-    attachments: ['graph_datasets.zip'],
-    created_at: '2026-06-12T11:00:00Z',
-  },
-  {
-    id: '6',
-    title: 'Sprint Planning Documentation',
-    subject: 'Software Engineering',
-    description: 'Prepare sprint planning documents for a hypothetical e-commerce project. Include user stories, task breakdown, effort estimation, and burndown chart.',
-    due_date: '2026-06-25T23:59:00Z',
-    max_marks: 75,
-    status: 'Active',
-    submissions_count: 0,
-    total_students: 40,
-    attachments: ['sprint_template.docx'],
-    created_at: '2026-06-13T08:00:00Z',
-  },
-];
 
-const MOCK_SUBMISSIONS: Record<string, { id: string; student_name: string; roll_number: string; submitted_at: string; marks?: number; feedback?: string }[]> = {
-  '1': [
-    { id: 's1', student_name: '', roll_number: 'CS2024001', submitted_at: '2026-06-14T10:30:00Z', marks: undefined },
-    { id: 's2', student_name: '', roll_number: 'CS2024015', submitted_at: '2026-06-15T14:20:00Z', marks: 85, feedback: 'Good implementation, minor edge case missed.' },
-    { id: 's3', student_name: '', roll_number: 'CS2024032', submitted_at: '2026-06-16T09:10:00Z', marks: undefined },
-    { id: 's4', student_name: '', roll_number: 'CS2024008', submitted_at: '2026-06-14T16:45:00Z', marks: 92, feedback: 'Excellent work with well-documented complexity analysis.' },
-    { id: 's5', student_name: '', roll_number: 'CS2024022', submitted_at: '2026-06-17T11:00:00Z', marks: undefined },
-  ],
-  '2': [
-    { id: 's6', student_name: '', roll_number: 'CS2024011', submitted_at: '2026-06-13T20:00:00Z', marks: 78, feedback: 'Working simulator but missing priority scheduling comparison.' },
-    { id: 's7', student_name: 'Karthik Nair', roll_number: 'CS2024028', submitted_at: '2026-06-14T22:15:00Z', marks: 95, feedback: 'Outstanding implementation with detailed metrics analysis.' },
-    { id: 's8', student_name: 'Meera Joshi', roll_number: 'CS2024005', submitted_at: '2026-06-14T18:30:00Z', marks: 88, feedback: 'Well-structured code with good visualization.' },
-  ],
-  '3': [
-    { id: 's9', student_name: 'Arjun Mehta', roll_number: 'CS2024019', submitted_at: '2026-06-10T15:00:00Z', marks: 90, feedback: 'Excellent multi-threaded implementation.' },
-    { id: 's10', student_name: '', roll_number: 'CS2024033', submitted_at: '2026-06-11T09:45:00Z', marks: 82, feedback: 'File transfer needs improvement, rest is solid.' },
-    { id: 's11', student_name: 'Nikhil Verma', roll_number: 'CS2024041', submitted_at: '2026-06-11T21:30:00Z', marks: 75, feedback: 'Basic implementation complete but lacks private messaging.' },
-  ],
-  '4': [
-    { id: 's12', student_name: 'Ishita Banerjee', roll_number: 'CS2024007', submitted_at: '2026-06-07T23:00:00Z', marks: 45, feedback: 'Complete ER diagram with proper normalization.' },
-    { id: 's13', student_name: 'Siddharth Rao', roll_number: 'CS2024025', submitted_at: '2026-06-08T01:30:00Z', marks: 38, feedback: 'Missing some cardinality constraints.' },
-  ],
-  '5': [
-    { id: 's14', student_name: 'Tanvi Desai', roll_number: 'CS2024014', submitted_at: '2026-06-13T12:00:00Z' },
-  ],
-  '6': [],
-};
 
 interface Assignment {
   id: string;
@@ -149,6 +42,7 @@ export default function TeacherAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubject, setActiveSubject] = useState('All');
   const [activeStatus, setActiveStatus] = useState('All');
@@ -174,15 +68,18 @@ export default function TeacherAssignmentsPage() {
 
   const fetchAssignments = async () => {
     setIsLoading(true);
+    setFetchError(false);
     try {
       const res = await apiGet('/core/assignments');
       if (res.success && res.assignments) {
         setAssignments(res.assignments);
       } else {
-        setAssignments(MOCK_ASSIGNMENTS);
+        setFetchError(true);
+        setAssignments([]);
       }
     } catch {
-      setAssignments(MOCK_ASSIGNMENTS);
+      setFetchError(true);
+      setAssignments([]);
     } finally {
       setIsLoading(false);
     }
@@ -194,10 +91,10 @@ export default function TeacherAssignmentsPage() {
       if (res.success && res.submissions) {
         setSubmissions(res.submissions);
       } else {
-        setSubmissions(MOCK_SUBMISSIONS[assignmentId] || []);
+        setSubmissions([]);
       }
     } catch {
-      setSubmissions(MOCK_SUBMISSIONS[assignmentId] || []);
+      setSubmissions([]);
     }
   };
 
@@ -374,9 +271,17 @@ export default function TeacherAssignmentsPage() {
 
         {/* Assignments List */}
         <div className="flex flex-col gap-3">
+          {fetchError && (
+            <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between">
+              <p className="text-xs text-red-400">Couldn't load assignments — the server may be unreachable.</p>
+              <button onClick={fetchAssignments} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+                Retry
+              </button>
+            </div>
+          )}
           {isLoading ? (
             <div className="text-center text-xs text-[#C4B5FD]/50 py-16">Loading assignments...</div>
-          ) : filteredAssignments.length === 0 ? (
+          ) : filteredAssignments.length === 0 && !fetchError ? (
             <div className="glass-panel rounded-2xl p-8 border border-white/5 text-center text-xs text-[#C4B5FD]/50 italic">
               No assignments found matching your criteria.
             </div>

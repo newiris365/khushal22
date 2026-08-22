@@ -951,10 +951,10 @@ export default function MultiStepApplyPage() {
 
                 <div className="flex gap-4">
                   <button 
-                    onClick={() => router.push(`/applicant/dashboard`)}
+                    onClick={() => router.push(`/admissions/${slug}/track`)}
                     className="flex-1 py-3 bg-[#6C2BD9] hover:bg-[#8B5CF6] text-white font-bold rounded-xl transition-all text-xs"
                   >
-                    Go to Portal Dashboard
+                    Track Application Status
                   </button>
                   <button 
                     onClick={() => alert('Receipt and acknowledgment PDF compiled successfully.')}

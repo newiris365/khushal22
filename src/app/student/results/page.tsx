@@ -6,7 +6,8 @@ import { apiGet } from '../../../lib/api';
 import { useAcademic } from '../AcademicContext';
 
 export default function StudentResultsPage() {
-  const { studentProfile, loading: profileLoading } = useAcademic();
+  const { studentProfile, loading: profileLoading, institutionType } = useAcademic();
+  const isSchool = institutionType === 'school';
   const [results, setResults] = useState<any[]>([]);
   const [activeExam, setActiveExam] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,8 +45,14 @@ export default function StudentResultsPage() {
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-heading font-extrabold text-2xl text-white">Your Grade Marksheet Report</h1>
-            <p className="text-xs text-[#C4B5FD]/70 font-light">Inspect assessment transcripts, average GPA performance, and letter grades.</p>
+            <h1 className="font-heading font-extrabold text-2xl text-white">
+              {isSchool ? 'Your School Report Card & Grades' : 'Your Grade Marksheet Report'}
+            </h1>
+            <p className="text-xs text-[#C4B5FD]/70 font-light">
+              {isSchool
+                ? 'Inspect term assessment transcripts, subject scores, and overall grade average.'
+                : 'Inspect assessment transcripts, average GPA performance, and letter grades.'}
+            </p>
           </div>
         </div>
 
@@ -54,11 +61,13 @@ export default function StudentResultsPage() {
           
           {/* GPA dial */}
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center gap-4">
-            <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">Cumulative SGPA</span>
+            <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">
+              {isSchool ? 'Overall Grade Average' : 'Cumulative SGPA'}
+            </span>
             <div className="relative w-36 h-36 flex items-center justify-center bg-[#13102A] border-4 border-[#6C2BD9]/50 rounded-full shadow-2xl">
               <div className="flex flex-col items-center">
                 <strong className="font-heading font-extrabold text-4xl text-white">{calculateOverallGpa()}</strong>
-                <span className="text-[9px] text-[#C4B5FD]/70 mt-0.5">Scale: 10.0</span>
+                <span className="text-[9px] text-[#C4B5FD]/70 mt-0.5">{isSchool ? 'Grade Points' : 'Scale: 10.0'}</span>
               </div>
             </div>
             <div className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg font-bold uppercase flex items-center gap-1">

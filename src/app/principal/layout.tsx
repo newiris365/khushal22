@@ -1,10 +1,12 @@
 "use client";
 
+import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Users, FileText, Award, IndianRupee,
   ClipboardList, BarChart3, GraduationCap, UserCircle
 } from 'lucide-react';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 const principalLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/principal/dashboard', icon: LayoutDashboard },
@@ -19,6 +21,16 @@ const principalLinks: SidebarLink[] = [
 ];
 
 export default function PrincipalLayout({ children }: { children: React.ReactNode }) {
+  const { authorized } = usePortalAuth(['Principal', 'SuperAdmin']);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-violet-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
+
   return (
     <PortalShell
       portalName="Principal Suite"

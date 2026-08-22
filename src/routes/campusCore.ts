@@ -72,6 +72,8 @@ import {
   getHealthScoresReport,
   calculateHealthScores,
   assignSubstitute,
+  getSubstitutes,
+  getVpDashboardMetrics,
   createInstallmentPlan,
   getEligibleScholarships,
   getAttendanceWarnings,
@@ -314,7 +316,9 @@ router.post('/timetable', requireRole(['Admin', 'SuperAdmin']), addTimetableBloc
 router.put('/timetable/:id', requireRole(['Admin', 'SuperAdmin']), updateTimetableBlock);
 router.delete('/timetable/:id', requireRole(['Admin', 'SuperAdmin']), deleteTimetableBlock);
 router.get('/timetable/student/:studentId', getStudentTimetable);
-router.post('/timetable/substitute', requireRole(['Admin', 'SuperAdmin']), assignSubstitute);
+router.post('/timetable/substitute', requireRole(['Admin', 'SuperAdmin', 'Vice Principal', 'HOD']), assignSubstitute);
+router.get('/timetable/substitutes', requireRole(['Admin', 'SuperAdmin', 'Vice Principal', 'HOD', 'Teacher', 'Staff']), getSubstitutes);
+router.get('/vp/metrics', requireRole(['Admin', 'SuperAdmin', 'Vice Principal', 'Principal', 'HOD']), getVpDashboardMetrics);
 router.get('/timetable/date', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'Staff', 'Student']), getTimetableForDate);
 router.post('/attendance/auto-start', requireRole(['Admin', 'SuperAdmin']), autoStartSessions);
 

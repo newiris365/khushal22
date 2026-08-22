@@ -9,10 +9,17 @@ import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Cal
 const parentLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
   { label: 'Attendance', href: '/parent/attendance', icon: CalendarDays },
+  { label: 'Assignments', href: '/parent/assignments', icon: Upload },
+  { label: 'Timetable', href: '/parent/timetable', icon: CalendarDays },
+  { label: 'Hostel', href: '/hostel', icon: Home },
+  { label: 'Transit GPS', href: '/transit', icon: Bus },
+  { label: 'FitZone Gym', href: '/gym', icon: Dumbbell },
   { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
   { label: 'Exam Results', href: '/parent/results', icon: FileText },
+  { label: 'Leave Application', href: '/parent/leave', icon: ClipboardList },
   { label: 'Wallet', href: '/parent/wallet', icon: Wallet },
   { label: 'Complaints', href: '/parent/complaints', icon: AlertCircle },
+  { label: 'Notices', href: '/parent/notices', icon: Bell },
   { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
   { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },
   { label: 'Link Child', href: '/parent/link', icon: Link2 },
@@ -84,29 +91,8 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   const applyLinks = (type: string) => {
-    if (type === 'school') {
-      setLinks([
-        { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
-        { label: 'Attendance', href: '/parent/attendance', icon: CalendarDays },
-        { label: 'Assignments', href: '/parent/assignments', icon: Upload },
-        { label: 'Timetable', href: '/parent/timetable', icon: CalendarDays },
-        { label: 'Hostel', href: '/hostel', icon: Home },
-        { label: 'Transit GPS', href: '/transit', icon: Bus },
-        { label: 'FitZone Gym', href: '/gym', icon: Dumbbell },
-        { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
-        { label: 'Exam Results', href: '/parent/results', icon: FileText },
-        { label: 'Leave Application', href: '/parent/leave', icon: ClipboardList },
-        { label: 'Wallet', href: '/parent/wallet', icon: Wallet },
-        { label: 'Complaints', href: '/parent/complaints', icon: AlertCircle },
-        { label: 'Notices', href: '/parent/notices', icon: Bell },
-        { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
-        { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },
-        { label: 'Link Child', href: '/parent/link', icon: Link2 },
-        { label: 'Profile', href: '/profile', icon: UserCircle },
-      ]);
-    } else {
-      setLinks(parentLinks);
-    }
+    // Both school and college parents maintain full feature parity across campus & academic modules
+    setLinks(parentLinks);
   };
 
   const handleSwitchChild = (studentId: string) => {

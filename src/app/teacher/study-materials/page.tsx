@@ -28,20 +28,10 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Question Bank': '❓', PPT: '📊', Syllabus: '📋', Other: '📁',
 };
 
-const MOCK_MATERIALS: Material[] = [
-  { id: '1', title: 'Data Structures - Chapter 1 Notes', description: 'Introduction to arrays, linked lists, and basic data structures', subject: 'Data Structures', file_url: '#', file_name: 'ds_ch1.pdf', file_type: 'pdf', file_size_kb: 2048, category: 'Notes', semester: 3, download_count: 45, uploaded_by_name: 'Prof. Sharma', created_at: '2026-05-10' },
-  { id: '2', title: 'DBMS Lab Manual', description: 'Complete lab exercises for database management systems course', subject: 'DBMS', file_url: '#', file_name: 'dbms_lab.pdf', file_type: 'pdf', file_size_kb: 5120, category: 'Lab Manual', semester: 4, download_count: 78, uploaded_by_name: 'Prof. Sharma', created_at: '2026-05-08' },
-  { id: '3', title: 'Operating Systems - Video Lecture 1', description: 'Process management and CPU scheduling overview', subject: 'Operating Systems', file_url: '#', file_name: 'os_lecture1.mp4', file_type: 'mp4', file_size_kb: 153600, category: 'Video', semester: 4, download_count: 112, uploaded_by_name: 'Prof. Sharma', created_at: '2026-05-06' },
-  { id: '4', title: 'Computer Networks PPT', description: 'OSI model and TCP/IP protocol stack presentation', subject: 'Computer Networks', file_url: '#', file_name: 'cn_osi_model.pptx', file_type: 'pptx', file_size_kb: 3072, category: 'PPT', semester: 5, download_count: 33, uploaded_by_name: 'Prof. Mehta', created_at: '2026-05-04' },
-  { id: '5', title: 'Mathematics - Question Bank', description: 'Previous year questions and practice problems for mid-term', subject: 'Mathematics', file_url: '#', file_name: 'math_qb.pdf', file_type: 'pdf', file_size_kb: 1024, category: 'Question Bank', semester: 2, download_count: 201, uploaded_by_name: 'Prof. Sharma', created_at: '2026-04-28' },
-  { id: '6', title: 'Semester 5 Syllabus', description: 'Complete syllabus for all subjects in semester 5', subject: 'General', file_url: '#', file_name: 'sem5_syllabus.pdf', file_type: 'pdf', file_size_kb: 512, category: 'Syllabus', semester: 5, download_count: 89, uploaded_by_name: 'Prof. Sharma', created_at: '2026-04-20' },
-  { id: '7', title: 'OOP with Java Textbook', description: 'Reference textbook covering object-oriented programming concepts', subject: 'OOP', file_url: '#', file_name: 'oop_java.pdf', file_type: 'pdf', file_size_kb: 8192, category: 'Textbook', semester: 3, download_count: 156, uploaded_by_name: 'Prof. Sharma', created_at: '2026-04-15' },
-  { id: '8', title: 'Web Development Project Guide', description: 'Step-by-step guide for the semester-end web development project', subject: 'Web Development', file_url: '#', file_name: 'web_guide.pdf', file_type: 'pdf', file_size_kb: 1536, category: 'Other', semester: 6, download_count: 67, uploaded_by_name: 'Prof. Sharma', created_at: '2026-04-10' },
-];
-
 export default function TeacherStudyMaterialsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -53,15 +43,18 @@ export default function TeacherStudyMaterialsPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setFetchError(false);
     try {
       const res = await apiGet('/core/study-materials');
-      if (res.success && res.materials?.length > 0) {
-        setMaterials(res.materials);
+      if (res.success) {
+        setMaterials(res.materials || []);
       } else {
-        setMaterials(MOCK_MATERIALS);
+        setFetchError(true);
+        setMaterials([]);
       }
     } catch {
-      setMaterials(MOCK_MATERIALS);
+      setFetchError(true);
+      setMaterials([]);
     } finally {
       setLoading(false);
     }
@@ -204,9 +197,17 @@ export default function TeacherStudyMaterialsPage() {
 
         {/* Materials list */}
         <div className="flex flex-col gap-3">
+          {fetchError && (
+            <div className="glass-panel rounded-2xl p-5 border border-red-500/20 flex items-center justify-between">
+              <p className="text-xs text-red-400">Couldn't load your study materials — the server may be unreachable.</p>
+              <button onClick={loadData} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-all">
+                Retry
+              </button>
+            </div>
+          )}
           {loading ? (
             <div className="glass-panel rounded-2xl p-8 text-center text-[#C4B5FD]/40 text-xs">Loading materials...</div>
-          ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 && !fetchError ? (
             <div className="glass-panel rounded-2xl p-8 text-center text-[#C4B5FD]/40 text-xs">No materials found</div>
           ) : filtered.map(m => (
             <div key={m.id} className="glass-panel rounded-2xl p-5 border border-white/5 hover:border-[#6C2BD9]/30 transition-all">

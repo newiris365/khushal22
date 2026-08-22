@@ -5,26 +5,38 @@ import { LayoutDashboard, BookOpen, Clock, Activity, AlertCircle } from 'lucide-
 import { apiGet } from '../../../lib/api';
 
 export default function VicePrincipalDashboard() {
-  const [stats, setStats] = useState({ activeClasses: 18, scheduledLectures: 45, dailyAttendanceRate: 92, pendingAppraisals: 4 });
+  const [stats, setStats] = useState({ activeClasses: 0, scheduledLectures: 0, dailyAttendanceRate: 0, pendingAppraisals: 0 });
   const [recentNotices, setRecentNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const [summaryRes, noticesRes] = await Promise.all([
-          apiGet('campusCore/attendance/institution-summary'),
+        const [vpMetricsRes, noticesRes, appraisalCountRes] = await Promise.all([
+          apiGet('campusCore/vp/metrics'),
           apiGet('campusCore/notices'),
+          apiGet('hr/appraisal/count?status=pending_vp'),
         ]);
-        if (summaryRes.success) {
-          setStats(s => ({
-            ...s,
-            dailyAttendanceRate: summaryRes.avg_attendance_pct || s.dailyAttendanceRate,
-          }));
+        if (vpMetricsRes.success) {
+          setStats({
+            activeClasses: vpMetricsRes.activeClasses || 0,
+            scheduledLectures: vpMetricsRes.scheduledLectures || 0,
+            dailyAttendanceRate: vpMetricsRes.dailyAttendanceRate || 0,
+            pendingAppraisals: appraisalCountRes.success ? (appraisalCountRes.count ?? 0) : (vpMetricsRes.pendingAppraisals || 0),
+          });
         }
-        if (noticesRes.success) setRecentNotices((noticesRes.notices || []).slice(0, 5));
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+        if (noticesRes.success) {
+          setRecentNotices((noticesRes.notices || []).slice(0, 5));
+        }
+      } catch (err: any) {
+        console.error(err);
+        setError('Failed to load dashboard metrics. Please refresh.');
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);

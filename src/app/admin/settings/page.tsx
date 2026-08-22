@@ -427,8 +427,8 @@ export default function AdminSettingsPage() {
                 {/* Role selector */}
                 <div className="flex flex-wrap gap-2">
                   {(instituteType === 'school'
-                    ? ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver']
-                    : ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver', 'HOD', 'Director', 'Principal', 'TPO']
+                    ? ['Admin', 'Principal', 'Vice Principal', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver']
+                    : ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver', 'HOD', 'Director', 'TPO']
                   ).map(role => (
                     <button key={role} onClick={() => setSelectedRole(role)}
                       className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${

@@ -1717,7 +1717,263 @@ export async function getReports(req: Request, res: Response) {
       return res.status(200).json({ success: true, report });
     }
 
-    return res.status(400).json({ success: false, error: `Invalid report type request: ${type}` });
+      return res.status(400).json({ success: false, error: `Invalid report type request: ${type}` });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// ============================================================
+// PUBLIC APPLICATION TRACKING & POST-DECISION CONTROLLERS
+// ============================================================
+
+export async function trackApplication(req: Request, res: Response) {
+  try {
+    const { application_number, dob } = req.query;
+    if (!application_number || !dob) {
+      return res.status(400).json({
+        success: false,
+        error: 'application_number and dob query parameters are required.'
+      });
+    }
+
+    const appNo = (application_number as string).trim();
+    const dobStr = (dob as string).trim();
+
+    const { data: applicant, error } = await supabaseAdmin
+      .from('applicants')
+      .select(`
+        *,
+        applicant_programs(*, programs(*)),
+        academic_records(*),
+        entrance_scores(*),
+        admission_offers(*, programs(*)),
+        admission_fees(*),
+        counseling_slots(*, counseling_sessions(*))
+      `)
+      .ilike('application_number', appNo)
+      .maybeSingle();
+
+    if (error || !applicant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Application number or date of birth mismatch.'
+      });
+    }
+
+    const storedDob = applicant.date_of_birth || applicant.dob || applicant.personal_details?.dob || '';
+    if (storedDob && storedDob.slice(0, 10) !== dobStr.slice(0, 10)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Application number or date of birth mismatch.'
+      });
+    }
+
+    let counselingSessions: any[] = [];
+    const { data: sessions } = await supabaseAdmin
+      .from('counseling_sessions')
+      .select('*, counseling_slots(*)')
+      .eq('institution_id', applicant.institution_id || 'a0000000-0000-0000-0000-000000000001');
+    if (sessions) counselingSessions = sessions;
+
+    return res.status(200).json({
+      success: true,
+      applicant,
+      offers: applicant.admission_offers || [],
+      counseling_sessions: counselingSessions,
+      counseling_slots: applicant.counseling_slots || []
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function trackAcceptOffer(req: Request, res: Response) {
+  try {
+    const { application_number, dob, offer_id } = req.body;
+    if (!application_number || !dob) {
+      return res.status(400).json({ success: false, error: 'application_number and dob are required.' });
+    }
+
+    const appNo = (application_number as string).trim();
+    const dobStr = (dob as string).trim();
+
+    const { data: applicant, error: appErr } = await supabaseAdmin
+      .from('applicants')
+      .select('id, date_of_birth, dob, personal_details')
+      .ilike('application_number', appNo)
+      .maybeSingle();
+
+    if (appErr || !applicant) {
+      return res.status(404).json({ success: false, error: 'Application verification failed.' });
+    }
+
+    const storedDob = applicant.date_of_birth || applicant.dob || applicant.personal_details?.dob || '';
+    if (storedDob && storedDob.slice(0, 10) !== dobStr.slice(0, 10)) {
+      return res.status(403).json({ success: false, error: 'Date of birth verification failed.' });
+    }
+
+    let targetOfferId = offer_id;
+    if (!targetOfferId) {
+      const { data: latestOffer } = await supabaseAdmin
+        .from('admission_offers')
+        .select('id')
+        .eq('applicant_id', applicant.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestOffer) targetOfferId = latestOffer.id;
+    }
+
+    if (!targetOfferId) {
+      return res.status(404).json({ success: false, error: 'No active offer found for this application.' });
+    }
+
+    const { data: offer, error: offerErr } = await supabaseAdmin
+      .from('admission_offers')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString()
+      })
+      .eq('id', targetOfferId)
+      .select()
+      .single();
+
+    if (offerErr || !offer) {
+      return res.status(500).json({ success: false, error: 'Failed to update offer status.' });
+    }
+
+    await supabaseAdmin
+      .from('applicants')
+      .update({ status: 'admitted', updated_at: new Date().toISOString() })
+      .eq('id', applicant.id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Offer accepted successfully! Please proceed to seat confirmation fee payment.',
+      offer
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function trackDeclineOffer(req: Request, res: Response) {
+  try {
+    const { application_number, dob, offer_id, reason } = req.body;
+    if (!application_number || !dob) {
+      return res.status(400).json({ success: false, error: 'application_number and dob are required.' });
+    }
+
+    const appNo = (application_number as string).trim();
+    const dobStr = (dob as string).trim();
+
+    const { data: applicant, error: appErr } = await supabaseAdmin
+      .from('applicants')
+      .select('id, date_of_birth, dob, personal_details')
+      .ilike('application_number', appNo)
+      .maybeSingle();
+
+    if (appErr || !applicant) {
+      return res.status(404).json({ success: false, error: 'Application verification failed.' });
+    }
+
+    const storedDob = applicant.date_of_birth || applicant.dob || applicant.personal_details?.dob || '';
+    if (storedDob && storedDob.slice(0, 10) !== dobStr.slice(0, 10)) {
+      return res.status(403).json({ success: false, error: 'Date of birth verification failed.' });
+    }
+
+    let targetOfferId = offer_id;
+    if (!targetOfferId) {
+      const { data: latestOffer } = await supabaseAdmin
+        .from('admission_offers')
+        .select('id')
+        .eq('applicant_id', applicant.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestOffer) targetOfferId = latestOffer.id;
+    }
+
+    if (!targetOfferId) {
+      return res.status(404).json({ success: false, error: 'No active offer found for this application.' });
+    }
+
+    const { data: offer, error: offerErr } = await supabaseAdmin
+      .from('admission_offers')
+      .update({
+        status: 'rejected',
+        rejected_at: new Date().toISOString(),
+        rejection_reason: reason || 'Declined via tracking portal'
+      })
+      .eq('id', targetOfferId)
+      .select()
+      .single();
+
+    if (offerErr || !offer) {
+      return res.status(500).json({ success: false, error: 'Failed to decline offer.' });
+    }
+
+    await supabaseAdmin
+      .from('applicants')
+      .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
+      .eq('id', applicant.id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Offer declined. Your application status has been updated to withdrawn.',
+      offer
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function trackBookCounseling(req: Request, res: Response) {
+  try {
+    const { application_number, dob, session_id, slot_time } = req.body;
+    if (!application_number || !dob) {
+      return res.status(400).json({ success: false, error: 'application_number and dob are required.' });
+    }
+
+    const appNo = (application_number as string).trim();
+    const dobStr = (dob as string).trim();
+
+    const { data: applicant, error: appErr } = await supabaseAdmin
+      .from('applicants')
+      .select('id, date_of_birth, dob, personal_details')
+      .ilike('application_number', appNo)
+      .maybeSingle();
+
+    if (appErr || !applicant) {
+      return res.status(404).json({ success: false, error: 'Application verification failed.' });
+    }
+
+    const storedDob = applicant.date_of_birth || applicant.dob || applicant.personal_details?.dob || '';
+    if (storedDob && storedDob.slice(0, 10) !== dobStr.slice(0, 10)) {
+      return res.status(403).json({ success: false, error: 'Date of birth verification failed.' });
+    }
+
+    const { data: slot, error: slotErr } = await supabaseAdmin
+      .from('counseling_slots')
+      .insert({
+        session_id: session_id || 'c1111111-1111-1111-1111-111111111111',
+        applicant_id: applicant.id,
+        slot_time: slot_time || new Date(Date.now() + 86400000).toISOString(),
+        officer_id: 'b0000000-0000-0000-0000-000000000002',
+        status: 'assigned',
+        attended: false
+      })
+      .select()
+      .single();
+
+    if (slotErr) throw slotErr;
+
+    return res.status(201).json({
+      success: true,
+      message: 'Counseling slot booked successfully.',
+      slot
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

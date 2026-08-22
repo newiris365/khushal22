@@ -5,6 +5,10 @@ import {
   registerApplicant,
   verifyOTP,
   getPublicMeritList,
+  trackApplication,
+  trackAcceptOffer,
+  trackDeclineOffer,
+  trackBookCounseling,
   getMyApplication,
   updatePersonalDetails,
   selectPrograms,
@@ -44,29 +48,16 @@ const router = Router();
 // ============================================================
 // PUBLIC ROUTINGS (NO AUTH)
 // ============================================================
+router.get('/track', trackApplication);
+router.post('/track/offer/accept', trackAcceptOffer);
+router.post('/track/offer/decline', trackDeclineOffer);
+router.post('/track/counseling/book', trackBookCounseling);
+
 router.get('/:slug', getInstitutionAdmissions);
 router.get('/:slug/programs', getOpenPrograms);
 router.post('/register', registerApplicant);
 router.post('/verify-otp', verifyOTP);
 router.get('/merit-list/:round', getPublicMeritList);
-
-// ============================================================
-// APPLICANT ROUTINGS (AUTH REQUIRED: ROLE='Applicant')
-// ============================================================
-router.get('/application/my', authMiddleware, requireRole(['Applicant']), getMyApplication);
-router.put('/application/personal', authMiddleware, requireRole(['Applicant']), updatePersonalDetails);
-router.post('/application/programs', authMiddleware, requireRole(['Applicant']), selectPrograms);
-router.post('/application/academic', authMiddleware, requireRole(['Applicant']), uploadAcademicRecord);
-router.post('/documents/upload', authMiddleware, requireRole(['Applicant']), uploadDocument);
-router.post('/application/submit', authMiddleware, requireRole(['Applicant']), submitApplication);
-
-// PAYMENT TRIGGERS
-router.post('/fees/pay/initiate', authMiddleware, requireRole(['Applicant']), initiatePayment);
-router.post('/fees/pay/verify', authMiddleware, requireRole(['Applicant']), verifyPayment);
-
-// OFFER TRIGGERS (BY APPLICANT)
-router.post('/offers/:id/accept', authMiddleware, requireRole(['Applicant']), acceptOffer);
-router.post('/offers/:id/decline', authMiddleware, requireRole(['Applicant']), declineOffer);
 
 // ============================================================
 // OFFICERS & ADMINS ROUTINGS

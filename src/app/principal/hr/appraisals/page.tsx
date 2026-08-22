@@ -9,11 +9,13 @@ interface Appraisal {
   department: string;
   designation: string;
   self_rating: number;
-  vp_rating: number | null;
+  hod_rating?: number | null;
+  vp_rating?: number | null;
   principal_rating: number | null;
   status: string;
   self_comments: string;
-  vp_comments: string;
+  hod_comments?: string;
+  vp_comments?: string;
   cycle_name: string;
 }
 
@@ -194,10 +196,17 @@ export default function PrincipalAppraisals() {
                       <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">Self Rating</span>
                       {renderStars(apr.self_rating)}
                     </div>
-                    <div className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-white/5 flex flex-col gap-2">
-                      <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">VP Rating</span>
-                      {renderStars(apr.vp_rating)}
-                    </div>
+                    {apr.hod_rating ? (
+                      <div className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-white/5 flex flex-col gap-2">
+                        <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">HOD Rating</span>
+                        {renderStars(apr.hod_rating)}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-white/5 flex flex-col gap-2">
+                        <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">VP Rating</span>
+                        {renderStars(apr.vp_rating)}
+                      </div>
+                    )}
                     <div className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-white/5 flex flex-col gap-2">
                       <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">Principal Rating</span>
                       {renderStars(apr.principal_rating)}
@@ -212,12 +221,22 @@ export default function PrincipalAppraisals() {
                       </span>
                       <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{apr.self_comments}</p>
                     </div>
-                    <div className="p-4 rounded-xl bg-[#0D0A1A]/60 border border-white/5 flex flex-col gap-2">
-                      <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold flex items-center gap-1">
-                        <Eye className="w-3 h-3" /> VP Comments
-                      </span>
-                      <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{apr.vp_comments}</p>
-                    </div>
+                    {apr.hod_comments && (
+                      <div className="p-4 rounded-xl bg-[#0D0A1A]/60 border border-white/5 flex flex-col gap-2">
+                        <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold flex items-center gap-1">
+                          <Eye className="w-3 h-3" /> HOD Comments
+                        </span>
+                        <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{apr.hod_comments}</p>
+                      </div>
+                    )}
+                    {apr.vp_comments && (
+                      <div className="p-4 rounded-xl bg-[#0D0A1A]/60 border border-white/5 flex flex-col gap-2">
+                        <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold flex items-center gap-1">
+                          <Eye className="w-3 h-3" /> VP Comments
+                        </span>
+                        <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{apr.vp_comments}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* AI Analysis */}
