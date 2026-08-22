@@ -32,23 +32,8 @@ export default function StrategicGoalsPage() {
       if (goalsRes.success) setGoals(goalsRes.goals || []);
       if (histRes.success) setHistory(histRes.history || {});
     } catch {
-      // Fallback sandbox data
-      setGoals([
-        { id: 'g1', metric_name: 'Attendance Rate', target_value: 85, current_value: 82, deadline: '2026-12-31', unit: '%', status: 'on_track', projected_value: 83.2, risk_alert: '' },
-        { id: 'g2', metric_name: 'Fee Collection', target_value: 15000000, current_value: 14200000, deadline: '2026-12-31', unit: '₹', status: 'on_track', projected_value: 14800000, risk_alert: '' },
-        { id: 'g3', metric_name: 'Pass Rate', target_value: 90, current_value: 88, deadline: '2026-12-31', unit: '%', status: 'on_track', projected_value: 89, risk_alert: '' },
-        { id: 'g4', metric_name: 'Annual Fee Target Large', target_value: 25000000, current_value: 11000000, deadline: '2026-12-31', unit: '₹', status: 'at_risk', projected_value: 17000000, risk_alert: 'At current rate, Annual Fee Target Large will be missed by ₹8,000,000' }
-      ]);
-      setHistory({
-        '2025': [
-          { metric_name: 'Attendance Rate', target_value: 82, current_value: 81, status: 'achieved', unit: '%' },
-          { metric_name: 'Fee Collection', target_value: 12000000, current_value: 12500000, status: 'achieved', unit: '₹' }
-        ],
-        '2024': [
-          { metric_name: 'Attendance Rate', target_value: 80, current_value: 79, status: 'missed', unit: '%' },
-          { metric_name: 'Fee Collection', target_value: 10000000, current_value: 9500000, status: 'missed', unit: '₹' }
-        ]
-      });
+      setGoals([]);
+      setHistory({});
     } finally {
       setLoading(false);
     }
@@ -73,23 +58,8 @@ export default function StrategicGoalsPage() {
         setCurrentVal('');
         loadGoalsData();
       }
-    } catch {
-      alert('Goal saved successfully! (MOCKED)');
-      // Local fallback push
-      const newGoal = {
-        id: `g_mock_${Date.now()}`,
-        metric_name: metricName,
-        target_value: parseFloat(targetVal),
-        current_value: currentVal ? parseFloat(currentVal) : 0,
-        deadline,
-        unit,
-        status: 'on_track',
-        projected_value: currentVal ? parseFloat(currentVal) * 1.05 : 0,
-        risk_alert: ''
-      };
-      setGoals(prev => [newGoal, ...prev]);
-      setTargetVal('');
-      setCurrentVal('');
+    } catch (err: any) {
+      alert('Failed to save goal: ' + (err?.message || 'Server error'));
     } finally {
       setSubmitting(false);
     }

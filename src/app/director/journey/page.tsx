@@ -29,30 +29,12 @@ export default function StudentJourneyPage() {
       const res = await apiGet('/director/student-journey');
       if (res.success) setData(res);
     } catch {
-      // Sandbox fallback data
-      const mockJourney = {
-        scores: [
-          { id: '1', student_id: 's1', roll_number: 'CS23B1042', name: 'Rohan Sharma', department: 'Computer Science', engagement_score: 92, academic_score: 88, social_score: 85, facility_score: 90, overall_score: 88.8, intervention_status: 'none' },
-          { id: '2', student_id: 's2', roll_number: 'CS23B1024', name: '', department: 'Computer Science', engagement_score: 95, academic_score: 92, social_score: 75, facility_score: 85, overall_score: 86.7, intervention_status: 'none' },
-          { id: '3', student_id: 's3', roll_number: 'EC23B1015', name: 'Vikram Aditya', department: 'Electronics', engagement_score: 24, academic_score: 78, social_score: 15, facility_score: 20, overall_score: 34.2, intervention_status: 'none' },
-          { id: '4', student_id: 's4', roll_number: 'ME23B1089', name: 'Sanjay Meena', department: 'Mechanical', engagement_score: 28, academic_score: 65, social_score: 22, facility_score: 25, overall_score: 35.0, intervention_status: 'pending_counselor' }
-        ],
-        ambassadors: [
-          { id: '1', student_id: 's1', roll_number: 'CS23B1042', name: 'Rohan Sharma', department: 'Computer Science', overall_score: 88.8 },
-          { id: '2', student_id: 's2', roll_number: 'CS23B1024', name: '', department: 'Computer Science', overall_score: 86.7 }
-        ],
-        disengaged: [
-          { id: '3', student_id: 's3', roll_number: 'EC23B1015', name: 'Vikram Aditya', department: 'Electronics', overall_score: 34.2, intervention_status: 'none' },
-          { id: '4', student_id: 's4', roll_number: 'ME23B1089', name: 'Sanjay Meena', department: 'Mechanical', overall_score: 35.0, intervention_status: 'pending_counselor' }
-        ],
-        department_engagement: [
-          { department: 'Computer Science', average_engagement: 84.5 },
-          { department: 'Electronics', average_engagement: 68.2 },
-          { department: 'Mechanical', average_engagement: 62.0 },
-          { department: 'Civil Eng', average_engagement: 71.4 }
-        ]
-      };
-      setData(mockJourney);
+      setData({
+        scores: [],
+        ambassadors: [],
+        disengaged: [],
+        department_engagement: []
+      });
     } finally {
       setLoading(false);
     }

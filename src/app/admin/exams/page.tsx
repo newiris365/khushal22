@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Plus, Upload, Check, Loader2, Sparkles } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 export default function AdminExamsPage() {
   const [exams, setExams] = useState<any[]>([]);
@@ -11,6 +12,7 @@ export default function AdminExamsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [activeExamForGrades, setActiveExamForGrades] = useState<any | null>(null);
   const [instituteType, setInstituteType] = useState('college');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const isSchool = instituteType === 'school';
 
@@ -66,10 +68,12 @@ export default function AdminExamsPage() {
       if (res.success) {
         setShowAddForm(false);
         fetchExams();
-        alert('Exam schedule registered!');
+        setToast({ msg: 'Exam schedule registered successfully!', type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Failed to schedule exam.', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to schedule exam.');
+      setToast({ msg: 'Failed to schedule exam.', type: 'error' });
     }
   };
 
@@ -108,11 +112,13 @@ export default function AdminExamsPage() {
 
       const res = await apiPost(`/core/exams/${activeExamForGrades.id}/results`, payload);
       if (res.success) {
-        alert(`Successfully entered grades for ${res.count} students!`);
+        setToast({ msg: `Successfully entered grades for ${res.count} students!`, type: 'success' });
         setActiveExamForGrades(null);
+      } else {
+        setToast({ msg: res.error || 'Failed to enter grades.', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to enter grades.');
+      setToast({ msg: 'Failed to enter grades.', type: 'error' });
     }
   };
 
@@ -347,6 +353,7 @@ export default function AdminExamsPage() {
           </div>
         </div>
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

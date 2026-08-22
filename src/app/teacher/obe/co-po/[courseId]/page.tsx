@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, HelpCircle, Save, Sparkles, RefreshCw } from 'lucide-react';
+import { apiPost } from '../../../../../lib/api';
 
 interface PO {
   id: string;
@@ -122,34 +123,49 @@ export default function CoPoMatrix({ params }: { params: { courseId: string } })
 
   const handleSaveMatrix = async () => {
     setSaving(true);
+    let successCount = 0;
+    let failCount = 0;
     try {
-      // Send changes to server
-      const promises: any[] = [];
+      const payload: any[] = [];
       Object.keys(mappings).forEach(coId => {
         Object.keys(mappings[coId]).forEach(poId => {
           const val = mappings[coId][poId];
           if (val > 0) {
-            promises.push(
-              fetch('/api/obe/co-po-mapping', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({
-                  course_id: courseId,
-                  co_id: coId,
-                  po_id: poId,
-                  correlation_level: val
-                })
-              })
-            );
+            payload.push({
+              course_id: courseId,
+              co_id: coId,
+              po_id: poId,
+              correlation_level: val
+            });
           }
         });
       });
-      
-      // Execute saves
-      await Promise.all(promises.slice(0, 5)); // cap promises for testing mock endpoint safety
-      alert('CO-PO correlation levels mapping saved successfully.');
-    } catch (err) {
-      alert('Saved mapping details to session database.');
+
+      if (payload.length === 0) {
+        alert('No correlation mappings to save.');
+        setSaving(false);
+        return;
+      }
+
+      const results = await Promise.all(
+        payload.map(item => apiPost('/obe/co-po-mapping', item))
+      );
+
+      results.forEach(res => {
+        if (res.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      });
+
+      if (failCount === 0) {
+        alert(`CO-PO correlation matrix saved successfully (${successCount} mappings registered).`);
+      } else {
+        alert(`${successCount} of ${payload.length} correlation mappings saved (${failCount} failed).`);
+      }
+    } catch (err: any) {
+      alert(`Error saving mapping matrix: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }

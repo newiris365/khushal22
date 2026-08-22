@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { 
-  Award, CheckCircle, AlertCircle, Loader2, ArrowRight, ShieldCheck, 
-  HelpCircle, Sparkles, Database, Percent, Plus
+  Award, CheckCircle, AlertCircle, Loader2, Sparkles, 
+  HelpCircle, Plus, Filter
 } from 'lucide-react';
 
 interface OfferItem {
@@ -21,6 +21,7 @@ export default function OfficerOffersPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const [selectedRound, setSelectedRound] = useState<number>(1);
   const [meritLists, setMeritLists] = useState<any[]>([]);
   const [selectedListId, setSelectedListId] = useState('');
   
@@ -34,33 +35,32 @@ export default function OfficerOffersPage() {
   // Generated offers list
   const [offersLog, setOffersLog] = useState<OfferItem[]>([]);
 
-  async function loadInitialData() {
+  async function loadMeritLists(round: number) {
     try {
-      // Fetch lists
-      const res = await apiGet('/merit-list/1'); // Fetch round 1 lists
+      const res = await apiGet(`/merit-list/${round}`);
       if (res.success && res.merit_lists) {
         setMeritLists(res.merit_lists);
         if (res.merit_lists.length > 0) {
           setSelectedListId(res.merit_lists[0].id);
+        } else {
+          setSelectedListId('');
         }
       }
     } catch {
-      // Mock merit lists
+      // Mock merit lists for selected round
       const mockLists = [
-        { id: 'ml-1', program_code: 'BTECH-CSE', round_number: 1, list_type: 'merit', cutoff_score: 92.1 },
-        { id: 'ml-2', program_code: 'BTECH-AIDS', round_number: 1, list_type: 'merit', cutoff_score: 89.6 }
+        { id: `ml-r${round}-1`, program_code: 'BTECH-CSE', round_number: round, list_type: 'merit', cutoff_score: 92.1 - (round - 1) * 3 },
+        { id: `ml-r${round}-2`, program_code: 'BTECH-AIDS', round_number: round, list_type: 'merit', cutoff_score: 89.6 - (round - 1) * 3 }
       ];
       setMeritLists(mockLists);
       setSelectedListId(mockLists[0].id);
-
-      // Mock offer log
       setOffersLog([]);
     }
   }
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    loadMeritLists(selectedRound);
+  }, [selectedRound]);
 
   const handleGenerateOffers = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +74,7 @@ export default function OfficerOffersPage() {
       const res = await apiPost('/admissions/offers/generate-bulk', { merit_list_id: selectedListId });
       if (res.success) {
         setSuccess(res.message || 'Provisional offers generated successfully!');
-        await loadInitialData();
+        await loadMeritLists(selectedRound);
       } else {
         throw new Error(res.error);
       }
@@ -121,12 +121,33 @@ export default function OfficerOffersPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
-      <div className="border-b border-[#6C2BD9]/20 pb-6">
-        <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
-          <Award className="w-6 h-6 text-[#A78BFA]" />
-          Admissions Offer dispatch Desk
-        </h1>
-        <p className="text-xs text-[#C4B5FD]/70 mt-1">Audit seat allocation ratios, generate bulk provisional offer letter PDFs, and audit acceptance logs.</p>
+      <div className="border-b border-[#6C2BD9]/20 pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+            <Award className="w-6 h-6 text-[#A78BFA]" />
+            Admissions Offer Dispatch Desk
+          </h1>
+          <p className="text-xs text-[#C4B5FD]/70 mt-1">Audit seat allocation ratios, generate bulk provisional offer letter PDFs, and audit acceptance logs.</p>
+        </div>
+
+        {/* Round Selector Tabs */}
+        <div className="flex items-center gap-2 bg-[#13102A] p-1.5 rounded-xl border border-white/10">
+          <Filter className="w-4 h-4 text-purple-400 ml-2" />
+          <span className="text-xs text-[#C4B5FD] font-bold mr-1">Round:</span>
+          {[1, 2, 3, 4, 5].map((r) => (
+            <button
+              key={r}
+              onClick={() => setSelectedRound(r)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                selectedRound === r
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              R{r}
+            </button>
+          ))}
+        </div>
       </div>
 
       {success && (
@@ -183,36 +204,40 @@ export default function OfficerOffersPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         {/* Left Form: Bulk Generate */}
         <div className="space-y-6">
           <form onSubmit={handleGenerateOffers} className="rounded-3xl border border-white/5 bg-[#13102A]/40 p-6 shadow-xl space-y-6">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/5 pb-2">
-              <Sparkles className="w-4.5 h-4.5 text-[#A78BFA]" /> Bulk Issue Offers
+            <h3 className="text-sm font-bold text-white flex items-center justify-between border-b border-white/5 pb-2">
+              <span className="flex items-center gap-2"><Sparkles className="w-4.5 h-4.5 text-[#A78BFA]" /> Bulk Issue Offers</span>
+              <span className="text-xs text-purple-400 font-mono">Round {selectedRound}</span>
             </h3>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-[#C4B5FD] uppercase tracking-wider font-mono">Select Published Merit Round</label>
+              <label className="text-[10px] font-bold text-[#C4B5FD] uppercase tracking-wider font-mono">Select Published Merit List</label>
               <select
                 value={selectedListId}
                 onChange={(e) => setSelectedListId(e.target.value)}
                 className="w-full bg-[#13102A] border border-[#6C2BD9]/30 py-2.5 px-3 rounded-xl text-xs text-white outline-none focus:border-[#8B5CF6]"
               >
-                {meritLists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.program_code} - Round {l.round_number} ({l.list_type})
-                  </option>
-                ))}
+                {meritLists.length === 0 ? (
+                  <option value="">No merit lists for Round {selectedRound}</option>
+                ) : (
+                  meritLists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.program_code} - Round {l.round_number} ({l.list_type})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
             <button
               type="submit"
               disabled={loading || !selectedListId}
-              className="w-full py-3.5 bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#6C2BD9]/20"
+              className="w-full py-3.5 bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#6C2BD9]/20 disabled:opacity-50"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              <span>Generate Provisional Offers</span>
+              <span>Generate Provisional Offers (Round {selectedRound})</span>
             </button>
           </form>
 
@@ -221,7 +246,7 @@ export default function OfficerOffersPage() {
               <HelpCircle className="w-4 h-4 text-indigo-400" /> Dispatch Pipeline
             </h4>
             <p className="text-[10px] text-[#C4B5FD]/70 leading-relaxed">
-              Generating provisional offers will automatically:
+              Generating provisional offers for Round {selectedRound} will automatically:
               <br/>1. Create a downloadable letter PDF template path.
               <br/>2. Send SMS, email, and WhatsApp notification checkouts.
               <br/>3. Start a 7-day confirmation payment lock timer.
@@ -231,7 +256,10 @@ export default function OfficerOffersPage() {
 
         {/* Right Log List */}
         <div className="lg:col-span-2 rounded-3xl border border-white/5 bg-[#13102A]/40 p-6 shadow-xl space-y-4">
-          <h3 className="text-sm font-bold text-white">Admissions Offers Logs</h3>
+          <h3 className="text-sm font-bold text-white flex items-center justify-between">
+            <span>Admissions Offers Logs</span>
+            <span className="text-xs text-slate-400 font-mono font-normal">Active Round: {selectedRound}</span>
+          </h3>
           
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -258,11 +286,17 @@ export default function OfficerOffersPage() {
                     <td className="py-3 text-[#C4B5FD]/50">{new Date(off.expires_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
+                {offersLog.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                      No offers dispatched yet for Round {selectedRound}.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
-
       </div>
     </div>
   );

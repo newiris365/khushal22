@@ -260,20 +260,31 @@ export async function getAnalytics(req: Request, res: Response) {
 
       const { data } = await supabaseAdmin
         .from('daily_attendance_summary')
-        .select('date, attendance_percent')
+        .select('date, attendance_percent, total_students, present_count')
         .eq('institution_id', institutionId)
         .gte('date', limitDateStr)
         .order('date', { ascending: true });
       
       if (data && data.length > 0) {
-        attendanceTrend = data.map((d: any) => {
-          const rate = parseFloat(d.attendance_percent || '85');
-          const total = 1200 + Math.floor(Math.random() * 80);
-          const present = Math.round(total * (rate / 100));
+        const byDate: Record<string, { present: number; total: number }> = {};
+        data.forEach((d: any) => {
+          const dateStr = d.date;
+          if (!byDate[dateStr]) {
+            byDate[dateStr] = { present: 0, total: 0 };
+          }
+          const tot = parseInt(d.total_students || 0);
+          const pres = parseInt(d.present_count || 0);
+          byDate[dateStr].total += tot;
+          byDate[dateStr].present += pres;
+        });
+
+        attendanceTrend = Object.keys(byDate).sort().map((dateStr) => {
+          const { present, total } = byDate[dateStr];
+          const absent = Math.max(0, total - present);
           return {
-            date: d.date,
+            date: dateStr,
             present,
-            absent: total - present,
+            absent,
             total
           };
         });
@@ -596,27 +607,72 @@ export async function getAnalyticsAttendance(req: Request, res: Response) {
       heatmap[item.date] = item.attendance_percent;
     });
 
-    // Defaulters list (Attendance < 75%)
+    // Defaulters list (Attendance < 75% over query window)
     let defaulters: any[] = [];
     try {
-      const { data } = await supabaseAdmin
-        .from('students')
-        .select('id, roll_number, users(name, phone), departments(name)')
+      const { data: attLogs } = await supabaseAdmin
+        .from('attendance')
+        .select('student_id, status')
         .eq('institution_id', institutionId)
-        .limit(10);
-      
-      defaulters = (data || []).map((s: any) => ({
-        id: s.id,
-        roll_number: s.roll_number,
-        name: s.users?.name || 'Khushal Gehlot',
-        phone: s.users?.phone || '+91 99999 88888',
-        department: s.departments?.name || 'Computer Science',
-        attendance_rate: 68 + Math.floor(Math.random() * 6)
-      }));
-    } catch {
-      defaulters = [
-        { id: 's1', roll_number: 'CS23B1042', name: 'Rohan Sharma', phone: '+919999912345', department: 'Computer Science', attendance_rate: 67 }
-      ];
+        .gte('date', limitDateStr);
+
+      if (attLogs && attLogs.length > 0) {
+        const studentStats: Record<string, { total: number; present: number }> = {};
+        attLogs.forEach((log: any) => {
+          const sid = log.student_id;
+          if (!sid) return;
+          if (!studentStats[sid]) {
+            studentStats[sid] = { total: 0, present: 0 };
+          }
+          studentStats[sid].total += 1;
+          if (log.status?.toLowerCase() === 'present' || log.status?.toLowerCase() === 'late') {
+            studentStats[sid].present += 1;
+          }
+        });
+
+        const defaulterStudentIds: { studentId: string; rate: number }[] = [];
+        Object.keys(studentStats).forEach((sid) => {
+          const { total, present } = studentStats[sid];
+          if (total >= 3) {
+            const rate = Math.round((present / total) * 100);
+            if (rate < 75) {
+              defaulterStudentIds.push({ studentId: sid, rate });
+            }
+          }
+        });
+
+        defaulterStudentIds.sort((a, b) => a.rate - b.rate);
+        const topDefaulters = defaulterStudentIds.slice(0, 10);
+
+        if (topDefaulters.length > 0) {
+          const ids = topDefaulters.map((d) => d.studentId);
+          const { data: studentDetails } = await supabaseAdmin
+            .from('students')
+            .select('id, roll_number, users(name, phone), departments(name)')
+            .in('id', ids);
+
+          if (studentDetails) {
+            const detailMap = new Map(studentDetails.map((s: any) => [s.id, s]));
+            defaulters = topDefaulters
+              .map((d) => {
+                const s = detailMap.get(d.studentId);
+                if (!s) return null;
+                return {
+                  id: s.id,
+                  roll_number: s.roll_number || '',
+                  name: s.users?.name || 'Student',
+                  phone: s.users?.phone || '',
+                  department: s.departments?.name || 'General',
+                  attendance_rate: d.rate
+                };
+              })
+              .filter(Boolean);
+          }
+        }
+      }
+    } catch (e) {
+      logger.error('Error computing attendance defaulters:', e);
+      defaulters = [];
     }
 
     return res.status(200).json({ success: true, trend, heatmap, defaulters });
@@ -701,20 +757,108 @@ export async function getAnalyticsUtilization(req: Request, res: Response) {
   }
 }
 
+function calculatePearsonCorrelation(data: { x: number; y: number }[]): number {
+  const n = data.length;
+  if (n < 2) return 0;
+
+  let sumX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  let sumX2 = 0;
+  let sumY2 = 0;
+
+  for (const p of data) {
+    sumX += p.x;
+    sumY += p.y;
+    sumXY += p.x * p.y;
+    sumX2 += p.x * p.x;
+    sumY2 += p.y * p.y;
+  }
+
+  const num = n * sumXY - sumX * sumY;
+  const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+
+  if (den === 0) return 0;
+  return Math.round((num / den) * 100) / 100;
+}
+
 export async function getAnalyticsCorrelation(req: Request, res: Response) {
   try {
-    // Attendance vs exam marks coordinates
-    const correlationData = [
-      { attendance: 95, marks: 88, name: 'Student A' },
-      { attendance: 84, marks: 76, name: 'Student B' },
-      { attendance: 72, marks: 61, name: 'Student C' },
-      { attendance: 65, marks: 48, name: 'Student D' },
-      { attendance: 90, marks: 92, name: 'Student E' },
-      { attendance: 55, marks: 74, name: 'Student F' }, // Low attendance, High score (Engagement risk)
-      { attendance: 98, marks: 52, name: 'Student G' }  // High attendance, Low score (Academic support)
-    ];
-    return res.status(200).json({ success: true, data_points: correlationData, coefficient: 0.76 });
+    const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+
+    const { data: attLogs } = await supabaseAdmin
+      .from('attendance')
+      .select('student_id, status')
+      .eq('institution_id', institutionId);
+
+    const attMap: Record<string, { total: number; present: number }> = {};
+    if (attLogs) {
+      attLogs.forEach((log: any) => {
+        const sid = log.student_id;
+        if (!sid) return;
+        if (!attMap[sid]) attMap[sid] = { total: 0, present: 0 };
+        attMap[sid].total += 1;
+        if (log.status?.toLowerCase() === 'present' || log.status?.toLowerCase() === 'late') {
+          attMap[sid].present += 1;
+        }
+      });
+    }
+
+    const { data: examData } = await supabaseAdmin
+      .from('exam_results')
+      .select('student_id, marks_obtained, max_marks')
+      .eq('institution_id', institutionId);
+
+    const examMap: Record<string, { sumPct: number; count: number }> = {};
+    if (examData) {
+      examData.forEach((resItem: any) => {
+        const sid = resItem.student_id;
+        if (!sid) return;
+        const maxM = parseFloat(resItem.max_marks || 100);
+        const obtM = parseFloat(resItem.marks_obtained || 0);
+        if (maxM <= 0) return;
+        const pct = (obtM / maxM) * 100;
+        if (!examMap[sid]) examMap[sid] = { sumPct: 0, count: 0 };
+        examMap[sid].sumPct += pct;
+        examMap[sid].count += 1;
+      });
+    }
+
+    const commonStudentIds = Object.keys(attMap).filter(
+      (sid) => examMap[sid] && attMap[sid].total > 0 && examMap[sid].count > 0
+    );
+
+    let correlationData: any[] = [];
+    let coefficient = 0;
+
+    if (commonStudentIds.length > 0) {
+      const { data: studentRecords } = await supabaseAdmin
+        .from('students')
+        .select('id, users(name)')
+        .in('id', commonStudentIds);
+
+      const nameMap = new Map(studentRecords?.map((s: any) => [s.id, s.users?.name || 'Student']) || []);
+      const xyPoints: { x: number; y: number }[] = [];
+
+      correlationData = commonStudentIds.map((sid) => {
+        const attRate = Math.round((attMap[sid].present / attMap[sid].total) * 100);
+        const marksAvg = Math.round(examMap[sid].sumPct / examMap[sid].count);
+        xyPoints.push({ x: attRate, y: marksAvg });
+
+        return {
+          student_id: sid,
+          name: nameMap.get(sid) || 'Student',
+          attendance: attRate,
+          marks: marksAvg
+        };
+      });
+
+      coefficient = calculatePearsonCorrelation(xyPoints);
+    }
+
+    return res.status(200).json({ success: true, data_points: correlationData, coefficient });
   } catch (err: any) {
+    logger.error('Error in getAnalyticsCorrelation:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -734,13 +878,8 @@ export async function getAlerts(req: Request, res: Response) {
       if (error) throw error;
       data = dbData || [];
     } catch (e) {
-      logger.warn('Failed fetching alerts from database, using fallback mock alerts:', e);
-      data = [
-        { type: 'attendance', severity: 'high', title: 'Low Attendance — CS Sem 6', detail: '18 students below 60% attendance in Computer Science Semester 6. Immediate action required.', created_at: new Date().toISOString() },
-        { type: 'fee', severity: 'high', title: 'Fee Defaulters — ₹12.5L Pending', detail: '47 students have overdue fee payments totaling ₹12,50,000. Escalation stage 3 reached.', created_at: new Date().toISOString() },
-        { type: 'hostel', severity: 'medium', title: 'Hostel Capacity Warning', detail: 'Boys Hostel B is at 95% capacity. 8 new admissions pending room allocation.', created_at: new Date().toISOString() },
-        { type: 'library', severity: 'low', title: '12 Books Overdue > 30 Days', detail: 'Library has 12 books overdue by more than 30 days. Total fine accrued: ₹4,800.', created_at: new Date().toISOString() }
-      ];
+      logger.error('Failed fetching director alerts from database:', e);
+      data = [];
     }
     return res.status(200).json({ success: true, alerts: data });
   } catch (err: any) {
@@ -1145,23 +1284,116 @@ export async function dismissInsight(req: Request, res: Response) {
   }
 }
 
-// Predictors specialized endpoint mocks
+// Predictors specialized endpoints
 export async function getDropoutRisk(req: Request, res: Response) {
-  return res.status(200).json({
-    success: true,
-    students: [
-      { id: '1', name: 'Khushal Gehlot', risk_score: 74, reason: 'Declining attendance (67% over 30 days) and outstanding library fines.', recommendation: 'Parent-teacher conference counselor schedule.' }
-    ]
-  });
+  try {
+    const institutionId = req.user?.institution_id || null;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    const { data, error } = await supabaseAdmin.rpc('get_dropout_risk_students', {
+      p_limit: limit,
+      p_institution_id: institutionId
+    });
+
+    if (error) throw error;
+
+    const students = (data || []).map((s: any) => {
+      const attRate = parseFloat(s.attendance_rate || 0);
+      const overdue = parseFloat(s.overdue_amount || 0);
+
+      const reasonParts: string[] = [];
+      if (attRate < 75) {
+        reasonParts.push(`Attendance is ${attRate}% over the last 30 days`);
+      }
+      if (overdue > 0) {
+        reasonParts.push(`Outstanding fee balance of ₹${overdue.toLocaleString('en-IN')}`);
+      }
+      if (reasonParts.length === 0) {
+        reasonParts.push(`Monitored for potential academic engagement risk`);
+      }
+
+      let recommendation = '';
+      if (attRate < 60 && overdue > 0) {
+        recommendation = 'Schedule urgent parent-teacher conference and issue fee payment reminder.';
+      } else if (attRate < 75) {
+        recommendation = 'Schedule academic counseling session to address attendance shortfall.';
+      } else if (overdue > 0) {
+        recommendation = 'Contact guardian regarding overdue fee payment schedule.';
+      } else {
+        recommendation = 'Monitor weekly attendance and academic progress.';
+      }
+
+      return {
+        id: s.id,
+        roll_number: s.roll_number,
+        name: s.name,
+        department: s.department_name,
+        attendance_rate: attRate,
+        overdue_amount: overdue,
+        risk_score: s.risk_score,
+        reason: reasonParts.join(' and ') + '.',
+        recommendation
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      students
+    });
+  } catch (err: any) {
+    logger.error('Error fetching dropout risk students:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 }
 
 export async function getFeeRisk(req: Request, res: Response) {
-  return res.status(200).json({
-    success: true,
-    defaulters: [
-      { id: '2', name: 'Rohan Sharma', default_likelihood: 'High', overdue_amount: 12000, days_overdue: 15 }
-    ]
-  });
+  try {
+    const institutionId = req.user?.institution_id || null;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    const { data, error } = await supabaseAdmin.rpc('get_fee_risk_students', {
+      p_limit: limit,
+      p_institution_id: institutionId
+    });
+
+    if (error) throw error;
+
+    const defaulters = (data || []).map((s: any) => {
+      const overdue = parseFloat(s.overdue_amount || 0);
+      const daysOverdue = parseInt(s.days_overdue || 0);
+      const likelihood = s.default_likelihood || 'Low';
+
+      const reason = `Overdue payment of ₹${overdue.toLocaleString('en-IN')} pending for ${daysOverdue} days.`;
+      let recommendation = '';
+      if (daysOverdue > 60) {
+        recommendation = 'Escalate to finance head for formal notice and fee recovery action.';
+      } else if (daysOverdue > 30) {
+        recommendation = 'Send automated payment reminder and call guardian.';
+      } else {
+        recommendation = 'Send payment reminder SMS/WhatsApp.';
+      }
+
+      return {
+        id: s.id,
+        roll_number: s.roll_number,
+        name: s.name,
+        department: s.department_name,
+        default_likelihood: likelihood,
+        overdue_amount: overdue,
+        days_overdue: daysOverdue,
+        reason,
+        recommendation
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      defaulters
+    });
+  } catch (err: any) {
+    logger.error('Error fetching fee risk defaulters:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 }
 
 // ========== 6. AUTO-GENERATED PDF REPORTS ==========
@@ -1945,23 +2177,116 @@ export async function generateBoardReport(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Quarter and Year are required fields.' });
     }
 
+    // 1. Fetch real institution name
+    let institutionName = 'IRIS 365 Campus';
+    try {
+      const { data: inst } = await supabaseAdmin
+        .from('institutions')
+        .select('name')
+        .eq('id', institutionId)
+        .single();
+      if (inst?.name) {
+        institutionName = inst.name;
+      }
+    } catch (e) {
+      logger.warn('Failed to fetch institution name for board report:', e);
+    }
+
+    // 2. Fetch real telemetry and KPIs from database
+    let attendanceRate = 0;
+    try {
+      const { data: attData } = await supabaseAdmin
+        .from('daily_attendance_summary')
+        .select('total_students, present_count')
+        .eq('institution_id', institutionId);
+
+      if (attData && attData.length > 0) {
+        const total = attData.reduce((sum, d: any) => sum + parseInt(d.total_students || 0), 0);
+        const present = attData.reduce((sum, d: any) => sum + parseInt(d.present_count || 0), 0);
+        if (total > 0) {
+          attendanceRate = Math.round((present / total) * 1000) / 10;
+        }
+      }
+    } catch {}
+
+    let feeCollectionPercent = 0;
+    try {
+      const { data: feeRecovery } = await supabaseAdmin.rpc('get_fee_recovery_tracking', {
+        p_semester: null,
+        p_department_id: null
+      });
+      if (feeRecovery?.summary?.collection_rate !== undefined) {
+        feeCollectionPercent = parseFloat(feeRecovery.summary.collection_rate);
+      }
+    } catch {}
+
+    let canteenUsers = 0;
+    try {
+      const { count } = await supabaseAdmin
+        .from('canteen_orders')
+        .select('student_id', { count: 'exact', head: true })
+        .eq('institution_id', institutionId);
+      if (count !== null) canteenUsers = count;
+    } catch {}
+
+    let moduleAdoption = 0;
+    try {
+      const { count: totalStudents } = await supabaseAdmin
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('institution_id', institutionId)
+        .eq('role', 'Student');
+
+      const { count: activeUsers } = await supabaseAdmin
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('institution_id', institutionId)
+        .eq('is_active', true);
+
+      if (totalStudents && totalStudents > 0) {
+        moduleAdoption = Math.round((activeUsers / totalStudents) * 100);
+      } else {
+        moduleAdoption = 80;
+      }
+    } catch {}
+
+    let netSurplusStr = '0L';
+    try {
+      const { data: pl } = await supabaseAdmin
+        .from('financial_pl')
+        .select('net_surplus')
+        .eq('institution_id', institutionId)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pl?.net_surplus !== undefined) {
+        const surplusVal = parseFloat(pl.net_surplus);
+        if (Math.abs(surplusVal) >= 100000) {
+          netSurplusStr = `${(surplusVal / 100000).toFixed(1)}L`;
+        } else {
+          netSurplusStr = `₹${surplusVal.toLocaleString('en-IN')}`;
+        }
+      }
+    } catch {}
+
     const scriptPath = path.join(process.cwd(), 'scripts', 'generate_board_report.py');
     const tempFileName = `Board_Report_Q${quarter}_${year}_${Date.now()}.pptx`;
     const tempFilePath = path.join(process.cwd(), 'scripts', tempFileName);
 
-    // Aggregate mock telemetry details to enrich the slides
-    const mockDataPayload = JSON.stringify({
-      attendance_rate: 82.5,
-      fee_collection_percent: 78,
-      module_adoption: 76,
-      canteen_users: 450,
-      net_surplus: '33.4L'
+    const realDataPayload = JSON.stringify({
+      attendance_rate: attendanceRate,
+      fee_collection_percent: feeCollectionPercent,
+      module_adoption: moduleAdoption,
+      canteen_users: canteenUsers,
+      net_surplus: netSurplusStr
     });
 
     let pptxUrl = '';
     try {
       // Execute the python presentation builder
-      await execPromise(`python "${scriptPath}" --institution "SIET Campus" --quarter ${quarter} --year ${year} --output "${tempFilePath}" --data '${mockDataPayload}'`);
+      await execPromise(`python "${scriptPath}" --institution "${institutionName.replace(/"/g, '\\"')}" --quarter ${quarter} --year ${year} --output "${tempFilePath}" --data '${realDataPayload}'`);
       
       const fileBuffer = fs.readFileSync(tempFilePath);
       pptxUrl = await uploadPPTXToSupabase(fileBuffer, tempFileName);
@@ -1995,21 +2320,86 @@ export async function generateBoardReport(req: Request, res: Response) {
 export async function emailBoardReport(req: Request, res: Response) {
   try {
     const { reportId, sent_to } = req.body;
-    if (!reportId || !sent_to || !Array.isArray(sent_to)) {
+    if (!reportId || !sent_to || !Array.isArray(sent_to) || sent_to.length === 0) {
       return res.status(400).json({ success: false, error: 'Invalid reportId or sent_to array.' });
     }
 
-    const { data, error } = await supabaseAdmin
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey || !resendApiKey.startsWith('re_')) {
+      return res.status(503).json({
+        success: false,
+        error: "Email delivery service is not configured yet. Set RESEND_API_KEY in environment to enable email delivery."
+      });
+    }
+
+    const { data: report, error: fetchErr } = await supabaseAdmin
+      .from('board_reports')
+      .select('*')
+      .eq('id', reportId)
+      .single();
+
+    if (fetchErr || !report) {
+      return res.status(404).json({ success: false, error: 'Board report not found.' });
+    }
+
+    let sentCount = 0;
+    const errors: string[] = [];
+
+    for (const recipientEmail of sent_to) {
+      try {
+        const mailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'reports@iris365.in',
+            to: recipientEmail,
+            subject: `IRIS 365 — Board Report Q${report.quarter} ${report.year}`,
+            html: `
+              <h2>IRIS 365 Executive Board Report</h2>
+              <p>The Executive Board Presentation deck for <strong>Q${report.quarter} ${report.year}</strong> is ready for review:</p>
+              <p><a href="${report.pptx_url}" target="_blank" style="padding: 10px 18px; background: #6C2BD9; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">Download Board Presentation (.pptx)</a></p>
+              <p>Generated on ${new Date(report.generated_at || Date.now()).toLocaleString('en-IN')}.</p>
+            `
+          })
+        });
+
+        if (mailRes.ok) {
+          sentCount++;
+        } else {
+          const errText = await mailRes.text();
+          errors.push(`Failed sending to ${recipientEmail}: ${errText}`);
+        }
+      } catch (e: any) {
+        errors.push(`Failed sending to ${recipientEmail}: ${e.message}`);
+      }
+    }
+
+    if (sentCount === 0 && errors.length > 0) {
+      return res.status(500).json({
+        success: false,
+        error: `Failed to deliver email: ${errors.join('; ')}`
+      });
+    }
+
+    const { data: updatedReport, error: updateErr } = await supabaseAdmin
       .from('board_reports')
       .update({ sent_to })
       .eq('id', reportId)
       .select()
       .single();
 
-    if (error) throw error;
-    logger.info(`[MOCK EMAIL] Board report ${reportId} emailed to: ${sent_to.join(', ')}`);
-    return res.status(200).json({ success: true, report: data });
+    if (updateErr) throw updateErr;
+
+    return res.status(200).json({
+      success: true,
+      message: `Board report emailed successfully to ${sentCount} recipient(s).`,
+      report: updatedReport
+    });
   } catch (err: any) {
+    logger.error('Error in emailBoardReport:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -2500,7 +2890,9 @@ export async function getSchemaHealth(req: Request, res: Response) {
       { name: 'get_complaint_sla_monitoring', args: {} },
       { name: 'get_naac_accreditation_data', args: {} },
       { name: 'detect_system_anomalies', args: {} },
-      { name: 'resolve_anomaly', args: { p_anomaly_id: '00000000-0000-0000-0000-000000000000', p_resolution_notes: '' } }
+      { name: 'resolve_anomaly', args: { p_anomaly_id: '00000000-0000-0000-0000-000000000000', p_resolution_notes: '' } },
+      { name: 'get_dropout_risk_students', args: { p_limit: 10, p_institution_id: null } },
+      { name: 'get_fee_risk_students', args: { p_limit: 10, p_institution_id: null } }
     ];
 
     const healthStatus: any[] = [];

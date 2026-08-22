@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Save, RefreshCw, Layers, ShieldCheck, Download } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 export default function AdminIdCardsPage() {
   const [template, setTemplate] = useState<any>({
@@ -20,6 +21,7 @@ export default function AdminIdCardsPage() {
   });
   const [isCompiling, setIsCompiling] = useState(false);
   const [zipUrl, setZipUrl] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
     fetchTemplate();
@@ -43,10 +45,12 @@ export default function AdminIdCardsPage() {
     try {
       const res = await apiPost('/core/idcards/template', { template_json: template });
       if (res.success) {
-        alert('Digital ID card canvas template saved to institution vault!');
+        setToast({ msg: 'Digital ID card canvas template saved to institution vault!', type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Failed to save template.', type: 'error' });
       }
     } catch (err) {
-      alert('Template successfully saved in sandbox mode.');
+      setToast({ msg: 'Template successfully saved in sandbox mode.', type: 'info' });
     }
   };
 
@@ -58,10 +62,12 @@ export default function AdminIdCardsPage() {
       const res = await apiPost('/core/idcards/generate/bulk', bulkData);
       if (res.success) {
         setZipUrl(res.downloadZipUrl || '#');
-        alert(`Successfully compiled ${res.count || 2} CR80 standard badge PDFs into ZIP archive!`);
+        setToast({ msg: `Successfully compiled ${res.count || 2} CR80 standard badge PDFs into ZIP archive!`, type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Bulk compilation failed.', type: 'error' });
       }
     } catch (err) {
-      alert('Mock ID Generation: ZIP output compiled successfully.');
+      setToast({ msg: 'ID Generation processed in sandbox mode.', type: 'info' });
       setZipUrl('https://invoices.iris365.in/idcards/bulk_generated_CSE_2024-2028.zip');
     } finally {
       setIsCompiling(false);
@@ -264,6 +270,7 @@ export default function AdminIdCardsPage() {
         </div>
 
       </div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

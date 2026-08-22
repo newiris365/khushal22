@@ -36,32 +36,30 @@ export default function TeacherObeCourses() {
     semester: 1,
     credits: 3,
     course_type: 'core' as any,
-    program_id: 'a0000000-0000-0000-0000-000000000001'
+    program_id: ''
   });
 
   const loadCourses = async () => {
     setLoading(true);
     try {
-      // Fetch courses for the default program
-      const data = await apiGet('/obe/courses/a0000000-0000-0000-0000-000000000001');
-      if (data.success && data.courses && data.courses.length > 0) {
-        setCourses(data.courses);
-      } else {
-        // Fallback demo courses
-        setCourses([
-          { id: 'c0000000-0000-0000-0000-000000000001', course_code: 'CS-401', course_name: 'Advanced Web Applications', semester: 4, credits: 4, course_type: 'core', co_count: 6 },
-          { id: 'c0000000-0000-0000-0000-000000000002', course_code: 'CS-402', course_name: 'Database Security & Sharding', semester: 4, credits: 3, course_type: 'core', co_count: 4 },
-          { id: 'c0000000-0000-0000-0000-000000000003', course_code: 'CS-408', course_name: 'Outcome Based Machine Learning', semester: 4, credits: 4, course_type: 'elective', co_count: 0 }
-        ]);
+      let programId = '';
+      const progData = await apiGet('/obe/programs');
+      if (progData.success && progData.programs && progData.programs.length > 0) {
+        programId = progData.programs[0].id;
+        setNewCourse(prev => ({ ...prev, program_id: programId }));
       }
+
+      if (programId) {
+        const data = await apiGet(`/obe/courses/${programId}`);
+        if (data.success && data.courses && data.courses.length > 0) {
+          setCourses(data.courses);
+          return;
+        }
+      }
+      setCourses([]);
     } catch (err) {
       console.error('Failed to load courses:', err);
-      // Demo fallback
-      setCourses([
-        { id: 'c0000000-0000-0000-0000-000000000001', course_code: 'CS-401', course_name: 'Advanced Web Applications', semester: 4, credits: 4, course_type: 'core', co_count: 6 },
-        { id: 'c0000000-0000-0000-0000-000000000002', course_code: 'CS-402', course_name: 'Database Security & Sharding', semester: 4, credits: 3, course_type: 'core', co_count: 4 },
-        { id: 'c0000000-0000-0000-0000-000000000003', course_code: 'CS-408', course_name: 'Outcome Based Machine Learning', semester: 4, credits: 4, course_type: 'elective', co_count: 0 }
-      ]);
+      setCourses([]);
     } finally {
       setLoading(false);
     }

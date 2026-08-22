@@ -38,6 +38,7 @@ const studentLinks: SidebarLink[] = [
   { label: 'Exam Enrollment', href: '/student/exams', icon: ClipboardList },
   { label: 'Notices', href: '/student/notices', icon: Bell },
   { label: 'ID Card', href: '/student/idcard', icon: User },
+  { label: 'Digital Gate Pass', href: '/gate/my-pass', icon: QrCode },
   { label: 'AI Assistant', href: '/ai/search', icon: MessageCircle, badge: 'AI' },
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
@@ -85,6 +86,7 @@ function getSchoolStudentLinks(profile: any): SidebarLink[] {
     { label: 'Leave Application', href: '/student/leave', icon: CalendarCheck },
     { label: 'Notices', href: '/student/notices', icon: Bell },
     { label: 'ID Card', href: '/student/idcard', icon: User },
+    { label: 'Digital Gate Pass', href: '/gate/my-pass', icon: QrCode },
     { label: 'AI Assistant', href: '/ai/search', icon: MessageCircle, badge: 'AI' },
     { label: 'Profile', href: '/profile', icon: UserCircle }
   );

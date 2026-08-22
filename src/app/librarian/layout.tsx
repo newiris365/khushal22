@@ -1,7 +1,9 @@
 "use client";
 
+import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import { LayoutDashboard, BookOpen, FileText, AlertTriangle, Upload, ClipboardList, UserCircle, CalendarClock, IndianRupee, DoorOpen, Users } from 'lucide-react';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 const librarianLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/librarian/library', icon: LayoutDashboard },
@@ -18,6 +20,16 @@ const librarianLinks: SidebarLink[] = [
 ];
 
 export default function LibrarianLayout({ children }: { children: React.ReactNode }) {
+  const { authorized } = usePortalAuth(['Librarian', 'SuperAdmin']);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-cyan-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
+
   return (
     <PortalShell
       portalName="Librarian Portal"

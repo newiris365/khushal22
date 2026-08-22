@@ -16,7 +16,7 @@ export default function StudentResultsPage() {
     if (profileLoading) return;
     const studentId = studentProfile?.id || '';
     if (!studentId) { setIsLoading(false); return; }
-    apiGet(`/core/exams/marksheet/${studentId}/a0000000-0000-0000-0000-000000000001`).then(res => {
+    apiGet(`/core/exams/marksheet/${studentId}`).then(res => {
       if (res?.success) {
         setResults(res.results || []);
         if (res.results?.length > 0) {

@@ -5,6 +5,8 @@ import {
   Building2, Plus, Search, RefreshCw, Edit2, Trash2, X, Check, AlertTriangle, CheckCircle
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../lib/api';
+import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
+import { SkeletonTable } from '../../../components/Skeleton';
 
 interface Department {
   id: string;
@@ -24,7 +26,13 @@ export default function AdminDepartmentsPage() {
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [addForm, setAddForm] = useState({ name: '', code: '' });
   const [editForm, setEditForm] = useState({ name: '', code: '' });
-  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   useEffect(() => {
     const saved = localStorage.getItem('iris_user_profile');
@@ -42,16 +50,15 @@ export default function AdminDepartmentsPage() {
 
   const fetchDepartments = async () => {
     setLoading(true);
-    setMsg(null);
     try {
       const res = await apiGet('campusCore/departments', { institution_id: institutionId });
       if (res.success) {
         setDepartments(res.departments || []);
       } else {
-        setMsg({ type: 'error', text: res.error || 'Failed to load departments.' });
+        setToast({ msg: res.error || 'Failed to load departments.', type: 'error' });
       }
     } catch (err: any) {
-      setMsg({ type: 'error', text: err.message });
+      setToast({ msg: err.message || 'Error fetching departments.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -59,25 +66,26 @@ export default function AdminDepartmentsPage() {
 
   const handleAdd = async () => {
     if (!addForm.name.trim()) {
-      setMsg({ type: 'error', text: 'Department name is required.' });
+      setToast({ msg: 'Department name is required.', type: 'error' });
       return;
     }
     setSaving(true);
     try {
       const res = await apiPost('campusCore/departments', {
         name: addForm.name,
+        code: addForm.code || null,
         institution_id: institutionId,
       });
       if (res.success) {
-        setMsg({ type: 'success', text: 'Department created!' });
+        setToast({ msg: 'Department created successfully!', type: 'success' });
         setShowAddModal(false);
         setAddForm({ name: '', code: '' });
         fetchDepartments();
       } else {
-        setMsg({ type: 'error', text: res.error || 'Failed to create.' });
+        setToast({ msg: res.error || 'Failed to create department.', type: 'error' });
       }
     } catch (err: any) {
-      setMsg({ type: 'error', text: err.message });
+      setToast({ msg: err.message || 'Error creating department.', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -90,35 +98,43 @@ export default function AdminDepartmentsPage() {
       const res = await apiPut('campusCore/departments', {
         id: selectedDept.id,
         name: editForm.name,
+        code: editForm.code || null
       });
       if (res.success) {
-        setMsg({ type: 'success', text: 'Department updated!' });
+        setToast({ msg: 'Department updated successfully!', type: 'success' });
         setShowEditModal(false);
         setSelectedDept(null);
         fetchDepartments();
       } else {
-        setMsg({ type: 'error', text: res.error || 'Failed to update.' });
+        setToast({ msg: res.error || 'Failed to update department.', type: 'error' });
       }
     } catch (err: any) {
-      setMsg({ type: 'error', text: err.message });
+      setToast({ msg: err.message || 'Error updating department.', type: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (dept: Department) => {
-    if (!confirm(`Delete department "${dept.name}"? This cannot be undone.`)) return;
-    try {
-      const res = await apiDelete(`campusCore/departments?id=${dept.id}`);
-      if (res.success) {
-        setMsg({ type: 'success', text: 'Department deleted.' });
-        fetchDepartments();
-      } else {
-        setMsg({ type: 'error', text: res.error || 'Failed to delete.' });
+  const handleDelete = (dept: Department) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Department',
+      message: `Are you sure you want to delete department "${dept.name}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await apiDelete(`campusCore/departments?id=${dept.id}`);
+          if (res.success) {
+            setToast({ msg: 'Department deleted successfully.', type: 'info' });
+            fetchDepartments();
+          } else {
+            setToast({ msg: res.error || 'Failed to delete department.', type: 'error' });
+          }
+        } catch (err: any) {
+          setToast({ msg: err.message || 'Error deleting department.', type: 'error' });
+        }
       }
-    } catch (err: any) {
-      setMsg({ type: 'error', text: err.message });
-    }
+    });
   };
 
   const openEdit = (dept: Department) => {
@@ -298,7 +314,16 @@ export default function AdminDepartmentsPage() {
             </div>
           </div>
         </div>
-      )}
+      {/* Toast & Confirm Modal */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isDanger={true}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

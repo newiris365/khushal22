@@ -55,7 +55,12 @@ import {
   getAnalyticsWeekly,
   getAnalyticsItems,
   getAnalyticsForecast,
+  getAnalyticsHourly,
   getNutritionSummary,
+  // Inventory
+  getInventory,
+  updateInventoryItem,
+  logInventoryWaste,
   // Hygiene
   submitHygieneChecklist,
   getHygieneReport,
@@ -128,7 +133,13 @@ router.get('/analytics/today', requireRole(['Admin', 'SuperAdmin', 'Vendor']), g
 router.get('/analytics/weekly', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getAnalyticsWeekly);
 router.get('/analytics/items', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getAnalyticsItems);
 router.get('/analytics/forecast', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getAnalyticsForecast);
+router.get('/analytics/hourly', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getAnalyticsHourly);
 router.get('/nutrition/:studentId', getNutritionSummary);
+
+// ──── INVENTORY ───────────────────────────────────────────────
+router.get('/inventory', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getInventory);
+router.put('/inventory/:id', requireRole(['Admin', 'SuperAdmin', 'Vendor']), updateInventoryItem);
+router.post('/inventory/waste', requireRole(['Admin', 'SuperAdmin', 'Vendor']), logInventoryWaste);
 
 // ──── HYGIENE ─────────────────────────────────────────────────
 router.post('/hygiene/checklist', requireRole(['Vendor']), submitHygieneChecklist);

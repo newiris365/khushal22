@@ -20,7 +20,7 @@ const getRedirectPath = (role: string): string => {
     case 'SuperAdmin': return '/admin/global';
     case 'Admin': return '/admin/dashboard';
     case 'Student': return '/student/dashboard';
-    case 'Warden': return '/warden/hostel';
+    case 'Warden': return '/warden/dashboard';
     case 'Security': return '/gate';
     case 'Driver': return '/transit';
     case 'Librarian': return '/librarian/library';
@@ -35,9 +35,9 @@ const getRedirectPath = (role: string): string => {
     case 'HR Admin': return '/hr/my/dashboard';
     case 'Company HR': return '/company';
     case 'IQAC Coordinator': return '/iqac';
-    case 'Admissions Officer': return '/officer';
+    case 'Admissions Officer': return '/officer/admissions';
     case 'TPO': return '/tpo';
-    case 'Staff': return '/faculty';
+    case 'Staff': return '/staff/dashboard';
     default: return '/dashboard';
   }
 };

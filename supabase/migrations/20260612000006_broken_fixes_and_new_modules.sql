@@ -559,10 +559,19 @@ AS $$
 DECLARE
     v_leave RECORD;
     v_new_status VARCHAR;
+    v_inst_id UUID;
+    v_user_role VARCHAR;
 BEGIN
+    SELECT u.institution_id, u.role INTO v_inst_id, v_user_role
+    FROM users u WHERE u.id = auth.uid();
+
     SELECT * INTO v_leave FROM student_leave_applications WHERE id = p_leave_id;
     IF v_leave IS NULL THEN
         RETURN json_build_object('success', false, 'error', 'Leave application not found.');
+    END IF;
+
+    IF v_inst_id IS NOT NULL AND v_leave.institution_id != v_inst_id AND COALESCE(v_user_role, '') != 'SuperAdmin' THEN
+        RETURN json_build_object('success', false, 'error', 'Access denied. Cross-institution leave approval prohibited.');
     END IF;
 
     IF p_approver_role = 'Teacher' OR p_approver_role = 'Staff' THEN
@@ -599,7 +608,23 @@ RETURNS JSON
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+    v_leave RECORD;
+    v_inst_id UUID;
+    v_user_role VARCHAR;
 BEGIN
+    SELECT u.institution_id, u.role INTO v_inst_id, v_user_role
+    FROM users u WHERE u.id = auth.uid();
+
+    SELECT * INTO v_leave FROM student_leave_applications WHERE id = p_leave_id;
+    IF v_leave IS NULL THEN
+        RETURN json_build_object('success', false, 'error', 'Leave not found or already processed.');
+    END IF;
+
+    IF v_inst_id IS NOT NULL AND v_leave.institution_id != v_inst_id AND COALESCE(v_user_role, '') != 'SuperAdmin' THEN
+        RETURN json_build_object('success', false, 'error', 'Access denied. Cross-institution leave rejection prohibited.');
+    END IF;
+
     UPDATE student_leave_applications SET status = 'rejected', hod_remarks = p_remarks, hod_approved_at = NOW()
     WHERE id = p_leave_id AND status IN ('pending', 'faculty_approved');
 

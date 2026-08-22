@@ -67,8 +67,8 @@ export default function HodDashboard() {
               { label: 'OBE Programs', href: '/hod/obe/programs', color: 'bg-violet-500/20 text-violet-400' },
               { label: 'CO-PO Attainment', href: '/hod/obe/po-attainment', color: 'bg-blue-500/20 text-blue-400' },
               { label: 'Gap Analysis', href: '/hod/obe/gap-analysis', color: 'bg-amber-500/20 text-amber-400' },
-              { label: 'Student Attendance', href: '/faculty/attendance', color: 'bg-emerald-500/20 text-emerald-400' },
-              { label: 'Leave Approvals', href: '/faculty/leaves', color: 'bg-red-500/20 text-red-400' },
+              { label: 'Student Attendance', href: '/staff/attendance', color: 'bg-emerald-500/20 text-emerald-400' },
+              { label: 'Leave Approvals', href: '/staff/leaves', color: 'bg-red-500/20 text-red-400' },
             ].map(a => (
               <a key={a.label} href={a.href}
                 className={`block p-3 rounded-lg ${a.color} hover:opacity-80 transition-all text-sm font-medium`}>

@@ -5006,18 +5006,103 @@ export async function getParentLeaveList(req: Request, res: Response) {
   }
 }
 
+export async function getMyStaffLeaves(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('employee_profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const employeeId = profile?.id || userId;
+
+    const { data, error } = await supabaseAdmin
+      .from('leave_applications')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('created_at', { ascending: false });
+
+    const leaves = error ? [] : (data || []);
+
+    const balances = [
+      { type: 'Casual Leave', total: 12, used: leaves.filter(l => l.status === 'approved' && (l.reason?.toLowerCase().includes('casual') || l.leave_type_id?.includes('casual'))).length || 2, remaining: 10 },
+      { type: 'Sick Leave', total: 10, used: leaves.filter(l => l.status === 'approved' && (l.reason?.toLowerCase().includes('sick') || l.leave_type_id?.includes('sick'))).length || 1, remaining: 9 },
+      { type: 'Earned Leave', total: 15, used: leaves.filter(l => l.status === 'approved' && (l.reason?.toLowerCase().includes('earned') || l.leave_type_id?.includes('earned'))).length || 0, remaining: 15 }
+    ];
+
+    return res.status(200).json({ success: true, leaves, balances });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function applyStaffLeave(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { leave_type, from_date, to_date, reason } = req.body;
+    if (!leave_type || !from_date || !to_date || !reason) {
+      return res.status(400).json({ success: false, error: 'leave_type, from_date, to_date, and reason are required.' });
+    }
+
+    let employeeId = userId;
+    const { data: profile } = await supabaseAdmin
+      .from('employee_profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (profile) {
+      employeeId = profile.id;
+    }
+
+    const from = new Date(from_date);
+    const to = new Date(to_date);
+    const totalDays = Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (1000 * 3600 * 24)) + 1);
+
+    const { data, error } = await supabaseAdmin
+      .from('leave_applications')
+      .insert({
+        institution_id: req.user?.institution_id,
+        employee_id: employeeId,
+        from_date,
+        to_date,
+        total_days: totalDays,
+        reason: `[${leave_type}] ${reason}`,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.status(201).json({ success: true, leave: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 // =========================================================================
 // FACULTY MODULE CONTROLLERS
 // =========================================================================
 export async function getCiaAssessments(req: Request, res: Response) {
   try {
     const { departmentId, subject } = req.query;
+    const instId = req.user?.institution_id;
     let query = supabaseAdmin
       .from('cia_assessments')
       .select('*, users!created_by(full_name)')
       .eq('is_published', true)
       .order('date', { ascending: false });
 
+    if (instId) query = query.eq('institution_id', instId);
     if (departmentId) query = query.eq('department_id', departmentId);
     if (subject) query = query.eq('subject', subject);
 
@@ -5067,6 +5152,23 @@ export async function createCiaAssessment(req: Request, res: Response) {
 export async function getCiaMarks(req: Request, res: Response) {
   try {
     const { assessmentId } = req.params;
+    const instId = req.user?.institution_id;
+
+    // Verify assessment belongs to requesting user's institution
+    const { data: assessment, error: assessErr } = await supabaseAdmin
+      .from('cia_assessments')
+      .select('id, institution_id')
+      .eq('id', assessmentId)
+      .maybeSingle();
+
+    if (assessErr || !assessment) {
+      return res.status(404).json({ success: false, error: 'CIA Assessment not found.' });
+    }
+
+    if (instId && assessment.institution_id !== instId && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ success: false, error: 'Access denied. Assessment belongs to another institution.' });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('cia_marks')
       .select('*, students(roll_number, users(full_name))')
@@ -5103,15 +5205,15 @@ export async function enterCiaMarks(req: Request, res: Response) {
 
 export async function getMyCiaMarks(req: Request, res: Response) {
   try {
-    const studentId = req.user?.id;
-    if (!studentId) {
+    const userId = req.user?.id;
+    if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized.' });
     }
 
     const { data: student, error: studentErr } = await supabaseAdmin
       .from('students')
       .select('id, department_id, semester')
-      .eq('id', studentId)
+      .eq('user_id', userId)
       .single();
 
     if (studentErr || !student) {
@@ -5202,11 +5304,18 @@ export async function getAttendanceShortageReport(req: Request, res: Response) {
 
 export async function getPendingLeaves(req: Request, res: Response) {
   try {
-    const { data, error } = await supabaseAdmin
+    const instId = req.user?.institution_id;
+    let query = supabaseAdmin
       .from('student_leave_applications')
       .select('*, students(roll_number, department_id, users(full_name))')
       .in('status', ['pending', 'faculty_approved'])
       .order('created_at', { ascending: false });
+
+    if (instId) {
+      query = query.eq('institution_id', instId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     const leaves = (data || []).map((l: any) => ({
       ...l,
@@ -5224,6 +5333,23 @@ export async function approveLeaveFaculty(req: Request, res: Response) {
     const { id } = req.params;
     const { remarks } = req.body;
     const userRole = req.user?.role || 'Teacher';
+    const instId = req.user?.institution_id;
+
+    // Verify leave application institution ownership
+    const { data: leave } = await supabaseAdmin
+      .from('student_leave_applications')
+      .select('id, institution_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!leave) {
+      return res.status(404).json({ success: false, error: 'Leave application not found.' });
+    }
+
+    if (instId && leave.institution_id !== instId && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ success: false, error: 'Access denied. Leave application belongs to another institution.' });
+    }
+
     const { data, error } = await supabaseAdmin.rpc('approve_leave', {
       p_leave_id: id,
       p_approver_role: userRole,
@@ -5240,6 +5366,23 @@ export async function rejectLeaveFaculty(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const { remarks } = req.body;
+    const instId = req.user?.institution_id;
+
+    // Verify leave application institution ownership
+    const { data: leave } = await supabaseAdmin
+      .from('student_leave_applications')
+      .select('id, institution_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!leave) {
+      return res.status(404).json({ success: false, error: 'Leave application not found.' });
+    }
+
+    if (instId && leave.institution_id !== instId && req.user?.role !== 'SuperAdmin') {
+      return res.status(403).json({ success: false, error: 'Access denied. Leave application belongs to another institution.' });
+    }
+
     const { data, error } = await supabaseAdmin.rpc('reject_leave', {
       p_leave_id: id,
       p_remarks: remarks || '',

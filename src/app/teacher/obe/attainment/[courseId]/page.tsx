@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, BarChart, CheckCircle2, XCircle, TrendingUp, HelpCircle, RefreshCw } from 'lucide-react';
 
+import { apiGet } from '../../../../../lib/api';
+
 interface AttainmentStats {
   course_id: string;
   academic_year: string;
@@ -22,56 +24,18 @@ export default function CoAttainmentDashboard({ params }: { params: { courseId: 
   const [stats, setStats] = useState<AttainmentStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
-  });
-
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/obe/co-attainment/${courseId}`, {
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (data.success && data.attainment) {
-        setStats(data.attainment);
+      const res = await apiGet(`/obe/co-attainment/${courseId}`);
+      if (res.success && res.attainment) {
+        setStats(res.attainment);
       } else {
-        // Fallback mock statistics
-        setStats({
-          course_id: courseId,
-          academic_year: '2026-27',
-          direct_attainment: 72.5,
-          indirect_attainment: 85.0,
-          final_attainment: 75.0,
-          target_attainment: 60.0,
-          is_attained: true,
-          co_scores: [
-            { co: 'CO1', score: 75, target: 60, attained: true },
-            { co: 'CO2', score: 68, target: 60, attained: true },
-            { co: 'CO3', score: 54, target: 60, attained: false },
-            { co: 'CO4', score: 82, target: 60, attained: true }
-          ]
-        });
+        setStats(null);
       }
     } catch (err) {
       console.error(err);
-      // Fallback
-      setStats({
-        course_id: courseId,
-        academic_year: '2026-27',
-        direct_attainment: 72.5,
-        indirect_attainment: 85.0,
-        final_attainment: 75.0,
-        target_attainment: 60.0,
-        is_attained: true,
-        co_scores: [
-          { co: 'CO1', score: 75, target: 60, attained: true },
-          { co: 'CO2', score: 68, target: 60, attained: true },
-          { co: 'CO3', score: 54, target: 60, attained: false },
-          { co: 'CO4', score: 82, target: 60, attained: true }
-        ]
-      });
+      setStats(null);
     } finally {
       setLoading(false);
     }

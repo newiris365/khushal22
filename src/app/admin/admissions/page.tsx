@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { apiGet } from '../../../lib/api';
 import { 
   Users, CheckCircle2, ShieldAlert, Sparkles, Loader2, ArrowRight,
-  TrendingUp, Award, DollarSign, BarChart3, GraduationCap, MapPin
+  TrendingUp, Award, DollarSign, BarChart3, GraduationCap, MapPin, AlertTriangle
 } from 'lucide-react';
+import { Toast, ToastMessage } from '../../../components/ToastModal';
+import { SkeletonCard, SkeletonTable } from '../../../components/Skeleton';
 
 interface ProgramOccupancy {
   name: string;
@@ -32,15 +34,18 @@ interface DashboardStats {
 
 export default function AdminAdmissionsDashboard() {
   const [loading, setLoading] = useState(true);
+  const [isFallbackData, setIsFallbackData] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   async function loadDashboardStats() {
+    setIsFallbackData(false);
     try {
       const res = await apiGet('/admissions/analytics/dashboard');
       if (res.success && res.dashboard) {
         setStats(res.dashboard);
       } else {
-        // No data from backend — show zeros
+        setIsFallbackData(true);
         setStats({
           applications_received: 0,
           applications_submitted: 0,
@@ -54,7 +59,7 @@ export default function AdminAdmissionsDashboard() {
         });
       }
     } catch {
-      // Backend not reachable — show zeros
+      setIsFallbackData(true);
       setStats({
         applications_received: 0,
         applications_submitted: 0,
@@ -77,9 +82,13 @@ export default function AdminAdmissionsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-        <div className="w-12 h-12 rounded-full border-4 border-[#6C2BD9]/30 border-t-[#6C2BD9] animate-spin"></div>
-        <p className="text-sm text-[#C4B5FD]/70 font-mono">Loading Funnel Dashboard...</p>
+      <div className="space-y-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} className="h-28" />
+          ))}
+        </div>
+        <SkeletonTable rows={4} cols={2} />
       </div>
     );
   }
@@ -95,6 +104,15 @@ export default function AdminAdmissionsDashboard() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
+      {isFallbackData && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs rounded-xl flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>Live admissions analytics unavailable — showing sample data</span>
+        </div>
+      )}
+
       {/* Metrics Card row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((c, idx) => {
@@ -125,25 +143,29 @@ export default function AdminAdmissionsDashboard() {
             <TrendingUp className="w-4.5 h-4.5 text-[#A78BFA]" /> Program Seat Occupancy Rates
           </h3>
           
-          <div className="space-y-4">
-            {stats.program_occupancies.map((p) => {
-              const ratio = Math.round((p.filled / p.seats) * 100);
-              return (
-                <div key={p.name} className="space-y-2">
-                  <div className="flex justify-between text-xs font-semibold text-white/90">
-                    <span className="truncate max-w-sm">{p.name}</span>
-                    <span className="font-mono text-[#A78BFA]">{p.filled} / {p.seats} seats ({ratio}%)</span>
+          {stats.program_occupancies.length === 0 ? (
+            <p className="text-xs text-[#C4B5FD]/50 py-6 text-center">No program occupancy data registered yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {stats.program_occupancies.map((p) => {
+                const ratio = p.seats > 0 ? Math.round((p.filled / p.seats) * 100) : 0;
+                return (
+                  <div key={p.name} className="space-y-2">
+                    <div className="flex justify-between text-xs font-semibold text-white/90">
+                      <span className="truncate max-w-sm">{p.name}</span>
+                      <span className="font-mono text-[#A78BFA]">{p.filled} / {p.seats} seats ({ratio}%)</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6]"
+                        style={{ width: `${ratio}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6]"
-                      style={{ width: `${ratio}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Geographic Distribution Card */}
@@ -152,17 +174,22 @@ export default function AdminAdmissionsDashboard() {
             <MapPin className="w-4.5 h-4.5 text-[#A78BFA]" /> Regional Demographics
           </h3>
           
-          <div className="space-y-3">
-            {stats.geographic_distribution.map((geo, idx) => (
-              <div key={idx} className="flex justify-between items-center py-2 border-b border-white/5 text-xs text-[#C4B5FD]/80">
-                <span className="font-semibold">{geo.state}</span>
-                <span className="font-mono font-bold text-white">{geo.count} leads</span>
-              </div>
-            ))}
-          </div>
+          {stats.geographic_distribution.length === 0 ? (
+            <p className="text-xs text-[#C4B5FD]/50 py-6 text-center">No regional demographic data recorded.</p>
+          ) : (
+            <div className="space-y-3">
+              {stats.geographic_distribution.map((geo, idx) => (
+                <div key={idx} className="flex justify-between items-center py-2 border-b border-white/5 text-xs text-[#C4B5FD]/80">
+                  <span className="font-semibold">{geo.state}</span>
+                  <span className="font-mono font-bold text-white">{geo.count} leads</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
     </div>
   );
 }
+

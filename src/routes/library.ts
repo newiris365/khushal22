@@ -14,16 +14,21 @@ import {
   listOverdueIssues,
   reserveBook,
   deleteReservation,
+  getAllReservations,
+  fulfillReservation,
   listReservationsForBook,
   listEbooks,
   createEbook,
   viewEbook,
   downloadEbook,
   listStudyRooms,
+  createStudyRoom,
+  listStudyRoomBookings,
   bookStudyRoom,
   deleteStudyRoomBooking,
   checkinStudyRoomBooking,
   getStudentFines,
+  getAllFines,
   payFine,
   getRecommendations,
   getOverviewStats,
@@ -75,8 +80,10 @@ router.get('/issues/student/:studentId', listStudentIssues);
 router.get('/issues/overdue', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), listOverdueIssues);
 
 // --- RESERVATIONS ---
+router.get('/reservations', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), getAllReservations);
 router.post('/reservations', reserveBook);
 router.delete('/reservations/:id', deleteReservation);
+router.post('/reservations/:id/fulfill', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), fulfillReservation);
 router.get('/reservations/book/:bookId', listReservationsForBook);
 
 // --- E-RESOURCE PORTAL ---
@@ -87,11 +94,14 @@ router.post('/ebooks/:id/download', downloadEbook);
 
 // --- STUDY ROOM BOOKINGS ---
 router.get('/study-rooms', listStudyRooms);
+router.post('/study-rooms', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), createStudyRoom);
+router.get('/study-room-bookings', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), listStudyRoomBookings);
 router.post('/study-room-bookings', bookStudyRoom);
 router.delete('/study-room-bookings/:id', deleteStudyRoomBooking);
 router.post('/study-room-bookings/:id/checkin', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), checkinStudyRoomBooking);
 
 // --- FINES ---
+router.get('/fines', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), getAllFines);
 router.get('/fines/:studentId', getStudentFines);
 router.post('/fines/:id/pay', payFine);
 

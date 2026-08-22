@@ -6,6 +6,7 @@ import {
   LayoutDashboard, ClipboardList, UtensilsCrossed, BarChart3, ChefHat,
   ListOrdered, Package, ShieldCheck, TrendingUp, UserCircle
 } from 'lucide-react';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 const vendorLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/vendor/dashboard', icon: LayoutDashboard },
@@ -21,6 +22,16 @@ const vendorLinks: SidebarLink[] = [
 ];
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
+  const { authorized } = usePortalAuth(['Vendor', 'SuperAdmin']);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-orange-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
+
   return (
     <PortalShell
       portalName="Canteen Portal"

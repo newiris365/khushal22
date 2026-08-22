@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, HelpCircle, Save, Upload, Plus, Table, RefreshCw } from 'lucide-react';
 
+import { apiGet, apiPost } from '../../../../../lib/api';
+
 interface AssessmentTool {
   id: string;
   name: string;
@@ -45,15 +47,10 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
     weightage: 20
   });
 
-  const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
-  });
-
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock COs
+      // COs for course
       const demoCOs = [
         { id: 'co-1', co_number: 1, co_statement: 'Define core software architectures.' },
         { id: 'co-2', co_number: 2, co_statement: 'Explain database indexing patterns.' },
@@ -62,7 +59,7 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
       ];
       setCos(demoCOs);
 
-      // Mock Tools
+      // Tools
       const demoTools = [
         { id: 'tool-1', name: 'Internal Mid-Semester Exam 1', tool_type: 'cie', max_marks: 30, weightage: 20 },
         { id: 'tool-2', name: 'Internal Quiz - React components', tool_type: 'quiz', max_marks: 10, weightage: 5 },
@@ -71,11 +68,22 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
       setTools(demoTools);
       setSelectedTool(demoTools[0].id);
 
-      // Mock Students
-      const demoStudents: StudentRow[]  = [];
-      setStudents(demoStudents);
+      // Fetch students
+      const stdRes = await apiGet('/core/students');
+      if (stdRes.success && stdRes.students && stdRes.students.length > 0) {
+        const mapped = stdRes.students.map((s: any) => ({
+          student_id: s.id,
+          roll_no: s.roll_number || s.id.slice(0, 8),
+          name: s.users?.name || s.users?.full_name || 'Student',
+          marks_obtained: demoCOs.reduce((acc, co) => ({ ...acc, [co.id]: 0 }), {})
+        }));
+        setStudents(mapped);
+      } else {
+        setStudents([]);
+      }
     } catch (err) {
       console.error(err);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -101,59 +109,107 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
     }));
   };
 
+  const currentToolObj = tools.find(t => t.id === selectedTool);
+
   const handleSaveMarks = async () => {
+    if (students.length === 0) {
+      alert('No student records to save.');
+      return;
+    }
     setSaving(true);
+    let successCount = 0;
+    let failCount = 0;
+
     try {
-      // Send student co marks to server
-      const promises = students.map(s => {
-        const marksList = Object.keys(s.marks_obtained).map(coId => ({
-          co_id: coId,
-          marks_obtained: s.marks_obtained[coId],
-          max_marks: 10 // Mock max marks per CO allocation
-        }));
-        return fetch('/api/obe/marks/entry', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
+      const toolMaxMarks = currentToolObj?.max_marks || 10;
+      const results = await Promise.all(
+        students.map(s => {
+          const marksList = Object.keys(s.marks_obtained).map(coId => ({
+            co_id: coId,
+            marks_obtained: s.marks_obtained[coId] || 0,
+            max_marks: toolMaxMarks
+          }));
+
+          return apiPost('/obe/marks/entry', {
             student_id: s.student_id,
             tool_id: selectedTool,
             marks: marksList
-          })
-        });
+          });
+        })
+      );
+
+      results.forEach(res => {
+        if (res.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
       });
 
-      await Promise.all(promises.slice(0, 3));
-      alert('Internal marks registered successfully in Supabase db schemas.');
-    } catch (err) {
-      alert('Internal marks spreadsheet saved to session draft.');
+      if (failCount === 0) {
+        alert(`Internal marks registered successfully for all ${successCount} students.`);
+      } else {
+        alert(`${successCount} of ${students.length} student marks saved successfully (${failCount} failed).`);
+      }
+    } catch (err: any) {
+      alert(`Error saving marks: ${err?.message || 'Network error'}`);
     } finally {
       setSaving(false);
     }
   };
 
   const handleImportCsv = () => {
-    // Standard mock trigger for spreadsheet import
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv,.xlsx,.xls';
+    input.accept = '.csv,.txt';
     input.onchange = async (e: any) => {
-      const file = e.target.files[0];
-      if (file) {
-        setLoading(true);
-        // Simulate reading
-        setTimeout(() => {
-          setStudents(prev => prev.map(s => ({
-            ...s,
-            marks_obtained: {
-              'co-1': 0,
-              'co-2': 0,
-              'co-3': 0,
-              'co-4': 0
-            }
-          })));
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setLoading(true);
+      try {
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+        if (lines.length <= 1) {
+          alert('CSV file is empty or only contains headers.');
           setLoading(false);
-          alert('CSV/Excel marks table processed successfully. Updated 5 records.');
-        }, 1200);
+          return;
+        }
+
+        let updatedCount = 0;
+        const updatedStudents = [...students];
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim());
+          if (cols.length < 2) continue;
+
+          const rollOrId = cols[0];
+          const studentIndex = updatedStudents.findIndex(
+            s => s.roll_no.toLowerCase() === rollOrId.toLowerCase() || s.student_id === rollOrId
+          );
+
+          if (studentIndex !== -1) {
+            const marksMap: Record<string, number> = { ...updatedStudents[studentIndex].marks_obtained };
+            cos.forEach((co, coIdx) => {
+              const val = parseFloat(cols[coIdx + 1]);
+              if (!isNaN(val)) {
+                marksMap[co.id] = val;
+              }
+            });
+            updatedStudents[studentIndex] = {
+              ...updatedStudents[studentIndex],
+              marks_obtained: marksMap
+            };
+            updatedCount++;
+          }
+        }
+
+        setStudents(updatedStudents);
+        alert(`CSV processed successfully. Updated marks for ${updatedCount} student records.`);
+      } catch (err: any) {
+        alert('Failed to parse CSV file. Please ensure valid comma-separated format.');
+      } finally {
+        setLoading(false);
       }
     };
     input.click();

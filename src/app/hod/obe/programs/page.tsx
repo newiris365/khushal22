@@ -38,33 +38,41 @@ export default function HodCoursesOverview() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadCourses = async () => {
+  const loadCourses = async (programIdParam?: string) => {
     setLoading(true);
     try {
-      // Fetch department courses
-      const res = await fetch('/api/obe/courses/a0000000-0000-0000-0000-000000000001', {
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (data.success && data.courses && data.courses.length > 0) {
-        // Map backend courses to mock HOD status details
-        const mapped = data.courses.map((c: any, idx: number) => ({
-          id: c.id,
-          course_code: c.course_code,
-          course_name: c.course_name,
-          teacher_name: c.staff?.name || 'Prof. Satish Kumar',
-          status: idx === 0 ? 'attained' : idx === 1 ? 'configured' : 'draft',
-          co_mapped: idx < 2,
-          marks_entered: idx === 0,
-          attainment_score: idx === 0 ? 75.0 : undefined
-        }));
-        setCourses(mapped);
-      } else {
-        // Fallback mock roster
-        setCourses([]);
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+      let targetProgramId = programIdParam;
+      if (!targetProgramId) {
+        const progRes = await fetch(`${API_BASE}/obe/programs`, { headers: getAuthHeaders() });
+        const progData = await progRes.json();
+        if (progData.success && progData.programs && progData.programs.length > 0) {
+          targetProgramId = progData.programs[0].id;
+        }
       }
+
+      if (targetProgramId) {
+        const res = await fetch(`${API_BASE}/obe/courses/${targetProgramId}`, {
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        if (data.success && data.courses && data.courses.length > 0) {
+          const mapped = data.courses.map((c: any, idx: number) => ({
+            id: c.id,
+            course_code: c.course_code,
+            course_name: c.course_name,
+            teacher_name: c.staff?.name || 'Prof. Satish Kumar',
+            status: idx === 0 ? 'attained' : idx === 1 ? 'configured' : 'draft',
+            co_mapped: idx < 2,
+            marks_entered: idx === 0,
+            attainment_score: idx === 0 ? 75.0 : undefined
+          }));
+          setCourses(mapped);
+          return;
+        }
+      }
+      setCourses([]);
     } catch (err) {
-      // Fallback
       setCourses([]);
     } finally {
       setLoading(false);
@@ -73,7 +81,8 @@ export default function HodCoursesOverview() {
 
   const loadPrograms = async () => {
     try {
-      const res = await fetch('/api/obe/programs', {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+      const res = await fetch(`${API_BASE}/obe/programs`, {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -81,22 +90,10 @@ export default function HodCoursesOverview() {
         setPrograms(data.programs);
         setNewCourse(prev => ({ ...prev, program_id: data.programs[0].id }));
       } else {
-        const fallback = [
-          { id: 'a0000000-0000-0000-0000-000000000001', program_name: 'Bachelor of Technology (Computer Science)', program_code: 'BTECH-CSE' },
-          { id: 'a0000000-0000-0000-0000-000000000002', program_name: 'Bachelor of Technology (Electronics)', program_code: 'BTECH-ECE' },
-          { id: 'a0000000-0000-0000-0000-000000000003', program_name: 'Master of Business Administration', program_code: 'MBA' }
-        ];
-        setPrograms(fallback);
-        setNewCourse(prev => ({ ...prev, program_id: fallback[0].id }));
+        setPrograms([]);
       }
     } catch (err) {
-      const fallback = [
-        { id: 'a0000000-0000-0000-0000-000000000001', program_name: 'Bachelor of Technology (Computer Science)', program_code: 'BTECH-CSE' },
-        { id: 'a0000000-0000-0000-0000-000000000002', program_name: 'Bachelor of Technology (Electronics)', program_code: 'BTECH-ECE' },
-        { id: 'a0000000-0000-0000-0000-000000000003', program_name: 'Master of Business Administration', program_code: 'MBA' }
-      ];
-      setPrograms(fallback);
-      setNewCourse(prev => ({ ...prev, program_id: fallback[0].id }));
+      setPrograms([]);
     }
   };
 

@@ -1,63 +1,63 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Eye, EyeOff, Clock } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
-export default function StaffNoticesPage() {
+export default function FacultyNoticesPage() {
   const [notices, setNotices] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchNotices(); }, []);
-
-  const fetchNotices = async () => {
-    setIsLoading(true);
-    try {
-      const res = await apiGet('staff/notices');
-      if (res.success) setNotices(res.notices || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getCategoryColor = (cat: string) => {
-    const colors: Record<string, string> = {
-      HR: 'bg-amber-500/20 text-amber-400',
-      Admin: 'bg-blue-500/20 text-blue-400',
-      General: 'bg-slate-500/20 text-slate-400',
-      Event: 'bg-purple-500/20 text-purple-400',
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await apiGet('campusCore/notices');
+        if (res.success) setNotices(res.notices || []);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
     };
-    return colors[cat] || 'bg-slate-500/20 text-slate-400';
+    load();
+  }, []);
+
+  const priorityColors: Record<string, string> = {
+    Urgent: 'bg-red-500/20 text-red-400 border-red-500/30',
+    Important: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    Normal: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-        <Bell size={24} className="text-amber-400" /> Notices
+        <Bell size={24} className="text-blue-400" />
+        Notices
       </h1>
 
-      {isLoading ? (
-        <div className="text-center py-12 text-slate-400">Loading...</div>
+      {loading ? (
+        <div className="text-center py-12 text-slate-400">Loading notices...</div>
       ) : notices.length === 0 ? (
-        <div className="text-center py-12 text-slate-400">
-          <Bell size={40} className="mx-auto mb-3 opacity-50" />
-          <p>No notices available.</p>
-        </div>
+        <div className="text-center py-12 text-slate-400">No notices found.</div>
       ) : (
         <div className="space-y-3">
-          {notices.map(n => (
-            <div key={n.id} className="bg-white/5 rounded-xl border border-white/10 p-4">
+          {notices.map((n: any) => (
+            <div key={n.id} className={`bg-white/5 rounded-xl p-4 border ${priorityColors[n.priority] || 'border-white/10'}`}>
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-white">{n.title}</h3>
-                  <p className="text-xs text-slate-400 mt-1">{n.content}</p>
-                  <p className="text-[10px] text-slate-500 mt-2">{n.created_at ? new Date(n.created_at).toLocaleDateString() : '—'}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-semibold text-white">{n.title}</h3>
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${priorityColors[n.priority] || 'bg-slate-500/20 text-slate-400'}`}>
+                      {n.priority}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-2">{n.content}</p>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span>{n.created_by_name || 'Admin'}</span>
+                    <span className="flex items-center gap-1"><Clock size={10} /> {new Date(n.created_at).toLocaleDateString()}</span>
+                    {n.target_audience && <span>Target: {n.target_audience}</span>}
+                  </div>
                 </div>
-                <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${getCategoryColor(n.category)}`}>
-                  {n.category || 'General'}
-                </span>
+                <div className="flex items-center gap-1 text-slate-400">
+                  {n.is_read ? <Eye size={14} /> : <EyeOff size={14} className="text-blue-400" />}
+                </div>
               </div>
             </div>
           ))}

@@ -1,69 +1,73 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Calendar, FileText, Award, Bell, Clock } from 'lucide-react';
+import {
+  LayoutDashboard, CalendarDays, ClipboardList, FileText, Users,
+  AlertTriangle, Clock, BookOpen, TrendingUp, Award, Bell
+} from 'lucide-react';
 import { apiGet } from '../../../lib/api';
-import Link from 'next/link';
 
-export default function StaffDashboard() {
-  const [stats, setStats] = useState({
-    leaveBalance: 0,
-    pendingLeaves: 0,
-    payslipsReady: 0,
-    upcomingAppraisal: '—',
-  });
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function FacultyDashboardPage() {
+  const [timetable, setTimetable] = useState<any[]>([]);
+  const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
+  const [todaySessions, setTodaySessions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
-    loadDashboard();
+    const saved = localStorage.getItem('iris_user_profile');
+    if (saved) { try { setProfile(JSON.parse(saved)); } catch {} }
   }, []);
 
-  const loadDashboard = async () => {
-    setLoading(true);
-    try {
-      const [leavesRes, payslipsRes] = await Promise.all([
-        apiGet('staff/leaves'),
-        apiGet('staff/payslips'),
-      ]);
-
-      if (leavesRes.success && leavesRes.leaves) {
-        const pending = leavesRes.leaves.filter((l: any) => l.status === 'pending');
-        const approved = leavesRes.leaves.filter((l: any) => l.status === 'approved');
-        setStats(s => ({
-          ...s,
-          pendingLeaves: pending.length,
-          leaveBalance: Math.max(0, 12 - approved.length),
-        }));
+  useEffect(() => {
+    if (!profile) return;
+    const load = async () => {
+      try {
+        const [ttRes, leavesRes] = await Promise.all([
+          apiGet('campusCore/faculty/timetable'),
+          apiGet('campusCore/faculty/leaves/pending'),
+        ]);
+        if (ttRes.success) setTimetable(ttRes.timetable || []);
+        if (leavesRes.success) setPendingLeaves(leavesRes.leaves || []);
+        const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+        setTodaySessions((ttRes.timetable || []).filter((t: any) => t.day_of_week === dayName));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
       }
+    };
+    load();
+  }, [profile]);
 
-      if (payslipsRes.success && payslipsRes.payslips) {
-        setStats(s => ({ ...s, payslipsReady: payslipsRes.payslips.length }));
-      }
-    } catch (err) {
-      console.error('Failed to load staff dashboard:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-blue-400 animate-pulse text-lg">Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: 'Today\'s Classes', value: todaySessions.length, icon: CalendarDays, color: 'text-blue-400' },
+    { label: 'Pending Leaves', value: pendingLeaves.length, icon: FileText, color: 'text-amber-400' },
+    { label: 'Weekly Classes', value: timetable.length, icon: ClipboardList, color: 'text-violet-400' },
+    { label: 'Quick Links', value: '→', icon: Users, color: 'text-emerald-400' },
+  ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <LayoutDashboard size={24} className="text-amber-400" /> Staff Dashboard
-        </h1>
-        <p className="text-sm text-[#C4B5FD]/60 mt-1">Welcome back! Manage your HR tasks here.</p>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Faculty Dashboard</h1>
+        <span className="text-sm text-slate-400">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        </span>
       </div>
 
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Leave Balance', value: stats.leaveBalance, icon: Calendar, color: 'text-amber-400' },
-          { label: 'Pending Leaves', value: stats.pendingLeaves, icon: Clock, color: 'text-blue-400' },
-          { label: 'Payslips Ready', value: stats.payslipsReady, icon: FileText, color: 'text-emerald-400' },
-          { label: 'Next Appraisal', value: stats.upcomingAppraisal, icon: Award, color: 'text-violet-400' },
-        ].map(s => (
-          <div key={s.label} className="bg-white/5 rounded-xl p-4 border border-white/10">
+        {stats.map((s) => (
+          <div key={s.label} className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
             <div className="flex items-center gap-3">
               <s.icon size={20} className={s.color} />
               <div>
@@ -76,37 +80,89 @@ export default function StaffDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white/5 rounded-xl border border-white/10 p-5">
-          <h3 className="text-sm font-bold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Apply Leave', href: '/staff/leave', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-              { label: 'View Payslips', href: '/staff/payslips', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-              { label: 'Appraisal Info', href: '/staff/appraisal', color: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
-              { label: 'Notices', href: '/staff/notices', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-            ].map(a => (
-              <Link key={a.label} href={a.href}
-                className={`p-3 rounded-lg border text-xs font-medium text-center hover:brightness-110 transition-all ${a.color}`}>
-                {a.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white/5 rounded-xl border border-white/10 p-5">
-          <h3 className="text-sm font-bold text-white mb-3">Recent Activity</h3>
-          {recentActivity.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">No recent activity.</p>
+        {/* Today's Schedule */}
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Clock size={18} className="text-blue-400" />
+            Today&apos;s Schedule
+          </h2>
+          {todaySessions.length === 0 ? (
+            <p className="text-slate-400 text-sm">No classes scheduled for today.</p>
           ) : (
-            <div className="space-y-2">
-              {recentActivity.map((a, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.03]">
-                  <p className="text-[11px] text-slate-300">{a.text}</p>
-                  <span className="text-[9px] text-slate-500">{a.time}</span>
+            <div className="space-y-3">
+              {todaySessions.map((s, i) => (
+                <div key={i} className="flex items-center gap-3 bg-white/5 rounded-lg p-3 border border-white/5">
+                  <div className="text-center min-w-[50px]">
+                    <p className="text-xs text-slate-400">Slot</p>
+                    <p className="text-sm font-mono text-white">{s.time_slot}</p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">{s.subject}</p>
+                    <p className="text-xs text-slate-400">{s.department_name || 'General'} {s.semester ? `— Sem ${s.semester}` : ''}</p>
+                  </div>
+                  <div className="text-xs text-slate-400">{s.room || '—'}</div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        {/* Pending Leave Applications */}
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <AlertTriangle size={18} className="text-amber-400" />
+            Pending Leave Applications
+            {pendingLeaves.length > 0 && (
+              <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full">
+                {pendingLeaves.length}
+              </span>
+            )}
+          </h2>
+          {pendingLeaves.length === 0 ? (
+            <p className="text-slate-400 text-sm">No pending leave applications.</p>
+          ) : (
+            <div className="space-y-3">
+              {pendingLeaves.slice(0, 5).map((leave: any) => (
+                <div key={leave.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3 border border-white/5">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold">
+                    {leave.student_name?.charAt(0) || '?'}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">{leave.student_name}</p>
+                    <p className="text-xs text-slate-400">{leave.leave_type} — {leave.start_date} to {leave.end_date}</p>
+                  </div>
+                  <a href="/staff/leaves" className="text-xs text-violet-400 hover:text-violet-300 underline">
+                    Review
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6 lg:col-span-2">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <TrendingUp size={18} className="text-emerald-400" />
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Start Attendance', href: '/staff/attendance', icon: CalendarDays, color: 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' },
+              { label: 'Enter CIA Marks', href: '/staff/cia', icon: FileText, color: 'bg-violet-500/20 text-violet-400 hover:bg-violet-500/30' },
+              { label: 'Review Leaves', href: '/staff/leaves', icon: Award, color: 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' },
+              { label: 'View Timetable', href: '/staff/timetable', icon: ClipboardList, color: 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' },
+            ].map((action) => (
+              <a
+                key={action.label}
+                href={action.href}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-white/5 transition-colors ${action.color}`}
+              >
+                <action.icon size={24} />
+                <span className="text-sm font-medium">{action.label}</span>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </div>

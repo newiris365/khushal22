@@ -32,10 +32,10 @@ export default function GenericDashboard() {
       { label: 'Notices', icon: Bell, href: '/student/notices', desc: 'Publish campus announcements' }
     ],
     Warden: [
-      { label: 'Hostel Rooms', icon: LayoutDashboard, href: '/warden/hostel/allocations', desc: 'View room allocations and occupancy' },
-      { label: 'Complaints', icon: ClipboardList, href: '/warden/hostel/complaints', desc: 'Review and resolve maintenance requests' },
-      { label: 'Visitors', icon: Users, href: '/warden/hostel/visitors', desc: 'Log and track hostel visitor passes' },
-      { label: 'Reports & Attendance', icon: Calendar, href: '/warden/hostel/reports', desc: 'Monitor hostel roll calls' }
+      { label: 'Hostel Rooms', icon: LayoutDashboard, href: '/warden/rooms', desc: 'View room allocations and occupancy' },
+      { label: 'Complaints', icon: ClipboardList, href: '/warden/complaints', desc: 'Review and resolve maintenance requests' },
+      { label: 'Visitors', icon: Users, href: '/warden/visitors', desc: 'Log and track hostel visitor passes' },
+      { label: 'Reports & Attendance', icon: Calendar, href: '/warden/reports', desc: 'Monitor hostel roll calls' }
     ],
     Security: [
       { label: 'Gate Logs', icon: Shield, href: '/gate/history', desc: 'Log entry/exit via RFID, QR, or biometric' },

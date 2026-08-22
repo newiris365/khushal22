@@ -418,6 +418,25 @@ export async function getPayslips(req: Request, res: Response) {
   }
 }
 
+export async function getMyPayslips(req: Request, res: Response) {
+  try {
+    let employeeId = req.user?.id || 'd0000000-0000-0000-0000-000000000003';
+    if (req.user?.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('employee_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profile) {
+        employeeId = profile.id;
+      }
+    }
+    return getPayslips({ ...req, params: { ...req.params, employeeId } } as any, res);
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 export async function getPayslipPdf(req: Request, res: Response) {
   try {
     const doc = new PDFDocument({ margin: 50 });

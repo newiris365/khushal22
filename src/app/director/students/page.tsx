@@ -76,15 +76,8 @@ export default function StudentLookupPage() {
         }
       }
     } catch {
-      // Sandbox Fallbacks
-      const fallbackList = [];
-      setStudentsList(fallbackList);
-      setFilteredList(fallbackList);
-
-      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const queryId = urlParams ? urlParams.get('id') : 's1';
-      setSelectedStudentId(queryId);
-      loadStudentProfile(queryId);
+      setStudentsList([]);
+      setFilteredList([]);
     } finally {
       setLoadingList(false);
     }
@@ -98,45 +91,7 @@ export default function StudentLookupPage() {
         setProfile(res.profile);
       }
     } catch {
-      // Sandbox fallback profiles
-      if (id === 's2') {
-        setProfile({
-          id: 's2',
-          roll_number: 'EC23B2011',
-          name: 'Rohan Sharma',
-          email: 'rohan@siet.edu.in',
-          phone: '+91 99999 12345',
-          department: 'Electronics',
-          semester: 4,
-          attendance_rate: 67,
-          fee_status: 'Outstanding Balance',
-          recent_movements: [
-            { id: 'm1', direction: 'in', gate_number: 'main', timestamp: new Date(Date.now() - 3600000).toISOString(), entry_method: 'rfid' },
-            { id: 'm2', direction: 'out', gate_number: 'main', timestamp: new Date(Date.now() - 3600000 * 5).toISOString(), entry_method: 'manual' }
-          ],
-          canteen_wallet_balance: 120,
-          active_subscriptions: { transit: 'Active (Route 4)', gym: 'Active (Slot B)', library: '1 Book overdue' }
-        });
-      } else {
-        setProfile({
-          id: 's1',
-          roll_number: 'CS23B1042',
-          name: '',
-          email: 'khushal@siet.edu.in',
-          phone: '+91 99999 88888',
-          department: 'Computer Science',
-          semester: 4,
-          attendance_rate: 88,
-          fee_status: 'Fully Paid',
-          recent_movements: [
-            { id: 'm3', direction: 'in', gate_number: 'main', timestamp: new Date().toISOString(), entry_method: 'qr' },
-            { id: 'm4', direction: 'out', gate_number: 'canteen_exit', timestamp: new Date(Date.now() - 3600000).toISOString(), entry_method: 'biometric' },
-            { id: 'm5', direction: 'in', gate_number: 'canteen_entry', timestamp: new Date(Date.now() - 3600000 * 2).toISOString(), entry_method: 'biometric' }
-          ],
-          canteen_wallet_balance: 350,
-          active_subscriptions: { transit: 'None', gym: 'None', library: '2 Books checked out' }
-        });
-      }
+      setProfile(null);
     } finally {
       setLoadingProfile(false);
     }

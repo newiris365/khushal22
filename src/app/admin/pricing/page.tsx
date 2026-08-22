@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, Plus, Trash2, Save, Loader2, CheckCircle, Home, Bus, Dumbbell, Pencil } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 interface PricingPlan {
   id: string;
@@ -29,6 +30,7 @@ export default function ServicePricingPage() {
   const [editingPlan, setEditingPlan] = useState<PricingPlan | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('hostel');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -46,11 +48,14 @@ export default function ServicePricingPage() {
     if (profile) {
       const parsed = JSON.parse(profile);
       setUser(parsed);
-      loadPlans(parsed.institution_id || 'a0000000-0000-0000-0000-000000000001');
+      if (parsed.institution_id) {
+        loadPlans(parsed.institution_id);
+      }
     }
   }, []);
 
   const loadPlans = async (instId: string) => {
+    if (!instId) return;
     setLoading(true);
     try {
       const res = await apiGet(`/service-subscriptions/pricing/${instId}`);
@@ -62,13 +67,14 @@ export default function ServicePricingPage() {
 
   const handleSave = async () => {
     if (!form.name || form.price <= 0) {
-      alert('Name and price are required.');
+      setToast({ msg: 'Name and price are required.', type: 'error' });
       return;
     }
     setSaving(true);
     try {
+      const instId = user?.institution_id || '';
       const res = await apiPost('/service-subscriptions/pricing', {
-        institution_id: user?.institution_id || 'a0000000-0000-0000-0000-000000000001',
+        institution_id: instId,
         service_type: form.service_type,
         name: form.name,
         description: form.description,
@@ -80,9 +86,10 @@ export default function ServicePricingPage() {
         setShowNewForm(false);
         setEditingPlan(null);
         resetForm();
-        loadPlans(user?.institution_id || 'a0000000-0000-0000-0000-000000000001');
+        setToast({ msg: 'Plan saved successfully!', type: 'success' });
+        loadPlans(instId);
       } else {
-        alert(res.error || 'Failed to save plan');
+        setToast({ msg: res.error || 'Failed to save plan', type: 'error' });
       }
     } catch {} finally { setSaving(false); }
   };
@@ -91,7 +98,9 @@ export default function ServicePricingPage() {
     if (!confirm('Deactivate this pricing plan?')) return;
     try {
       await apiDelete(`/service-subscriptions/pricing/${id}`);
-      loadPlans(user?.institution_id || 'a0000000-0000-0000-0000-000000000001');
+      if (user?.institution_id) {
+        loadPlans(user.institution_id);
+      }
     } catch {}
   };
 
@@ -328,6 +337,7 @@ export default function ServicePricingPage() {
           )}
         </div>
       </div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

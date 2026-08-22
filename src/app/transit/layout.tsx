@@ -32,6 +32,9 @@ export default function TransitLayout({ children }: { children: React.ReactNode 
     if (link.href === '/transit/sos' && role !== 'Parent') {
       return false;
     }
+    if (role === 'Driver' && ['/transit/subscription', '/transit/parking', '/transit/carbon', '/transit/sos'].includes(link.href)) {
+      return false;
+    }
     return true;
   });
 

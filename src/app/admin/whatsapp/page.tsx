@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Save, Send, CheckCircle, XCircle, AlertTriangle, RefreshCw, Eye, EyeOff, Clock, ExternalLink } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 const PROVIDERS = [
   { id: 'twilio', name: 'Twilio', desc: 'Twilio WhatsApp Business API (sandbox or production)', fields: ['api_url', 'api_key', 'from_number', 'template_namespace'] },
@@ -34,6 +35,7 @@ export default function AdminWhatsAppPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'config' | 'logs'>('config');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const [form, setForm] = useState({
     provider: 'twilio',
@@ -95,18 +97,18 @@ export default function AdminWhatsAppPage() {
     try {
       const res = await apiPost('campusCore/whatsapp/config', form);
       if (res.success) {
-        alert('WhatsApp API configuration saved successfully!');
+        setToast({ msg: 'WhatsApp API configuration saved successfully!', type: 'success' });
         fetchConfig();
       } else {
-        alert('Failed to save: ' + (res.error || 'Unknown error'));
+        setToast({ msg: 'Failed to save: ' + (res.error || 'Unknown error'), type: 'error' });
       }
     } catch (err: any) {
-      alert('Error: ' + err.message);
+      setToast({ msg: 'Error: ' + err.message, type: 'error' });
     } finally { setSaving(false); }
   };
 
   const handleTest = async () => {
-    if (!testPhone) { alert('Enter a phone number to test.'); return; }
+    if (!testPhone) { setToast({ msg: 'Enter a phone number to test.', type: 'error' }); return; }
     setTesting(true);
     setTestResult(null);
     try {
@@ -338,6 +340,7 @@ export default function AdminWhatsAppPage() {
           )}
         </div>
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   Users, MapPin, X
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 interface CalendarEvent {
   id: string;
@@ -65,6 +66,7 @@ export default function AcademicCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [typeFilter, setTypeFilter] = useState('all');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Create event form
   const [showEventForm, setShowEventForm] = useState(false);
@@ -114,14 +116,18 @@ export default function AcademicCalendarPage() {
       setShowEventForm(false);
       setEventForm({ title: '', event_type: 'semester_start', description: '', start_date: '', end_date: '', semester: '', batch_year: '', color: '#6C2BD9' });
       fetchData();
+      setToast({ msg: 'Calendar event created successfully!', type: 'success' });
     } else {
-      alert(res.error || 'Failed to create event.');
+      setToast({ msg: res.error || 'Failed to create event.', type: 'error' });
     }
   };
 
   const handleDeleteEvent = async (id: string) => {
     const res = await apiDelete(`campusCore/calendar/${id}`);
-    if (res.success) fetchData();
+    if (res.success) {
+      fetchData();
+      setToast({ msg: 'Calendar event removed.', type: 'info' });
+    }
   };
 
   const handleCreateHoliday = async () => {
@@ -131,8 +137,9 @@ export default function AcademicCalendarPage() {
       setShowHolidayForm(false);
       setHolidayForm({ name: '', date: '', is_optional: false });
       fetchData();
+      setToast({ msg: 'Holiday added successfully!', type: 'success' });
     } else {
-      alert(res.error || 'Failed to add holiday.');
+      setToast({ msg: res.error || 'Failed to add holiday.', type: 'error' });
     }
   };
 
@@ -517,6 +524,7 @@ export default function AcademicCalendarPage() {
           </div>
         </div>
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

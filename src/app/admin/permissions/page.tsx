@@ -8,6 +8,7 @@ import {
   getRolePermissions, setRolePermissions, seedPermissions,
   type ModulePermission
 } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 const ALL_ROLES = [
   'SuperAdmin', 'Admin', 'Director', 'Principal', 'HOD', 'Teacher', 'Staff',
@@ -185,6 +186,7 @@ export default function AdminPermissionsPage() {
   const [selectedRole, setSelectedRole] = useState('Teacher');
   const [hasExisting, setHasExisting] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [institutionId, setInstitutionId] = useState('');
   const [instituteType, setInstituteType] = useState('college');
 
@@ -285,12 +287,12 @@ export default function AdminPermissionsPage() {
     try {
       const res = await seedPermissions(institutionId);
       if (res.success) {
-        alert('Default permissions seeded! Refreshing...');
+        setToast({ msg: 'Default permissions seeded successfully!', type: 'success' });
         fetchPermissions();
       } else {
-        alert('Seed failed: ' + (res.error || 'Unknown'));
+        setToast({ msg: 'Seed failed: ' + (res.error || 'Unknown error'), type: 'error' });
       }
-    } catch (err: any) { alert('Error: ' + err.message); }
+    } catch (err: any) { setToast({ msg: 'Error: ' + err.message, type: 'error' }); }
     finally { setSaving(false); }
   };
 
@@ -438,6 +440,8 @@ export default function AdminPermissionsPage() {
           </div>
         </div>
       </div>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

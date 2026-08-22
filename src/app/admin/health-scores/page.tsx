@@ -6,6 +6,7 @@ import {
   Search, AlertTriangle, AlertCircle, CheckCircle, ChevronRight, UserMinus,
   BrainCircuit
 } from 'lucide-react';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 interface HealthReport {
   id: string;
@@ -44,6 +45,7 @@ export default function HealthScoresPage() {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [counselorName, setCounselorName] = useState('');
   const [recalculating, setRecalculating] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
     fetchReports();
@@ -83,12 +85,14 @@ export default function HealthScoresPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Health scores recalculated successfully for all students.');
+        setToast({ msg: 'Health scores recalculated successfully for all students.', type: 'success' });
         fetchReports();
+      } else {
+        setToast({ msg: data.error || 'Failed to calculate health scores.', type: 'error' });
       }
     } catch (err) {
       console.error(err);
-      alert('Error triggering health calculation.');
+      setToast({ msg: 'Error triggering health calculation.', type: 'error' });
     } finally {
       setRecalculating(false);
     }
@@ -408,6 +412,7 @@ export default function HealthScoresPage() {
           </div>
         )}
       </div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

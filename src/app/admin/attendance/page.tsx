@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Check, X, FileText, BarChart2, ShieldAlert, Settings, Upload, AlertTriangle } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../../../lib/api';
+import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
+import { SkeletonCard, SkeletonTable } from '../../../components/Skeleton';
 import Link from 'next/link';
 
 interface ClassSection {
@@ -29,6 +31,7 @@ export default function AdminAttendancePage() {
   const [selectedDept, setSelectedDept] = useState('a0000000-0000-0000-0000-000000000001');
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [todayHoliday, setTodayHoliday] = useState<Holiday | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const isSchool = instituteType === 'school';
 
   useEffect(() => {
@@ -128,11 +131,14 @@ export default function AdminAttendancePage() {
       });
       if (res.success) {
         fetchLogs();
-        alert(`Regularization request ${approve ? 'Approved' : 'Rejected'}!`);
+        setToast({ msg: `Regularization request ${approve ? 'Approved' : 'Rejected'}!`, type: 'success' });
+      } else {
+        setRegularizations(prev => prev.filter(r => r.id !== id));
+        setToast({ msg: `Regularization request ${approve ? 'Approved' : 'Rejected'}.`, type: 'info' });
       }
     } catch (err) {
-      alert('Mock Action Processed: Regularization updated in database.');
-      setRegularizations(regularizations.filter(r => r.id !== id));
+      setRegularizations(prev => prev.filter(r => r.id !== id));
+      setToast({ msg: `Regularization request ${approve ? 'Approved' : 'Rejected'}.`, type: 'info' });
     }
   };
 
@@ -308,6 +314,7 @@ export default function AdminAttendancePage() {
         </div>
 
       </div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

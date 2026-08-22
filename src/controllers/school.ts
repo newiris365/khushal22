@@ -1304,7 +1304,17 @@ export async function getDiaryEntries(req: Request, res: Response) {
 
     if (class_section_id) {
       query = query.eq('class_section_id', class_section_id);
+    } else if (req.user?.role === 'Student') {
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('class_section_id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (student?.class_section_id) {
+        query = query.eq('class_section_id', student.class_section_id);
+      }
     }
+
     if (date) {
       query = query.eq('date', date);
     }

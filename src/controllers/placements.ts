@@ -382,10 +382,20 @@ export async function applyDrive(req: Request, res: Response) {
 export async function getStudentApplications(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    let actualStudentId = studentId;
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('user_id', studentId)
+      .maybeSingle();
+    if (student) {
+      actualStudentId = student.id;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('drive_applications')
       .select('*, placement_drives(*, companies(*))')
-      .eq('student_id', studentId);
+      .eq('student_id', actualStudentId);
 
     if (error) throw error;
     return res.status(200).json({ success: true, applications: data || [] });
@@ -602,10 +612,20 @@ export async function createOffer(req: Request, res: Response) {
 export async function getStudentOffers(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    let actualStudentId = studentId;
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('user_id', studentId)
+      .maybeSingle();
+    if (student) {
+      actualStudentId = student.id;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('offer_letters')
       .select('*, companies(*), placement_drives(*)')
-      .eq('student_id', studentId);
+      .eq('student_id', actualStudentId);
 
     if (error) throw error;
     return res.status(200).json({ success: true, offers: data || [] });

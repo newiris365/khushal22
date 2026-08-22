@@ -62,6 +62,7 @@ import {
   getResults,
   publishResults,
   getMarksheetMetadata,
+  getStudentMarksheet,
   getCardTemplate,
   saveCardTemplate,
   generateCard,
@@ -96,6 +97,8 @@ import {
   getStudyMaterials,
   createStudyMaterial,
   getMyLeaves,
+  getMyStaffLeaves,
+  applyStaffLeave,
   getDepartmentLeaves,
   getMyCiaMarks,
   getWalletBalance,
@@ -360,6 +363,7 @@ router.post('/exams', requireRole(['Staff', 'Admin', 'SuperAdmin']), createExam)
 router.post('/exams/:id/results', requireRole(['Staff', 'Admin', 'SuperAdmin']), enterResults);
 router.get('/exams/:id/results', getResults);
 router.post('/exams/:id/publish', requireRole(['Staff', 'Admin', 'SuperAdmin']), publishResults);
+router.get('/exams/marksheet/:studentId', getStudentMarksheet);
 router.get('/exams/marksheet/:studentId/:examId', getMarksheetMetadata);
 
 // =========================================================================
@@ -440,6 +444,8 @@ router.post('/study-materials', requireRole(['Admin', 'SuperAdmin', 'Teacher']),
 // 18. LEAVE APPLICATION ROUTERS
 // =========================================================================
 router.get('/leaves/my', requireRole(['Student']), getMyLeaves);
+router.get('/leaves/my-staff', requireRole(['Staff', 'HOD', 'Teacher', 'Driver', 'SuperAdmin', 'Admin']), getMyStaffLeaves);
+router.post('/leaves/my-staff', requireRole(['Staff', 'HOD', 'Teacher', 'Driver', 'SuperAdmin', 'Admin']), applyStaffLeave);
 router.get('/leaves/department', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'HOD']), getDepartmentLeaves);
 
 // =========================================================================

@@ -5,8 +5,10 @@ import Link from 'next/link';
 import {
   Users, GraduationCap, Building2, CheckCircle, IndianRupee, AlertTriangle,
   CalendarDays, DoorOpen, Activity, TrendingUp, FileText, LogOut,
-  Dumbbell, Bus, ShoppingBag, BookOpen, Shield, X, ChevronDown, Loader2
+  Dumbbell, Bus, ShoppingBag, BookOpen, Shield, X, ChevronDown, Loader2, AlertCircle
 } from 'lucide-react';
+import { Toast, ToastMessage } from '../../components/ToastModal';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 // ========== TYPE DEFINITIONS ==========
 interface OverviewData {
@@ -67,6 +69,10 @@ export default function AdminDashboard() {
   const [modules, setModules] = useState<ModuleUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [isFallbackData, setIsFallbackData] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [dateRangeError, setDateRangeError] = useState<string>('');
+
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'>('monthly');
   const [reportMonth, setReportMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -93,6 +99,7 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setIsFallbackData(false);
     let fetchedOverview = null;
     let fetchedAttendanceTrend = [];
     let fetchedFeeByMonth = [];
@@ -140,13 +147,13 @@ export default function AdminDashboard() {
         setModules(modulesData.modules);
       }
     } catch (err) {
-      console.warn('Backend not reachable, loading sandbox demo data:', err);
+      console.warn('Backend not reachable, loading fallback data:', err);
+      setIsFallbackData(true);
     } finally {
-      // Always load sandbox fallback data for empty states
       if (fetchedOverview) {
         setOverview(fetchedOverview);
       } else {
-        // No data from backend - show zeros
+        setIsFallbackData(true);
         setOverview(isSchool ? {
           total_students: 0,
           total_staff: 0,
@@ -175,10 +182,7 @@ export default function AdminDashboard() {
           gate_entries_today: 0,
         });
       }
-      if (fetchedAttendanceTrend.length === 0) {
-        // No data from backend - show empty
-        setAttendanceTrend([]);
-      }
+      if (fetchedAttendanceTrend.length === 0) setAttendanceTrend([]);
       if (fetchedFeeByMonth.length === 0) {
         setFeeByMonth([
           { month: 'Jan', amount: 0 },
@@ -196,14 +200,7 @@ export default function AdminDashboard() {
         ]);
       }
       if (fetchedCanteenRevenue === 0) setCanteenRevenue(0);
-      if (fetchedAlerts.length === 0) {
-        setAlerts(isSchool ? [
-          { type: 'attendance', severity: 'high', title: 'Low Attendance — Grade 10', detail: '8 students below 75% attendance in Grade 10. Parent notifications sent.', created_at: new Date().toISOString() },
-          { type: 'fee', severity: 'high', title: 'Fee Defaulters — ₹1.2L Pending', detail: '12 students have overdue fee payments totaling ₹1,20,000.', created_at: new Date().toISOString() },
-          { type: 'bus', severity: 'medium', title: 'Bus Route 3 Delayed', detail: 'Bus RJ-14-AB-1234 on Route 3 is running 15 minutes behind schedule.', created_at: new Date().toISOString() },
-          { type: 'gate', severity: 'low', title: 'Parent Pickup Reminder', detail: '5 students still waiting for pickup. Last bell was 30 minutes ago.', created_at: new Date().toISOString() },
-        ] : []);
-      }
+      if (fetchedAlerts.length === 0) setAlerts([]);
       if (!fetchedModules) {
         setModules({
           canteen: { orders_today: 0 },
@@ -219,38 +216,39 @@ export default function AdminDashboard() {
   };
 
   const handleDownloadReport = async () => {
+    setDateRangeError('');
+    let startDate = '';
+    let endDate = '';
+
+    if (reportType === 'daily') {
+      startDate = endDate = new Date().toISOString().split('T')[0];
+    } else if (reportType === 'weekly') {
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      startDate = weekStart.toISOString().split('T')[0];
+      endDate = now.toISOString().split('T')[0];
+    } else if (reportType === 'monthly') {
+      startDate = `${reportYear}-${reportMonth}-01`;
+      const lastDay = new Date(parseInt(reportYear), parseInt(reportMonth), 0).getDate();
+      endDate = `${reportYear}-${reportMonth}-${String(lastDay).padStart(2, '0')}`;
+    } else if (reportType === 'yearly') {
+      startDate = `${reportYear}-01-01`;
+      endDate = `${reportYear}-12-31`;
+    } else if (reportType === 'custom') {
+      startDate = reportStartDate;
+      endDate = reportEndDate;
+    }
+
+    if (!startDate || !endDate) {
+      setDateRangeError('Please select a valid start and end date range.');
+      return;
+    }
+
     setDownloading(true);
     setShowReportModal(false);
+
     try {
-      let startDate = '';
-      let endDate = '';
-
-      if (reportType === 'daily') {
-        startDate = endDate = new Date().toISOString().split('T')[0];
-      } else if (reportType === 'weekly') {
-        const now = new Date();
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay());
-        startDate = weekStart.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
-      } else if (reportType === 'monthly') {
-        startDate = `${reportYear}-${reportMonth}-01`;
-        const lastDay = new Date(parseInt(reportYear), parseInt(reportMonth), 0).getDate();
-        endDate = `${reportYear}-${reportMonth}-${String(lastDay).padStart(2, '0')}`;
-      } else if (reportType === 'yearly') {
-        startDate = `${reportYear}-01-01`;
-        endDate = `${reportYear}-12-31`;
-      } else if (reportType === 'custom') {
-        startDate = reportStartDate;
-        endDate = reportEndDate;
-      }
-
-      if (!startDate || !endDate) {
-        alert('Please select a valid date range.');
-        setDownloading(false);
-        return;
-      }
-
       const response = await fetch('/api/v1/director/report/pdf', {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -266,11 +264,12 @@ export default function AdminDashboard() {
         const token = localStorage.getItem('iris_jwt_token');
         const downloadUrl = `${result.report.pdf_url}?token=${encodeURIComponent(token || '')}`;
         window.location.href = downloadUrl;
+        setToast({ msg: 'Report generated successfully! Download started.', type: 'success' });
       } else {
-        alert('Failed to generate report.');
+        setToast({ msg: result.error || 'Failed to generate report.', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to download report.');
+      setToast({ msg: 'Failed to download report due to network error.', type: 'error' });
     } finally {
       setDownloading(false);
     }
@@ -283,6 +282,16 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full">
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
+      {/* Fallback Data Banner */}
+      {isFallbackData && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs rounded-xl flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>Live data unavailable — showing cached/sample data</span>
+        </div>
+      )}
+
       {/* Section Tabs */}
       <div className="flex gap-3 mb-8 flex-wrap">
         {[
@@ -296,7 +305,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveSection(tab.key as any)}
             className={`px-5 py-2.5 rounded-xl flex items-center gap-2 font-bold text-sm transition-all ${
               activeSection === tab.key
-                ? 'bg-[#6C2BD9] text-white shadow-lg shadow-[#6C2BD9]/20'
+                ? 'bg-[#6C2BD9] text-[#FFFFFF] shadow-lg shadow-[#6C2BD9]/20'
                 : 'bg-[#13102A] text-[#C4B5FD] hover:bg-white/5 border border-white/5'
             }`}
           >
@@ -317,12 +326,7 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {loading && (
-        <div className="text-center py-20">
-          <div className="w-8 h-8 border-2 border-[#6C2BD9] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-[#C4B5FD]">Loading dashboard data...</p>
-        </div>
-      )}
+      {loading && <SkeletonDashboard />}
 
       {/* ===== OVERVIEW SECTION ===== */}
       {!loading && activeSection === 'overview' && overview && (

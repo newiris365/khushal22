@@ -232,7 +232,7 @@ export default function ProfilePage() {
       Director: '/director/dashboard',
       HOD: '/hod/dashboard',
       Teacher: '/teacher/attendance',
-      Staff: '/faculty/dashboard',
+      Staff: '/staff/dashboard',
       Student: '/student/dashboard',
       Parent: '/parent/dashboard',
       Warden: '/warden/dashboard',

@@ -4,8 +4,9 @@ import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, ScanLine, Car, ShieldAlert, Users, Clock, KeyRound,
-  AlertTriangle, Phone, UserCircle, Eye
+  AlertTriangle, Phone, UserCircle
 } from 'lucide-react';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 const securityLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/security/dashboard', icon: LayoutDashboard },
@@ -23,6 +24,16 @@ const securityLinks: SidebarLink[] = [
 ];
 
 export default function SecurityLayout({ children }: { children: React.ReactNode }) {
+  const { authorized } = usePortalAuth(['Security', 'SuperAdmin']);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-red-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
+
   return (
     <PortalShell
       portalName="Security Portal"

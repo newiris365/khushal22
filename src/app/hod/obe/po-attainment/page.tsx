@@ -24,46 +24,28 @@ export default function HodPoAttainment() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/obe/po-attainment/a0000000-0000-0000-0000-000000000001', {
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.attainments)) {
-        setPoAttainments(data.attainments);
-      } else {
-        // Fallback mock
-        setPoAttainments([
-          { po: 'PO1', statement: 'Engineering Knowledge', attained: 68, target: 60, is_attained: true },
-          { po: 'PO2', statement: 'Problem Analysis', attained: 64, target: 60, is_attained: true },
-          { po: 'PO3', statement: 'Design/Development', attained: 52, target: 60, is_attained: false },
-          { po: 'PO4', statement: 'Investigations', attained: 71, target: 60, is_attained: true },
-          { po: 'PO5', statement: 'Modern Tool Usage', attained: 78, target: 60, is_attained: true },
-          { po: 'PO6', statement: 'Engineer & Society', attained: 61, target: 60, is_attained: true },
-          { po: 'PO7', statement: 'Sustainability', attained: 58, target: 60, is_attained: false },
-          { po: 'PO8', statement: 'Ethics', attained: 80, target: 60, is_attained: true },
-          { po: 'PO9', statement: 'Individual & Team', attained: 84, target: 60, is_attained: true },
-          { po: 'PO10', statement: 'Communication', attained: 73, target: 60, is_attained: true },
-          { po: 'PO11', statement: 'Project Management', attained: 69, target: 60, is_attained: true },
-          { po: 'PO12', statement: 'Life-long Learning', attained: 76, target: 60, is_attained: true }
-        ]);
+      let programId = '';
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+      const progRes = await fetch(`${API_BASE}/obe/programs`, { headers: getAuthHeaders() });
+      const progData = await progRes.json();
+      if (progData.success && progData.programs && progData.programs.length > 0) {
+        programId = progData.programs[0].id;
       }
+
+      if (programId) {
+        const res = await fetch(`${API_BASE}/obe/po-attainment/${programId}`, {
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.attainments)) {
+          setPoAttainments(data.attainments);
+          return;
+        }
+      }
+      setPoAttainments([]);
     } catch (err) {
       console.error(err);
-      // Fallback
-      setPoAttainments([
-        { po: 'PO1', statement: 'Engineering Knowledge', attained: 68, target: 60, is_attained: true },
-        { po: 'PO2', statement: 'Problem Analysis', attained: 64, target: 60, is_attained: true },
-        { po: 'PO3', statement: 'Design/Development', attained: 52, target: 60, is_attained: false },
-        { po: 'PO4', statement: 'Investigations', attained: 71, target: 60, is_attained: true },
-        { po: 'PO5', statement: 'Modern Tool Usage', attained: 78, target: 60, is_attained: true },
-        { po: 'PO6', statement: 'Engineer & Society', attained: 61, target: 60, is_attained: true },
-        { po: 'PO7', statement: 'Sustainability', attained: 58, target: 60, is_attained: false },
-        { po: 'PO8', statement: 'Ethics', attained: 80, target: 60, is_attained: true },
-        { po: 'PO9', statement: 'Individual & Team', attained: 84, target: 60, is_attained: true },
-        { po: 'PO10', statement: 'Communication', attained: 73, target: 60, is_attained: true },
-        { po: 'PO11', statement: 'Project Management', attained: 69, target: 60, is_attained: true },
-        { po: 'PO12', statement: 'Life-long Learning', attained: 76, target: 60, is_attained: true }
-      ]);
+      setPoAttainments([]);
     } finally {
       setLoading(false);
     }

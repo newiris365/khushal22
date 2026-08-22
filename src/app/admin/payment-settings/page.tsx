@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Building, Smartphone, Wallet, Save, CheckCircle2, AlertTriangle, Eye, EyeOff, TestTube } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 export default function PaymentSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const [config, setConfig] = useState({
     razorpay_key_id: '',
@@ -72,9 +74,9 @@ export default function PaymentSettingsPage() {
       }, { onConflict: 'institution_id' });
 
       if (error) throw error;
-      alert('Payment settings saved successfully!');
+      setToast({ msg: 'Payment settings saved successfully!', type: 'success' });
     } catch (err) {
-      alert('Settings saved (sandbox mode).');
+      setToast({ msg: 'Settings saved in sandbox mode.', type: 'info' });
     } finally {
       setSaving(false);
     }
@@ -283,6 +285,7 @@ export default function PaymentSettingsPage() {
           </button>
         </div>
       </div>
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

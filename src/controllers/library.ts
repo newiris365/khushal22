@@ -797,6 +797,51 @@ export async function reserveBook(req: Request, res: Response) {
   }
 }
 
+export async function getAllReservations(req: Request, res: Response) {
+  try {
+    const instId = req.user?.institution_id;
+    let query = supabaseAdmin
+      .from('book_reservations')
+      .select('*, books(title, author, isbn), students(*, users(name, full_name))')
+      .order('reserved_at', { ascending: false });
+
+    if (instId) {
+      query = query.eq('institution_id', instId);
+    }
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    const formatted = (data || []).map((r: any) => ({
+      ...r,
+      book_title: r.books?.title || r.book_title || 'Book',
+      student_name: r.students?.users?.full_name || r.students?.users?.name || r.student_name || 'Student',
+      status: r.status === 'waiting' || r.status === 'notified' ? 'pending' : r.status
+    }));
+
+    return res.status(200).json({ success: true, reservations: formatted });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+export async function fulfillReservation(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabaseAdmin
+      .from('book_reservations')
+      .update({ status: 'fulfilled', fulfilled_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.status(200).json({ success: true, message: 'Reservation fulfilled.', reservation: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
 export async function deleteReservation(req: Request, res: Response) {
   try {
     const { id } = req.params;
@@ -826,6 +871,33 @@ export async function listReservationsForBook(req: Request, res: Response) {
     return res.status(200).json({ success: true, reservations: data || [] });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal server error.' });
+  }
+}
+
+export async function listStudyRoomBookings(req: Request, res: Response) {
+  try {
+    const instId = req.user?.institution_id;
+    let query = supabaseAdmin
+      .from('study_room_bookings')
+      .select('*, study_rooms(name, capacity, location), students(*, users(name, full_name))')
+      .order('date', { ascending: false });
+
+    if (instId) {
+      query = query.eq('institution_id', instId);
+    }
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    const formatted = (data || []).map((b: any) => ({
+      ...b,
+      room_name: b.study_rooms?.name || b.room_name || 'Study Room',
+      student_name: b.students?.users?.full_name || b.students?.users?.name || b.student_name || 'Student'
+    }));
+
+    return res.status(200).json({ success: true, bookings: formatted });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 
@@ -1176,6 +1248,33 @@ export async function checkinStudyRoomBooking(req: Request, res: Response) {
 // ============================================================
 // 6. FINES MANAGER
 // ============================================================
+
+export async function getAllFines(req: Request, res: Response) {
+  try {
+    const instId = req.user?.institution_id;
+    let query = supabaseAdmin
+      .from('library_fines')
+      .select('*, book_issues(*, books(title)), students(*, users(name, full_name))')
+      .order('created_at', { ascending: false });
+
+    if (instId) {
+      query = query.eq('institution_id', instId);
+    }
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    const formatted = (data || []).map((f: any) => ({
+      ...f,
+      student_name: f.students?.users?.full_name || f.students?.users?.name || f.student_name || 'Student',
+      book_title: f.book_issues?.books?.title || f.book_title
+    }));
+
+    return res.status(200).json({ success: true, fines: formatted });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
 
 export async function getStudentFines(req: Request, res: Response) {
   try {

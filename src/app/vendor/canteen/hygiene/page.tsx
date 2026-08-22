@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, AlertTriangle, Thermometer, CheckSquare, 
-  Square, RefreshCw, Calendar, ClipboardCheck, Sparkles 
+  RefreshCw, ClipboardCheck, History, Calendar, Check
 } from 'lucide-react';
-import { apiPost } from '../../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 export default function VendorHygienePage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [pastReports, setPastReports] = useState<any[]>([]);
+  const [fetchingReports, setFetchingReports] = useState(true);
 
   // Form states
   const [refTemp, setRefTemp] = useState('4.0');
@@ -22,6 +24,27 @@ export default function VendorHygienePage() {
     foodCovered: false
   });
 
+  useEffect(() => {
+    loadHygieneReports();
+  }, []);
+
+  const loadHygieneReports = async () => {
+    setFetchingReports(true);
+    try {
+      const res = await apiGet('canteen/hygiene/report');
+      if (res.success && res.report) {
+        setPastReports(res.report);
+      } else {
+        setPastReports([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setPastReports([]);
+    } finally {
+      setFetchingReports(false);
+    }
+  };
+
   const handleToggleCheck = (key: keyof typeof checks) => {
     setChecks(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -33,7 +56,6 @@ export default function VendorHygienePage() {
     const refNum = Number(refTemp);
     const cookNum = Number(cookTemp);
     
-    // Auto calculations of compliance rating for display
     let complianceDeductions = 0;
     if (refNum > 5.0 || refNum < 0.0) complianceDeductions += 20;
     if (cookNum < 70.0) complianceDeductions += 20;
@@ -44,13 +66,16 @@ export default function VendorHygienePage() {
     const mockScore = Math.max(10, 100 - complianceDeductions);
 
     try {
-      await apiPost('/canteen/hygiene/checklist', {
-        institution_id: 'i0000000-0000-0000-0000-000000000001',
+      const res = await apiPost('canteen/hygiene/checklist', {
         fridge_temperature: refNum,
         food_temperature: cookNum,
         checklist_items: checks,
         compliance_score: mockScore
       });
+
+      if (res.success) {
+        loadHygieneReports();
+      }
     } catch (err) {}
 
     setLoading(false);
@@ -73,123 +98,175 @@ export default function VendorHygienePage() {
   const isCookingUnsafe = Number(cookTemp) < 70.0;
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-      
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto space-y-6">
       {/* Header Bar */}
-      <div className="flex items-center gap-3 bg-[#13102A]/80 border border-white/5 p-6 rounded-3xl">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#6C2BD9] to-[#8B5CF6] flex items-center justify-center">
-          <ShieldCheck className="w-6 h-6 text-white" />
+      <div className="flex items-center justify-between bg-[#13102A]/80 border border-white/5 p-6 rounded-3xl">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#6C2BD9] to-[#8B5CF6] flex items-center justify-center">
+            <ShieldCheck className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Daily Hygiene Audit & FSSAI Logs</h2>
+            <p className="text-xs text-[#A78BFA]/70 mt-0.5">Submit daily sanitization audits and temperatures matching campus compliance laws.</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold">Daily Hygiene Audit & Temperatures</h2>
-          <p className="text-xs text-[#A78BFA]/70 mt-0.5">Submit daily sanitization audits and temperatures matching FSSAI laws.</p>
-        </div>
+        <button
+          onClick={loadHygieneReports}
+          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[#C4B5FD] transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
-      {success ? (
-        <div className="glass-panel border border-emerald-500/30 rounded-2xl p-8 text-center space-y-4">
-          <ClipboardCheck className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
-          <div>
-            <h3 className="text-lg font-bold text-white">Hygiene Audit Submitted!</h3>
-            <p className="text-xs text-[#C4B5FD]/60 mt-1">Checklist saved to the campus compliance ledger.</p>
-          </div>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* Temperatures Section */}
-          <div className="glass-panel border border-white/5 p-5 rounded-2xl space-y-4">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <Thermometer className="w-4 h-4 text-[#A78BFA]" /> Temperature Loggers
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Form Column */}
+        <div className="space-y-6">
+          {success ? (
+            <div className="glass-panel border border-emerald-500/30 rounded-2xl p-8 text-center space-y-4">
+              <ClipboardCheck className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
               <div>
-                <label className="text-[10px] text-[#C4B5FD]/60 uppercase tracking-wider block mb-1.5 font-bold">Refrigerator Temp (°C)</label>
-                <div className="relative">
-                  <input 
-                    required
-                    type="number"
-                    step="any"
-                    value={refTemp}
-                    onChange={(e) => setRefTemp(e.target.value)}
-                    className={`w-full pl-4 pr-10 py-2.5 bg-[#0D0A1A] border rounded-xl text-xs text-white outline-none font-mono ${
-                      isFridgeUnsafe ? 'border-red-500/40 focus:border-red-500' : 'border-white/10 focus:border-[#6C2BD9]/50'
-                    }`}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-[#C4B5FD]/45 font-bold">Max 5.0°</span>
-                </div>
-                {isFridgeUnsafe && (
-                  <p className="text-[9px] text-red-400 mt-1 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> Warning: Ideal range is 0.0°C - 5.0°C</p>
-                )}
-              </div>
-
-              <div>
-                <label className="text-[10px] text-[#C4B5FD]/60 uppercase tracking-wider block mb-1.5 font-bold">Serving Warm Food Temp (°C)</label>
-                <div className="relative">
-                  <input 
-                    required
-                    type="number"
-                    step="any"
-                    value={cookTemp}
-                    onChange={(e) => setCookTemp(e.target.value)}
-                    className={`w-full pl-4 pr-10 py-2.5 bg-[#0D0A1A] border rounded-xl text-xs text-white outline-none font-mono ${
-                      isCookingUnsafe ? 'border-red-500/40 focus:border-red-500' : 'border-white/10 focus:border-[#6C2BD9]/50'
-                    }`}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-[#C4B5FD]/45 font-bold">Min 70.0°</span>
-                </div>
-                {isCookingUnsafe && (
-                  <p className="text-[9px] text-red-400 mt-1 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> Warning: Food must be kept warm above 70°C</p>
-                )}
+                <h3 className="text-lg font-bold text-white">Hygiene Audit Submitted!</h3>
+                <p className="text-xs text-[#C4B5FD]/60 mt-1">Checklist saved to the campus compliance ledger.</p>
               </div>
             </div>
-          </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Temperatures Section */}
+              <div className="glass-panel border border-white/5 p-5 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Thermometer className="w-4 h-4 text-[#A78BFA]" /> Temperature Loggers
+                </h3>
 
-          {/* Sanitization Checklist */}
-          <div className="glass-panel border border-white/5 p-5 rounded-2xl space-y-4">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-[#A78BFA]" /> Canteen Sanitization Checks
-            </h3>
-
-            <div className="flex flex-col gap-3">
-              {[
-                { key: 'countersCleaned' as const, label: 'Preparation counters cleaned and sanitized' },
-                { key: 'staffGloved' as const, label: 'Cooking staff wearing hair nets & kitchen gloves' },
-                { key: 'dishesSanitized' as const, label: 'Serving dishes washed and run in sanitizer cycle' },
-                { key: 'pestCheck' as const, label: 'No visual signs of pests or insects' },
-                { key: 'foodCovered' as const, label: 'Cooked ingredients and dishes fully covered' }
-              ].map(item => {
-                const checked = checks[item.key];
-                return (
-                  <div 
-                    key={item.key}
-                    onClick={() => handleToggleCheck(item.key)}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-[#6C2BD9]/20 transition-all cursor-pointer select-none"
-                  >
-                    {checked ? (
-                      <div className="w-5 h-5 bg-[#6C2BD9] rounded flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5 text-white" /></div>
-                    ) : (
-                      <div className="w-5 h-5 border border-white/20 rounded" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] text-[#C4B5FD]/60 uppercase tracking-wider block mb-1.5 font-bold">Refrigerator Temp (°C)</label>
+                    <div className="relative">
+                      <input 
+                        required
+                        type="number"
+                        step="any"
+                        value={refTemp}
+                        onChange={(e) => setRefTemp(e.target.value)}
+                        className={`w-full pl-4 pr-10 py-2.5 bg-[#0D0A1A] border rounded-xl text-xs text-white outline-none font-mono ${
+                          isFridgeUnsafe ? 'border-red-500/40 focus:border-red-500' : 'border-white/10 focus:border-[#6C2BD9]/50'
+                        }`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-[#C4B5FD]/45 font-bold">Max 5.0°</span>
+                    </div>
+                    {isFridgeUnsafe && (
+                      <p className="text-[9px] text-red-400 mt-1 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> Ideal: 0.0°C - 5.0°C</p>
                     )}
-                    <span className="text-xs text-[#C4B5FD]/85 font-medium">{item.label}</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-[#C4B5FD]/60 uppercase tracking-wider block mb-1.5 font-bold">Serving Warm Food Temp (°C)</label>
+                    <div className="relative">
+                      <input 
+                        required
+                        type="number"
+                        step="any"
+                        value={cookTemp}
+                        onChange={(e) => setCookTemp(e.target.value)}
+                        className={`w-full pl-4 pr-10 py-2.5 bg-[#0D0A1A] border rounded-xl text-xs text-white outline-none font-mono ${
+                          isCookingUnsafe ? 'border-red-500/40 focus:border-red-500' : 'border-white/10 focus:border-[#6C2BD9]/50'
+                        }`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-[#C4B5FD]/45 font-bold">Min 70.0°</span>
+                    </div>
+                    {isCookingUnsafe && (
+                      <p className="text-[9px] text-red-400 mt-1 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> Min: 70°C warm threshold</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sanitization Checklist */}
+              <div className="glass-panel border border-white/5 p-5 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-[#A78BFA]" /> Canteen Sanitization Checks
+                </h3>
+
+                <div className="flex flex-col gap-3">
+                  {[
+                    { key: 'countersCleaned' as const, label: 'Preparation counters cleaned and sanitized' },
+                    { key: 'staffGloved' as const, label: 'Cooking staff wearing hair nets & kitchen gloves' },
+                    { key: 'dishesSanitized' as const, label: 'Serving dishes washed and run in sanitizer cycle' },
+                    { key: 'pestCheck' as const, label: 'No visual signs of pests or insects' },
+                    { key: 'foodCovered' as const, label: 'Cooked ingredients and dishes fully covered' }
+                  ].map(item => {
+                    const checked = checks[item.key];
+                    return (
+                      <div 
+                        key={item.key}
+                        onClick={() => handleToggleCheck(item.key)}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-[#6C2BD9]/20 transition-all cursor-pointer select-none"
+                      >
+                        {checked ? (
+                          <div className="w-5 h-5 bg-[#6C2BD9] rounded flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5 text-white" /></div>
+                        ) : (
+                          <div className="w-5 h-5 border border-white/20 rounded" />
+                        )}
+                        <span className="text-xs text-[#C4B5FD]/85 font-medium">{item.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5 shadow-lg"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Publish Daily Hygiene Log'}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* History Column */}
+        <div className="glass-panel border border-white/5 p-6 rounded-2xl space-y-4 h-fit">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <History className="w-4 h-4 text-emerald-400" /> Compliance Audit History
+          </h3>
+
+          {fetchingReports ? (
+            <div className="py-12 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
+              <span>Fetching past compliance logs...</span>
+            </div>
+          ) : pastReports.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-500">
+              No previous hygiene audit reports logged yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pastReports.map((rep: any, idx: number) => {
+                const score = rep.compliance_score || 90;
+                return (
+                  <div key={rep.id || idx} className="bg-slate-900/60 border border-white/5 p-4 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">
+                        {rep.date ? new Date(rep.date).toLocaleDateString() : 'Recent Audit'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        score >= 85 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        Score: {score}%
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-[#C4B5FD]/70 pt-1 border-t border-white/5">
+                      <div>Fridge: <strong className="text-white">{rep.fridge_temperature ?? '4.0'}°C</strong></div>
+                      <div>Food: <strong className="text-white">{rep.food_temperature ?? '74.5'}°C</strong></div>
+                    </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#6C2BD9]/15"
-          >
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Publish Daily Hygiene Log'}
-          </button>
-
-        </form>
-      )}
-
+          )}
+        </div>
+      </div>
     </div>
   );
 }

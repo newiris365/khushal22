@@ -34,30 +34,7 @@ export default function DirectorSettingsPage() {
         setThresholds(res.thresholds || []);
       }
     } catch {
-      // Sandbox Fallbacks
-      setThresholds([
-        {
-          alert_type: 'attendance_low',
-          threshold_value: 80,
-          comparison: 'lt',
-          is_enabled: true,
-          notify_via: ['push', 'email']
-        },
-        {
-          alert_type: 'complaint_overdue',
-          threshold_value: 5,
-          comparison: 'gt',
-          is_enabled: true,
-          notify_via: ['push']
-        },
-        {
-          alert_type: 'library_overdue_surge',
-          threshold_value: 50,
-          comparison: 'gt',
-          is_enabled: false,
-          notify_via: ['email']
-        }
-      ]);
+      setThresholds([]);
     } finally {
       setLoading(false);
     }
@@ -82,10 +59,8 @@ export default function DirectorSettingsPage() {
         setThresholds(prev => prev.map(t => t.alert_type === type ? { ...t, ...res.threshold } : t));
         alert(`Successfully saved threshold parameters for: ${type}`);
       }
-    } catch {
-      // Sandbox mock save
-      setThresholds(prev => prev.map(t => t.alert_type === type ? { ...t, ...updatedData } : t));
-      alert(`Saved threshold parameters for: ${type} (MOCKED)`);
+    } catch (err: any) {
+      alert(`Failed to save threshold parameters for ${type}: ${err?.message || 'Server error'}`);
     } finally {
       setSavingType(null);
     }

@@ -1729,3 +1729,143 @@ export async function getDailyMenuByDate(req: Request, res: Response) {
   }
 }
 
+// ──── HOURLY SALES ANALYTICS ────
+export async function getAnalyticsHourly(req: Request, res: Response) {
+  try {
+    const instId = req.user?.institution_id;
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data: todayOrders } = await supabaseAdmin
+      .from('canteen_orders')
+      .select('id, total_amount, order_time, created_at')
+      .eq('institution_id', instId)
+      .gte('created_at', `${today}T00:00:00Z`);
+
+    const hoursMap: Record<string, { orders: number; revenue: number }> = {};
+    for (let h = 8; h <= 17; h++) {
+      const timeLabel = `${h.toString().padStart(2, '0')}:00`;
+      hoursMap[timeLabel] = { orders: 0, revenue: 0 };
+    }
+
+    if (todayOrders) {
+      todayOrders.forEach(o => {
+        const timeStr = o.order_time || o.created_at;
+        if (timeStr) {
+          const hour = new Date(timeStr).getHours();
+          const timeLabel = `${hour.toString().padStart(2, '0')}:00`;
+          if (hoursMap[timeLabel]) {
+            hoursMap[timeLabel].orders += 1;
+            hoursMap[timeLabel].revenue += Number(o.total_amount || 0);
+          }
+        }
+      });
+    }
+
+    const hourly = Object.keys(hoursMap).map(time => ({
+      time,
+      orders: hoursMap[time].orders,
+      revenue: hoursMap[time].revenue
+    }));
+
+    return res.status(200).json({ success: true, hourly });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch hourly analytics' });
+  }
+}
+
+// ──── INVENTORY & STOCK ITEMS ────
+export async function getInventory(req: Request, res: Response) {
+  try {
+    const instId = req.user?.institution_id;
+
+    const { data: menuItems, error: menuErr } = await supabaseAdmin
+      .from('canteen_menus')
+      .select('id, name, daily_stock, stock_remaining, price')
+      .eq('institution_id', instId);
+
+    if (menuErr) {
+      return res.status(500).json({ success: false, error: menuErr.message });
+    }
+
+    const stock = (menuItems || []).map(m => ({
+      id: m.id,
+      name: m.name,
+      qty: m.stock_remaining ?? m.daily_stock ?? 20,
+      unit: 'items',
+      min_required: 10,
+      cost_per_unit: Number(m.price || 50)
+    }));
+
+    const { data: wasteData } = await supabaseAdmin
+      .from('inventory_logs')
+      .select('id, item_id, waste, created_at, canteen_menus(name, price)')
+      .eq('institution_id', instId)
+      .gt('waste', 0)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    const wasteLogs = (wasteData || []).map(w => ({
+      id: w.id,
+      item_name: (w.canteen_menus as any)?.name || 'Canteen Item',
+      qty: w.waste,
+      unit: 'items',
+      reason: 'Spoiled / Expired',
+      cost: Number((w.canteen_menus as any)?.price || 50) * w.waste,
+      logged_at: w.created_at
+    }));
+
+    return res.status(200).json({ success: true, stock, wasteLogs });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch inventory' });
+  }
+}
+
+export async function updateInventoryItem(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { qty } = req.body;
+
+    const { data, error } = await supabaseAdmin
+      .from('canteen_menus')
+      .update({ stock_remaining: qty })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, item: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to update inventory' });
+  }
+}
+
+export async function logInventoryWaste(req: Request, res: Response) {
+  try {
+    const instId = req.user?.institution_id;
+    const { item_id, qty, reason } = req.body;
+
+    const { data, error } = await supabaseAdmin
+      .from('inventory_logs')
+      .insert({
+        institution_id: instId,
+        item_id: item_id,
+        waste: qty,
+        logged_by: req.user?.id
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(201).json({ success: true, wasteLog: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to log waste' });
+  }
+}
+
+

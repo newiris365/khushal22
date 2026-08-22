@@ -23,20 +23,8 @@ export default function CompetitorBenchmarksPage() {
         setSuggestions(res.suggestions || []);
       }
     } catch {
-      // Sandbox fallback data
-      setBenchmarks([
-        { id: 'b1', metric: 'Attendance Rate', our_value: 82, industry_avg: 78.5, top_performer: 92, percentile: 74 },
-        { id: 'b2', metric: 'Fee Collection Rate', our_value: 78, industry_avg: 72, top_performer: 95, percentile: 82 },
-        { id: 'b3', metric: 'Module Adoption (Canteen)', our_value: 92, industry_avg: 80, top_performer: 98, percentile: 88 },
-        { id: 'b4', metric: 'Module Adoption (FitZone)', our_value: 64, industry_avg: 50, top_performer: 85, percentile: 70 },
-        { id: 'b5', metric: 'Module Adoption (Library+)', our_value: 72, industry_avg: 60, top_performer: 90, percentile: 75 },
-        { id: 'b6', metric: 'Module Adoption (Transit)', our_value: 58, industry_avg: 65, top_performer: 88, percentile: 42 }
-      ]);
-      setSuggestions([
-        { metric: 'Attendance Rate', suggestion: 'Introduce RFID bus scans to capture transit-linked attendance automatically.' },
-        { metric: 'Fee Collection Rate', suggestion: 'Configure auto-whatsapp reminders 3 days prior to fee structures installments due date.' },
-        { metric: 'Module Adoption (FitZone)', suggestion: 'Run virtual classes stream logs directly in student mobile feed to boost subscriptions.' }
-      ]);
+      setBenchmarks([]);
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }

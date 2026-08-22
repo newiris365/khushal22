@@ -204,7 +204,7 @@ export default function GymPage() {
     if (profile) {
       const parsed = JSON.parse(profile);
       setUser(parsed);
-      setInstId(parsed.institution_id || 'a0000000-0000-0000-0000-000000000001');
+      setInstId(parsed.institution_id || '');
     }
   }, []);
 

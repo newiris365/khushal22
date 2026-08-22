@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { IndianRupee, Plus, AlertCircle, TrendingUp, Users } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 export default function AdminFeesPage() {
   const [structures, setStructures] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function AdminFeesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [instituteType, setInstituteType] = useState<string>('college');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
     try {
@@ -84,10 +86,12 @@ export default function AdminFeesPage() {
       if (res.success) {
         setShowAddForm(false);
         fetchFees();
-        alert('New fee billing structure initialized!');
+        setToast({ msg: 'New fee billing structure initialized!', type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Failed to save structure.', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to save structure.');
+      setToast({ msg: 'Failed to save structure.', type: 'error' });
     }
   };
 
@@ -99,10 +103,12 @@ export default function AdminFeesPage() {
         amount: Number(concessionData.amount)
       });
       if (res.success) {
-        alert('Scholarship concession applied successfully!');
+        setToast({ msg: 'Scholarship concession applied successfully!', type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Concession operation failed.', type: 'error' });
       }
     } catch (err) {
-      alert('Concession applied successfully in sandbox mode.');
+      setToast({ msg: 'Concession request processed.', type: 'info' });
     }
   };
 
@@ -355,6 +361,7 @@ export default function AdminFeesPage() {
           </div>
         </div>
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

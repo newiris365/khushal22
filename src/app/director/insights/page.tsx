@@ -62,32 +62,8 @@ export default function DirectorAIInsightsPage() {
       if (dropRes.success) setDropoutStudents(dropRes.students || []);
       if (feeRes.success) setFeeDefaulters(feeRes.defaulters || []);
     } catch {
-      // Sandbox Fallbacks
-      setInsights([
-        {
-          id: 'i1',
-          insight_type: 'canteen_inventory',
-          title: 'Canteen Stock Optimization',
-          description: 'A 24% surge in Friday snacks demand predicted due to afternoon events scheduled.',
-          severity: 'info',
-          recommendation: 'Pre-order 20% more stock of beverages and fast snacks by Thursday evening.',
-          affected_entities: { count: 3 },
-          generated_at: new Date().toISOString()
-        },
-        {
-          id: 'i2',
-          insight_type: 'dropout_cluster',
-          title: 'High-risk Dropouts Detected',
-          description: 'Sophomore batch Computer Science department has 5 students tracking below 70% attendance and declining average exam marks.',
-          severity: 'critical',
-          recommendation: 'Alert respective academic counselors to trigger mentorship meetings.',
-          affected_entities: { count: 5 },
-          generated_at: new Date(Date.now() - 3600000 * 2).toISOString()
-        }
-      ]);
-
+      setInsights([]);
       setDropoutStudents([]);
-
       setFeeDefaulters([]);
     } finally {
       setLoading(false);

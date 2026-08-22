@@ -313,27 +313,70 @@ export async function marksImport(req: Request, res: Response) {
 export async function getCoAttainment(req: Request, res: Response) {
   try {
     const { courseId } = req.params;
-    
-    // Attainment calculator formula direct/indirect (80-20 weightages)
-    const directMock = 72.5;
-    const indirectMock = 85.0;
-    const final = parseFloat((0.8 * directMock + 0.2 * indirectMock).toFixed(2));
-    const target = 60.0;
+
+    // Query COs for this course
+    const { data: cos } = await supabaseAdmin
+      .from('course_outcomes')
+      .select('id, co_number')
+      .eq('course_id', courseId);
+
+    // Query tools for this course
+    const { data: tools } = await supabaseAdmin
+      .from('assessment_tools')
+      .select('id')
+      .eq('course_id', courseId);
+
+    const toolIds = (tools || []).map(t => t.id);
+
+    let coScores: { co: string; score: number; target: number; attained: boolean }[] = [];
+
+    if (cos && cos.length > 0 && toolIds.length > 0) {
+      const { data: marks } = await supabaseAdmin
+        .from('student_co_marks')
+        .select('*')
+        .in('tool_id', toolIds);
+
+      coScores = cos.map(co => {
+        const coMarks = (marks || []).filter(m => m.co_id === co.id);
+        let totalPct = 0;
+        if (coMarks.length > 0) {
+          const sumPct = coMarks.reduce((acc, m) => acc + ((m.marks_obtained / (m.max_marks || 10)) * 100), 0);
+          totalPct = Math.round(sumPct / coMarks.length);
+        }
+        const target = 60;
+        return {
+          co: `CO${co.co_number}`,
+          score: totalPct,
+          target,
+          attained: totalPct >= target
+        };
+      });
+    }
+
+    if (coScores.length === 0) {
+      coScores = [
+        { co: 'CO1', score: 0, target: 60, attained: false },
+        { co: 'CO2', score: 0, target: 60, attained: false },
+        { co: 'CO3', score: 0, target: 60, attained: false },
+        { co: 'CO4', score: 0, target: 60, attained: false }
+      ];
+    }
+
+    const avgDirect = coScores.reduce((acc, c) => acc + c.score, 0) / coScores.length;
+    const directAttainment = parseFloat(avgDirect.toFixed(1));
+    const indirectAttainment = 0;
+    const finalAttainment = parseFloat((0.8 * directAttainment + 0.2 * indirectAttainment).toFixed(1));
+    const targetAttainment = 60.0;
 
     const stats = {
       course_id: courseId,
       academic_year: '2026-27',
-      direct_attainment: directMock,
-      indirect_attainment: indirectMock,
-      final_attainment: final,
-      target_attainment: target,
-      is_attained: final >= target,
-      co_scores: [
-        { co: 'CO1', score: 75, target: 60, attained: true },
-        { co: 'CO2', score: 68, target: 60, attained: true },
-        { co: 'CO3', score: 54, target: 60, attained: false },
-        { co: 'CO4', score: 82, target: 60, attained: true }
-      ]
+      direct_attainment: directAttainment,
+      indirect_attainment: indirectAttainment,
+      final_attainment: finalAttainment,
+      target_attainment: targetAttainment,
+      is_attained: finalAttainment >= targetAttainment,
+      co_scores: coScores
     };
 
     return res.status(200).json({ success: true, attainment: stats });

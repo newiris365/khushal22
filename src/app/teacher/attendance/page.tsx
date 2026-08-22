@@ -16,7 +16,7 @@ export default function TeacherAttendancePage() {
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    department_id: 'a0000000-0000-0000-0000-000000000001', // CSE
+    department_id: '',
     subject: 'Compiler Design',
     time_slot: '09:00 - 10:00 AM'
   });

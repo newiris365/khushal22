@@ -60,12 +60,12 @@ const vendorLinks: SidebarLink[] = [
 ];
 
 const wardenLinks: SidebarLink[] = [
-  { label: 'Dashboard', href: '/warden/hostel', icon: LayoutDashboard },
-  { label: 'Complaints', href: '/warden/hostel/complaints', icon: AlertTriangle },
-  { label: 'Leave Requests', href: '/warden/hostel/leave', icon: FileText },
-  { label: 'Room Allocations', href: '/warden/hostel/allocations', icon: Bed },
-  { label: 'Visitors', href: '/warden/hostel/visitors', icon: Users },
-  { label: 'Reports', href: '/warden/hostel/reports', icon: ClipboardList },
+  { label: 'Dashboard', href: '/warden/dashboard', icon: LayoutDashboard },
+  { label: 'Complaints', href: '/warden/complaints', icon: AlertTriangle },
+  { label: 'Leave Requests', href: '/warden/leaves', icon: FileText },
+  { label: 'Room Allocations', href: '/warden/rooms', icon: Bed },
+  { label: 'Visitors', href: '/warden/visitors', icon: Users },
+  { label: 'Reports', href: '/warden/reports', icon: ClipboardList },
 ];
 
 const librarianLinks: SidebarLink[] = [

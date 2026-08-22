@@ -50,39 +50,7 @@ export default function DirectorReportsPage() {
       if (reportsRes.success) setReports(reportsRes.reports || []);
       if (scheduleRes.success) setSchedules(scheduleRes.schedule || schedules);
     } catch {
-      // Sandbox Fallbacks
-      setReports([
-        {
-          id: 'r1',
-          report_type: 'weekly',
-          report_date: new Date().toISOString().split('T')[0],
-          data: {
-            attendance_rate: 84,
-            fee_collected: 185000,
-            students_on_campus: 48,
-            open_complaints: 6,
-            active_bus_trips: 3,
-            events_count: 2
-          },
-          pdf_url: '#',
-          generated_at: new Date().toISOString()
-        },
-        {
-          id: 'r2',
-          report_type: 'monthly',
-          report_date: '2026-05-31',
-          data: {
-            attendance_rate: 81,
-            fee_collected: 1450000,
-            students_on_campus: 52,
-            open_complaints: 12,
-            active_bus_trips: 3,
-            events_count: 14
-          },
-          pdf_url: '#',
-          generated_at: new Date(Date.now() - 86400000 * 10).toISOString()
-        }
-      ]);
+      setReports([]);
     } finally {
       setLoading(false);
     }

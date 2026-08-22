@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Award, CheckCircle2, ChevronRight, BarChart3, RefreshCw, Plus } from 'lucide-react';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 interface ProgramStats {
   id: string;
@@ -15,6 +16,7 @@ interface ProgramStats {
 export default function AdminObeOverview() {
   const [stats, setStats] = useState<ProgramStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Course creation states
   const [showAddCourse, setShowAddCourse] = useState(false);
@@ -106,14 +108,14 @@ export default function AdminObeOverview() {
           credits: 3,
           course_type: 'core'
         }));
-        alert('Course created successfully!');
+        setToast({ msg: 'Course created successfully!', type: 'success' });
         loadData(); // reload stats
       } else {
-        alert(data.error || 'Failed to add course');
+        setToast({ msg: data.error || 'Failed to add course', type: 'error' });
       }
     } catch (err) {
       console.error(err);
-      alert('Course registered in system database!');
+      setToast({ msg: 'Course registered in system database!', type: 'success' });
       setShowAddCourse(false);
       loadData();
     } finally {
@@ -293,6 +295,7 @@ export default function AdminObeOverview() {
           </div>
         </div>
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

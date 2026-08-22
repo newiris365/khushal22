@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Plus, Eye, Send, FileText, CheckCircle2 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../lib/api';
+import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
 export default function AdminNoticesPage() {
   const [notices, setNotices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedNoticeAnalytics, setSelectedNoticeAnalytics] = useState<any | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -46,10 +48,12 @@ export default function AdminNoticesPage() {
       if (res.success) {
         setShowAddForm(false);
         fetchNotices();
-        alert('Notice draft saved successfully!');
+        setToast({ msg: 'Notice draft saved successfully!', type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Failed to save notice.', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to save notice.');
+      setToast({ msg: 'Failed to save notice.', type: 'error' });
     }
   };
 
@@ -58,10 +62,12 @@ export default function AdminNoticesPage() {
       const res = await apiPut(`/core/notices/${id}/publish`, {});
       if (res.success) {
         fetchNotices();
-        alert('Notice published and FCM push alerts dispatched!');
+        setToast({ msg: 'Notice published and FCM push alerts dispatched!', type: 'success' });
+      } else {
+        setToast({ msg: res.error || 'Failed to publish notice.', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to publish notice.');
+      setToast({ msg: 'Failed to publish notice.', type: 'error' });
     }
   };
 
@@ -272,6 +278,7 @@ export default function AdminNoticesPage() {
           </div>
         </div>
       )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </main>
   );
 }

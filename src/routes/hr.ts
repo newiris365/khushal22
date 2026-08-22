@@ -12,6 +12,7 @@ import {
   disbursePayrollRun,
   publishPayslips,
   getPayslips,
+  getMyPayslips,
   getPayslipPdf,
   getEcrReport,
   getForm16Pdf,
@@ -60,7 +61,8 @@ router.post('/payroll/run', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), ru
 router.get('/payroll/runs', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Principal']), getPayrollRuns);
 router.put('/payroll/runs/:id/approve', requireRole(['Admin', 'SuperAdmin', 'Principal']), approvePayrollRun);
 router.put('/payroll/runs/:id/disburse', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), disbursePayrollRun);
-router.get('/payslips/:employeeId', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff', 'Principal']), getPayslips);
+router.get('/payslips/me', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff', 'Teacher', 'HOD', 'Principal', 'Driver']), getMyPayslips);
+router.get('/payslips/:employeeId', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff', 'Principal', 'Driver']), getPayslips);
 router.get('/payslips/download/:id', getPayslipPdf); // Download handler via direct link
 router.post('/payroll/runs/:id/publish-payslips', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), publishPayslips);
 router.get('/payroll/reports/ecr', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), getEcrReport);

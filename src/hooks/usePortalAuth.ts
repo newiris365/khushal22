@@ -10,14 +10,15 @@ export const ROLE_DASHBOARD_MAP: Record<string, string> = {
   Director: '/director/dashboard',
   HOD: '/hod/dashboard',
   Teacher: '/teacher/timetable',
-  Staff: '/faculty/dashboard',
+  Staff: '/staff/dashboard',
   Student: '/student/dashboard',
   Parent: '/parent/dashboard',
-  Warden: '/warden/hostel',
+  Warden: '/warden/dashboard',
   Security: '/gate',
   Vendor: '/vendor/dashboard',
   Driver: '/driver/dashboard',
   Librarian: '/librarian/library',
+  'Admissions Officer': '/officer/admissions',
 };
 
 export interface PortalAuthResult {
