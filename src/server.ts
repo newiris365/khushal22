@@ -402,12 +402,16 @@ app.use(express.json({
 // Global rate limiter (500 req / 15 min per IP)
 app.use(globalLimiter);
 
-// Request logging middleware
+import { requestIdMiddleware } from './middleware/requestId';
+
+// Request ID & Logging middleware
+app.use(requestIdMiddleware);
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.info(`${req.method} ${req.originalUrl} ${res.statusCode}`, {
+      requestId: req.id,
       method: req.method,
       url: req.originalUrl,
       status: res.statusCode,

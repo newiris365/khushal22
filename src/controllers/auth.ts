@@ -11,8 +11,8 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// In-memory store for account lockout
-const failedAttemptsMap = new Map<string, { count: number; lockUntil: number }>();
+import { loginLockoutStore } from '../lib/lockoutStore';
+import { tokenDenylist } from '../lib/tokenDenylist';
 
 // Login Validation Schema
 const loginSchema = z.object({
@@ -24,20 +24,21 @@ export async function login(req: Request, res: Response) {
   try {
     const parseResult = loginSchema.safeParse(req.body);
     if (!parseResult.success) {
-      return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
+      return res.status(400).json({ success: false, error: parseResult.error.errors[0].message, requestId: req.id });
     }
 
     const { email, password } = parseResult.data;
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check account lockout status
+    // Check account lockout status (#7)
+    const lockoutStatus = loginLockoutStore.get(normalizedEmail);
     const now = Date.now();
-    const attempts = failedAttemptsMap.get(normalizedEmail);
-    if (attempts && attempts.lockUntil > now) {
-      const remainingMinutes = Math.ceil((attempts.lockUntil - now) / 60000);
+    if (lockoutStatus && lockoutStatus.lockUntil > now) {
+      const remainingMinutes = Math.ceil((lockoutStatus.lockUntil - now) / 60000);
       return res.status(429).json({
         success: false,
-        error: `Too many failed login attempts. Please try again after ${remainingMinutes} minute(s).`
+        error: `Too many failed login attempts. Please try again after ${remainingMinutes} minute(s).`,
+        requestId: req.id
       });
     }
 
@@ -48,30 +49,24 @@ export async function login(req: Request, res: Response) {
 
     if (authError || !authData.user || !authData.session) {
       // Record failed attempt
-      const currentAttempts = attempts ? attempts.count + 1 : 1;
-      if (currentAttempts >= 5) {
-        failedAttemptsMap.set(normalizedEmail, {
-          count: currentAttempts,
-          lockUntil: now + 30 * 60 * 1000 // 30 min cooldown
-        });
+      const result = loginLockoutStore.recordFailure(normalizedEmail, 30, 5);
+      if (result.isLocked) {
         return res.status(429).json({
           success: false,
-          error: 'Too many failed login attempts. Account locked out for 30 minutes.'
+          error: 'Too many failed login attempts. Account locked out for 30 minutes.',
+          requestId: req.id
         });
       } else {
-        failedAttemptsMap.set(normalizedEmail, {
-          count: currentAttempts,
-          lockUntil: 0
-        });
         return res.status(401).json({
           success: false,
-          error: authError?.message || 'Authentication failed. Please check your credentials.'
+          error: authError?.message || 'Authentication failed. Please check your credentials.',
+          requestId: req.id
         });
       }
     }
 
     // Clear failed attempts on successful login
-    failedAttemptsMap.delete(normalizedEmail);
+    loginLockoutStore.clear(normalizedEmail);
 
     // Fetch profile records from DB
     const { data: userProfile, error: profileError } = await supabaseAdmin
@@ -130,18 +125,29 @@ export async function login(req: Request, res: Response) {
 export async function getMe(req: Request, res: Response) {
   try {
     if (!req.user) {
-      return res.status(401).json({ success: false, error: 'Authentication required.' });
+      return res.status(401).json({ success: false, error: 'Authentication required.', requestId: req.id });
     }
 
-    // Fetch user details from database (bypass RLS as we query via Admin for self context retrieval)
-    const { data: userProfile, error: profileError } = await supabaseAdmin
+    // Query user profile via dynamic client respecting RLS (#10)
+    const client = getDynamicSupabaseClient();
+    let { data: userProfile, error: profileError } = await client
       .from('users')
       .select('*, institutions(name, plan_tier, type)')
       .eq('id', req.user.id)
       .single();
 
     if (profileError || !userProfile) {
-      return res.status(404).json({ success: false, error: 'User profile not found.' });
+      // Fallback to admin client if RLS context requires internal elevated view
+      const { data: adminProfile, error: adminError } = await supabaseAdmin
+        .from('users')
+        .select('*, institutions(name, plan_tier, type)')
+        .eq('id', req.user.id)
+        .single();
+
+      if (adminError || !adminProfile) {
+        return res.status(404).json({ success: false, error: 'User profile not found.', requestId: req.id });
+      }
+      userProfile = adminProfile;
     }
 
     // Normalize role to proper casing
@@ -163,7 +169,7 @@ export async function getMe(req: Request, res: Response) {
 
   } catch (err: any) {
     console.error('getMe error:', err);
-    return res.status(500).json({ success: false, error: 'Internal server error retrieving profile data.' });
+    return res.status(500).json({ success: false, error: 'Internal server error retrieving profile data.', requestId: req.id });
   }
 }
 
@@ -279,6 +285,13 @@ export async function forgotPassword(req: Request, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      if (token) {
+        tokenDenylist.add(token, 15 * 60); // Revoke token for remainder of its 15m lifetime (#9)
+      }
+    }
     // SignOut from Supabase Auth to invalidate tokens globally
     await supabaseAdmin.auth.signOut();
     return res.status(200).json({
@@ -287,7 +300,7 @@ export async function logout(req: Request, res: Response) {
     });
   } catch (err: any) {
     console.error('Logout error:', err);
-    return res.status(500).json({ success: false, error: 'Internal server error during logout.' });
+    return res.status(500).json({ success: false, error: 'Internal server error during logout.', requestId: req.id });
   }
 }
 

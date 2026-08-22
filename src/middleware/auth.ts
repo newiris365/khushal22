@@ -29,6 +29,8 @@ declare global {
 }
 
 
+import { tokenDenylist } from '../lib/tokenDenylist';
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   let authHeader = req.headers.authorization;
   
@@ -37,15 +39,22 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   }
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, error: 'Authorization token required. Access Denied.' });
+    return res.status(401).json({ success: false, error: 'Authorization token required. Access Denied.', requestId: req.id });
   }
 
   const token = authHeader.split(' ')[1];
 
   authLocalStorage.run(token, () => {
+    // Check if token has been revoked via logout denylist (#9)
+    if (tokenDenylist.has(token)) {
+      return res.status(401).json({ success: false, error: 'Authentication token has been revoked.', requestId: req.id });
+    }
+
+    // Strict gate for sandbox/mock tokens: disabled in production & only allowed when explicitly enabled (#8)
     if (token.startsWith('mock-sandbox-jwt-token-value.')) {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(403).json({ success: false, error: 'Sandbox mock tokens are disabled in production.' });
+      const allowMock = process.env.ALLOW_MOCK_AUTH === 'true' && process.env.NODE_ENV !== 'production';
+      if (!allowMock) {
+        return res.status(403).json({ success: false, error: 'Sandbox mock tokens are disabled in this environment.', requestId: req.id });
       }
       try {
         const parts = token.split('.');
@@ -58,7 +67,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
         req.user = decoded;
         return next();
       } catch (err) {
-        return res.status(403).json({ success: false, error: 'Invalid or corrupted sandbox mock token.' });
+        return res.status(403).json({ success: false, error: 'Invalid or corrupted sandbox mock token.', requestId: req.id });
       }
     }
 
@@ -74,7 +83,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
         if (decoded.fingerprint !== currentFingerprint) {
           return res.status(403).json({ 
             success: false, 
-            error: 'Session security integrity compromised (device mismatch). Re-authentication required.' 
+            error: 'Session security integrity compromised (device mismatch). Re-authentication required.',
+            requestId: req.id
           });
         }
       }
@@ -82,7 +92,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
       req.user = decoded;
       next();
     } catch (err) {
-      return res.status(403).json({ success: false, error: 'Invalid or expired authentication token.' });
+      return res.status(403).json({ success: false, error: 'Invalid or expired authentication token.', requestId: req.id });
     }
   });
 }

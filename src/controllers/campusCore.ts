@@ -9,6 +9,9 @@ import { getRazorpayClient, isMockOrderId } from '../lib/razorpay';
 import { generateFeeReceiptPDF, uploadReportToSupabase } from '../services/pdfGenerator';
 import logger from '../config/logger';
 
+import { methodConfigCache, methodFullConfigCache, holidayCache } from '../lib/cache';
+import { enqueueTask } from '../lib/asyncWorker';
+
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
   throw new Error('CRITICAL SECURITY: JWT_SECRET must be set and >= 32 chars');
@@ -35,8 +38,12 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; // in meters
 }
 
-// Check if an attendance method is enabled for an institution
+// Check if an attendance method is enabled for an institution (cached with 60s TTL - #3)
 async function isMethodEnabled(institutionId: string, method: string): Promise<boolean> {
+  const cacheKey = `${institutionId}:${method}`;
+  const cached = methodConfigCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   try {
     const { data } = await supabaseAdmin
       .from('attendance_methods')
@@ -44,14 +51,20 @@ async function isMethodEnabled(institutionId: string, method: string): Promise<b
       .eq('institution_id', institutionId)
       .eq('method_key', method)
       .maybeSingle();
-    return data?.is_enabled ?? true; // default to enabled if no record
+    const enabled = data?.is_enabled ?? true; // default to enabled if no record
+    methodConfigCache.set(cacheKey, enabled);
+    return enabled;
   } catch {
     return true;
   }
 }
 
-// Get attendance method config for an institution
+// Get attendance method config for an institution (cached - #3)
 async function getMethodConfig(institutionId: string, method: string): Promise<Record<string, any>> {
+  const cacheKey = `${institutionId}:${method}:config`;
+  const cached = methodFullConfigCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   try {
     const { data } = await supabaseAdmin
       .from('attendance_methods')
@@ -59,42 +72,49 @@ async function getMethodConfig(institutionId: string, method: string): Promise<R
       .eq('institution_id', institutionId)
       .eq('method_key', method)
       .maybeSingle();
-    return data?.config || {};
+    const config = data?.config || {};
+    methodFullConfigCache.set(cacheKey, config);
+    return config;
   } catch {
     return {};
   }
 }
 
-// Check if a date is an academic holiday for the institution
+// Check if a date is an academic holiday for the institution (#2 concurrent queries + #3 caching)
 async function isDateHoliday(institutionId: string, date: string): Promise<{ isHoliday: boolean; holidayName?: string }> {
+  const cacheKey = `${institutionId}:${date}`;
+  const cached = holidayCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   try {
-    // Check academic_calendar_holidays table
-    const { data: holiday } = await supabaseAdmin
-      .from('academic_calendar_holidays')
-      .select('name')
-      .eq('institution_id', institutionId)
-      .eq('date', date)
-      .maybeSingle();
+    const [{ data: holiday }, { data: calendarEvent }] = await Promise.all([
+      supabaseAdmin
+        .from('academic_calendar_holidays')
+        .select('name')
+        .eq('institution_id', institutionId)
+        .eq('date', date)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('academic_calendar')
+        .select('title, event_type')
+        .eq('institution_id', institutionId)
+        .in('event_type', ['holiday', 'vacation'])
+        .lte('start_date', date)
+        .gte('end_date', date)
+        .maybeSingle(),
+    ]);
 
+    let res: { isHoliday: boolean; holidayName?: string };
     if (holiday) {
-      return { isHoliday: true, holidayName: holiday.name };
+      res = { isHoliday: true, holidayName: holiday.name };
+    } else if (calendarEvent) {
+      res = { isHoliday: true, holidayName: calendarEvent.title };
+    } else {
+      res = { isHoliday: false };
     }
 
-    // Check academic_calendar table for holiday OR vacation events spanning this date
-    const { data: calendarEvent } = await supabaseAdmin
-      .from('academic_calendar')
-      .select('title, event_type')
-      .eq('institution_id', institutionId)
-      .in('event_type', ['holiday', 'vacation'])
-      .lte('start_date', date)
-      .gte('end_date', date)
-      .maybeSingle();
-
-    if (calendarEvent) {
-      return { isHoliday: true, holidayName: calendarEvent.title };
-    }
-
-    return { isHoliday: false };
+    holidayCache.set(cacheKey, res);
+    return res;
   } catch {
     return { isHoliday: false };
   }
@@ -309,6 +329,70 @@ async function notifyParent(studentId: string, type: string, title: string, mess
     }
   } catch (err) {
     console.error('[NOTIFY PARENT] Failed:', err);
+  }
+}
+
+// Batched notification helper for bulk operations (#4)
+async function notifyParentsBulk(records: Array<{ student_id: string; date: string }>) {
+  try {
+    if (!records || records.length === 0) return;
+    const studentIds = Array.from(new Set(records.map(r => r.student_id)));
+
+    // Batch query 1: Fetch all student names in a single query (#4)
+    const { data: studentRows } = await supabaseAdmin
+      .from('students')
+      .select('id, users(full_name)')
+      .in('id', studentIds);
+
+    const studentNameMap = new Map<string, string>();
+    (studentRows || []).forEach((s: any) => {
+      studentNameMap.set(s.id, s.users?.full_name || 'Your child');
+    });
+
+    // Batch query 2: Fetch all parent links for these students in a single query (#4)
+    const { data: parentLinks } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('student_id, parent_user_id')
+      .in('student_id', studentIds)
+      .eq('verified', true);
+
+    if (!parentLinks || parentLinks.length === 0) return;
+
+    // Prepare batch notification rows & push notification promises
+    const notificationInserts: any[] = [];
+    const pushTasks: Promise<any>[] = [];
+
+    for (const link of parentLinks) {
+      const studentName = studentNameMap.get(link.student_id) || 'Your child';
+      const rec = records.find(r => r.student_id === link.student_id);
+      const dateStr = rec?.date || new Date().toISOString().split('T')[0];
+      const title = 'Student Absent Today';
+      const message = `${studentName} was marked absent today (${dateStr}). - IRIS 365`;
+      const metadata = { student_id: link.student_id, student_name: studentName, date: dateStr, status: 'Absent' };
+
+      notificationInserts.push({
+        parent_user_id: link.parent_user_id,
+        student_id: link.student_id,
+        notification_type: 'student_absent',
+        title,
+        message,
+        metadata,
+      });
+
+      pushTasks.push(
+        sendPushNotification(link.parent_user_id, title, message, { type: 'student_absent', ...metadata })
+      );
+    }
+
+    // Batch insert notification records & send push notifications concurrently (#4)
+    await Promise.all([
+      notificationInserts.length > 0
+        ? supabaseAdmin.from('parent_notifications').insert(notificationInserts)
+        : Promise.resolve(),
+      Promise.allSettled(pushTasks)
+    ]);
+  } catch (err) {
+    console.error('[NOTIFY PARENTS BULK] Failed:', err);
   }
 }
 
@@ -666,24 +750,35 @@ export async function getSessionQr(req: Request, res: Response) {
 export async function markAttendanceQr(req: Request, res: Response) {
   try {
     const parse = qrVerificationSchema.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message, requestId: req.id });
     const { token, latitude, longitude, device_id } = parse.data;
     const institutionId = req.user?.institution_id;
-    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.', requestId: req.id });
 
-    // Check if today is a holiday
     const today = new Date().toISOString().split('T')[0];
-    const holidayCheck = await isDateHoliday(institutionId, today);
+
+    // Concurrently fetch holiday status, QR method status, and student record (#1)
+    const [holidayCheck, qrEnabled, studentResult] = await Promise.all([
+      isDateHoliday(institutionId, today),
+      isMethodEnabled(institutionId, 'qr'),
+      supabaseAdmin.from('students').select('id').eq('user_id', req.user?.id).single(),
+    ]);
+
     if (holidayCheck.isHoliday) {
       return res.status(400).json({ 
         success: false, 
-        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${today}.` 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${today}.`,
+        requestId: req.id
       });
     }
 
-    // Check if QR method is enabled
-    if (!(await isMethodEnabled(institutionId, 'qr'))) {
-      return res.status(403).json({ success: false, error: 'QR attendance is not enabled for your institution.' });
+    if (!qrEnabled) {
+      return res.status(403).json({ success: false, error: 'QR attendance is not enabled for your institution.', requestId: req.id });
+    }
+
+    const { data: student, error: stdErr } = studentResult;
+    if (stdErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student profile not mapped to current login credentials.', requestId: req.id });
     }
 
     // Decode JWT first to get session_id
@@ -691,25 +786,27 @@ export async function markAttendanceQr(req: Request, res: Response) {
     try {
       decoded = jwt.verify(token, JWT_SECRET) as unknown as { session_id: string; type: string };
     } catch {
-      return res.status(401).json({ success: false, error: 'QR token expired or invalid.' });
+      return res.status(401).json({ success: false, error: 'QR token expired or invalid.', requestId: req.id });
     }
-    if (decoded.type !== 'ATTENDANCE_QR') return res.status(400).json({ success: false, error: 'Invalid QR token structure.' });
+    if (decoded.type !== 'ATTENDANCE_QR') return res.status(400).json({ success: false, error: 'Invalid QR token structure.', requestId: req.id });
 
-    // Validate token against qr_tokens table
-    const tokenValidation = await validateQrToken(token, decoded.session_id);
+    // Validate token against qr_tokens table and fetch attendance_sessions in parallel (#1)
+    const [tokenValidation, sessionResult] = await Promise.all([
+      validateQrToken(token, decoded.session_id),
+      supabaseAdmin
+        .from('attendance_sessions')
+        .select('geo_lat, geo_lng, geo_radius, is_active')
+        .eq('id', decoded.session_id)
+        .maybeSingle(),
+    ]);
+
     if (!tokenValidation.valid) {
-      return res.status(401).json({ success: false, error: tokenValidation.reason });
+      return res.status(401).json({ success: false, error: tokenValidation.reason, requestId: req.id });
     }
 
-    // Fetch session for geo-fence config
-    const { data: session } = await supabaseAdmin
-      .from('attendance_sessions')
-      .select('geo_lat, geo_lng, geo_radius, is_active')
-      .eq('id', decoded.session_id)
-      .maybeSingle();
-
-    if (!session) return res.status(404).json({ success: false, error: 'Session not found.' });
-    if (!session.is_active) return res.status(400).json({ success: false, error: 'This session has been closed.' });
+    const session = sessionResult.data;
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found.', requestId: req.id });
+    if (!session.is_active) return res.status(400).json({ success: false, error: 'This session has been closed.', requestId: req.id });
 
     // Geo-fence verification using per-session coordinates
     const campLat = session.geo_lat || DEFAULT_CAMPUS_LAT;
@@ -717,49 +814,35 @@ export async function markAttendanceQr(req: Request, res: Response) {
     const maxRadius = session.geo_radius || DEFAULT_MAX_RADIUS_METERS;
     const distance = calculateDistance(latitude, longitude, campLat, campLng);
     if (distance > maxRadius) {
-      return res.status(400).json({ success: false, error: `Not on campus. You are ${Math.round(distance)}m away (max ${maxRadius}m).` });
+      return res.status(400).json({ success: false, error: `Not on campus. You are ${Math.round(distance)}m away (max ${maxRadius}m).`, requestId: req.id });
     }
 
-    const { data: student, error: stdErr } = await supabaseAdmin
-      .from('students')
-      .select('id')
-      .eq('user_id', req.user?.id)
-      .single();
-
-    if (stdErr || !student) return res.status(404).json({ success: false, error: 'Student profile not mapped to current login credentials.' });
-
-    // Prevent double attendance
-    const { data: existing } = await supabaseAdmin
-      .from('attendance')
-      .select('id')
-      .eq('student_id', student.id)
-      .eq('session_id', decoded.session_id)
-      .maybeSingle();
-
-    if (existing) return res.status(409).json({ success: true, message: 'Already marked present' });
-
+    // Atomic upsert to eliminate duplicate check race conditions (#6)
     const { data, error } = await supabaseAdmin
       .from('attendance')
-      .insert({
+      .upsert({
         institution_id: institutionId,
         student_id: student.id,
         session_id: decoded.session_id,
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         status: 'present',
         marked_by: req.user?.id,
         method: 'qr',
         latitude,
         longitude,
         device_id
-      })
-      .select()
-      .single();
+      }, { onConflict: 'student_id,session_id', ignoreDuplicates: true })
+      .select();
 
-    if (error) return res.status(500).json({ success: false, error: 'Failed to record attendance.' });
+    if (error) return res.status(500).json({ success: false, error: 'Failed to record attendance.', requestId: req.id });
 
-    return res.status(200).json({ success: true, message: 'Attendance marked present', data });
+    if (!data || data.length === 0) {
+      return res.status(409).json({ success: true, message: 'Already marked present' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Attendance marked present', data: data[0] || data });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Attendance marking failed.' });
+    return res.status(500).json({ success: false, error: 'Attendance marking failed.', requestId: req.id });
   }
 }
 
@@ -856,34 +939,32 @@ export async function markAttendanceBiometric(req: Request, res: Response) {
 export async function markAttendanceBulk(req: Request, res: Response) {
   try {
     const parse = bulkAttendanceSchema.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message, requestId: req.id });
     const { session_id, records } = parse.data;
     const institutionId = req.user?.institution_id;
-    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.', requestId: req.id });
     const date = new Date().toISOString().split('T')[0];
 
-    // Check if today is a holiday
-    const holidayCheck = await isDateHoliday(institutionId, date);
+    // Concurrently verify holiday, manual method, and session existence (#1 & #5)
+    const [holidayCheck, manualEnabled, sessionResult] = await Promise.all([
+      isDateHoliday(institutionId, date),
+      isMethodEnabled(institutionId, 'manual'),
+      supabaseAdmin.from('attendance_sessions').select('id, is_active').eq('id', session_id).maybeSingle()
+    ]);
+
     if (holidayCheck.isHoliday) {
       return res.status(400).json({ 
         success: false, 
-        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${date}.` 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${date}.`,
+        requestId: req.id
       });
     }
 
-    // Check if manual method is enabled
-    if (!(await isMethodEnabled(institutionId, 'manual'))) {
-      return res.status(403).json({ success: false, error: 'Manual attendance is not enabled for your institution.' });
+    if (!manualEnabled) {
+      return res.status(403).json({ success: false, error: 'Manual attendance is not enabled for your institution.', requestId: req.id });
     }
 
-    // Verify session exists and is active
-    const { data: session } = await supabaseAdmin
-      .from('attendance_sessions')
-      .select('id, is_active')
-      .eq('id', session_id)
-      .maybeSingle();
-
-    if (!session) return res.status(404).json({ success: false, error: 'Session not found.' });
+    if (!sessionResult.data) return res.status(404).json({ success: false, error: 'Session not found.', requestId: req.id });
 
     const logs = records.map(rec => ({
       institution_id: institutionId,
@@ -900,31 +981,19 @@ export async function markAttendanceBulk(req: Request, res: Response) {
       .upsert(logs, { onConflict: 'student_id,session_id' })
       .select();
 
-    if (error) return res.status(500).json({ success: false, error: error.message });
+    if (error) return res.status(500).json({ success: false, error: error.message, requestId: req.id });
 
-    // Fire-and-forget: notify parents of absent students
-    (async () => {
-      try {
-        const absentStudents = records.filter((r: any) => r.status === 'Absent');
-        for (const r of absentStudents) {
-          const { data: stu } = await supabaseAdmin.from('students').select('users(full_name)').eq('id', r.student_id).single();
-          const studentName = (stu as any)?.users?.full_name || 'Your child';
-          await notifyParent(
-            r.student_id,
-            'student_absent',
-            'Student Absent Today',
-            `${studentName} was marked absent today. - IRIS 365`,
-            { student_name: studentName, date, status: 'Absent' }
-          );
-        }
-      } catch (err) {
-        console.error('[ATTENDANCE NOTIFICATIONS] Background error:', err);
-      }
-    })();
+    // Reliable background worker for batched parent notifications (#4 & #11)
+    const absentRecords = records.filter((r: any) => r.status.toLowerCase() === 'absent');
+    if (absentRecords.length > 0) {
+      enqueueTask('notifyParentsBulk', async () => {
+        await notifyParentsBulk(absentRecords.map(r => ({ student_id: r.student_id, date })));
+      });
+    }
 
     return res.status(200).json({ success: true, count: data.length });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Internal bulk write failure.' });
+    return res.status(500).json({ success: false, error: 'Internal bulk write failure.', requestId: req.id });
   }
 }
 
@@ -932,9 +1001,9 @@ export async function markSchoolAttendanceBulk(req: Request, res: Response) {
   try {
     const { date, academic_year, records } = req.body;
     const institutionId = req.user?.institution_id;
-    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.', requestId: req.id });
     if (!date || !academic_year || !Array.isArray(records) || records.length === 0) {
-      return res.status(400).json({ success: false, error: 'date, academic_year, and records are required.' });
+      return res.status(400).json({ success: false, error: 'date, academic_year, and records are required.', requestId: req.id });
     }
 
     // Check if the date is a holiday
@@ -942,7 +1011,8 @@ export async function markSchoolAttendanceBulk(req: Request, res: Response) {
     if (holidayCheck.isHoliday) {
       return res.status(400).json({ 
         success: false, 
-        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Date: ${date}` 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Date: ${date}`,
+        requestId: req.id
       });
     }
 
@@ -960,37 +1030,24 @@ export async function markSchoolAttendanceBulk(req: Request, res: Response) {
       .upsert(dbRecords, { onConflict: 'student_id,date,academic_year' });
 
     if (error) {
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ success: false, error: error.message, requestId: req.id });
     }
 
-    // Fire-and-forget: notify parents of absent students + low attendance alerts
-    (async () => {
-      try {
-        const absentStudents = records.filter((r: any) => r.status === 'Absent');
-        for (const r of absentStudents) {
-          const { data: stu } = await supabaseAdmin.from('students').select('users(full_name)').eq('id', r.student_id).single();
-          const studentName = (stu as any)?.users?.full_name || 'Your child';
-          await notifyParent(
-            r.student_id,
-            'student_absent',
-            'Student Absent Today',
-            `${studentName} was marked absent on ${date}. - IRIS 365`,
-            { student_name: studentName, date, status: 'Absent' }
-          );
-        }
-        // Check low attendance threshold for all marked students
+    // Reliable background worker for batched parent notifications & low attendance checks (#4 & #11)
+    const absentRecords = records.filter((r: any) => r.status.toLowerCase() === 'absent');
+    if (absentRecords.length > 0) {
+      enqueueTask('notifyParentsBulkSchool', async () => {
+        await notifyParentsBulk(absentRecords.map(r => ({ student_id: r.student_id, date })));
         const uniqueStudentIds = [...new Set(records.map((r: any) => r.student_id))];
         for (const sid of uniqueStudentIds) {
           await checkAndNotifyLowAttendance(sid, institutionId);
         }
-      } catch (err) {
-        console.error('[ATTENDANCE NOTIFICATIONS] Background error:', err);
-      }
-    })();
+      });
+    }
 
     return res.status(200).json({ success: true, count: dbRecords.length, message: 'Daily school attendance register updated successfully.' });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message || 'Failed to update daily attendance register.' });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to update daily attendance register.', requestId: req.id });
   }
 }
 
@@ -1243,6 +1300,10 @@ export async function updateAttendanceMethod(req: Request, res: Response) {
       .single();
 
     if (error) throw error;
+    if (institutionId) {
+      methodConfigCache.invalidatePrefix(institutionId);
+      methodFullConfigCache.invalidatePrefix(institutionId);
+    }
     return res.json({ success: true, method: data });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -1270,6 +1331,10 @@ export async function batchUpdateAttendanceMethods(req: Request, res: Response) 
       .upsert(rows, { onConflict: 'institution_id,method_key' });
 
     if (error) throw error;
+    if (institutionId) {
+      methodConfigCache.invalidatePrefix(institutionId);
+      methodFullConfigCache.invalidatePrefix(institutionId);
+    }
     return res.json({ success: true, message: 'Attendance methods updated.' });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
