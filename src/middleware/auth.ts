@@ -33,14 +33,7 @@ declare global {
 import { tokenDenylist } from '../lib/tokenDenylist';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  let authHeader = req.headers.authorization;
-  
-  if (!authHeader && req.query && typeof req.query.token === 'string' && req.method === 'GET') {
-    const isDownloadRoute = req.path.includes('/download') || req.path.includes('/export') || req.path.includes('/reports');
-    if (isDownloadRoute) {
-      authHeader = `Bearer ${req.query.token}`;
-    }
-  }
+  const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, error: 'Authorization token required. Access Denied.', requestId: req.id });
