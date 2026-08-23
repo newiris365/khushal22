@@ -59,6 +59,7 @@ export const ROLE_CASING_MAP: Record<string, string> = {
  */
 export function normalizeRole(role: string | undefined | null): string {
   if (!role) return '';
-  const normalized = ROLE_CASING_MAP[role.toLowerCase()];
-  return normalized || role;
+  const trimmed = role.trim();
+  const normalized = ROLE_CASING_MAP[trimmed.toLowerCase()];
+  return normalized || trimmed;
 }

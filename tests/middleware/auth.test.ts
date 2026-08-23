@@ -120,4 +120,18 @@ describe('requireRole', () => {
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
+
+  it('normalizes and matches mixed-case role strings cleanly (regression check)', () => {
+    const mixedCaseRoles = ['director', 'Director', 'DIRECTOR', 'DiReCtOr'];
+    mixedCaseRoles.forEach((roleVariant) => {
+      const req = makeUserReq(roleVariant);
+      const res = makeRes();
+      const next = jest.fn();
+
+      requireRole(['Director'])(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+  });
 });
