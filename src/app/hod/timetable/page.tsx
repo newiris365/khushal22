@@ -81,8 +81,8 @@ const MOCK_CS_TIMETABLE: TimetableGrid = [
 const PERIOD_TIMES = ['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM'];
 
 export default function HodTimetablePage() {
-  const [departments] = useState<Department[]>(MOCK_DEPARTMENTS);
-  const [selectedDept, setSelectedDept] = useState<string>('cs');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string>('');
   const [semester, setSemester] = useState<string>('3');
   const [batch, setBatch] = useState<string>('A');
   const [timetable, setTimetable] = useState<TimetableGrid>([]);
@@ -91,17 +91,33 @@ export default function HodTimetablePage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    const loadDepts = async () => {
+      try {
+        const res = await apiGet('/users/departments');
+        if (res.success && res.departments && res.departments.length > 0) {
+          setDepartments(res.departments);
+          setSelectedDept(res.departments[0].id);
+        }
+      } catch (err) {
+        console.log('Failed to fetch departments:', err);
+      }
+    };
+    loadDepts();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDept) return;
     const fetchTimetable = async () => {
       setLoading(true);
       try {
-        const res = await apiGet(`/campusCore/timetable/${selectedDept}`);
+        const res = await apiGet(`/campus/timetable?department_id=${selectedDept}`);
         if (res.success && res.timetable) {
           setTimetable(res.timetable);
         } else {
-          setTimetable(MOCK_CS_TIMETABLE);
+          setTimetable([]);
         }
       } catch {
-        setTimetable(MOCK_CS_TIMETABLE);
+        setTimetable([]);
       } finally {
         setLoading(false);
       }

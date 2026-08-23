@@ -16,6 +16,7 @@ export interface AuthenticatedUser {
   email: string;
   fingerprint?: string;
   institute_type?: string;
+  company_id?: string;
 }
 
 // Extend Express Request object to hold user details

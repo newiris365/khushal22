@@ -2959,9 +2959,98 @@ export async function publishResults(req: Request, res: Response) {
   }
 }
 
+export async function getStudentMarksheet(req: Request, res: Response) {
+  try {
+    const { studentId } = req.params;
+
+    // IDOR & Role Protection
+    if (req.user) {
+      const userRole = req.user.role;
+      const userId = req.user.id;
+      const isStaff = ['Teacher', 'Staff', 'Admin', 'SuperAdmin', 'HOD', 'Principal', 'Admissions Officer'].includes(userRole);
+
+      if (!isStaff) {
+        if (userRole === 'Student') {
+          const { data: std } = await supabaseAdmin
+            .from('students')
+            .select('id, user_id')
+            .eq('id', studentId)
+            .maybeSingle();
+
+          if (!std || (std.id !== studentId && std.user_id !== userId && userId !== studentId)) {
+            return res.status(403).json({ success: false, error: 'Access denied. You can only view your own marksheet.' });
+          }
+        } else if (userRole === 'Parent') {
+          const { data: link } = await supabaseAdmin
+            .from('parent_student_mappings')
+            .select('*')
+            .eq('parent_id', userId)
+            .eq('student_id', studentId)
+            .maybeSingle();
+
+          if (!link) {
+            return res.status(403).json({ success: false, error: 'Access denied. You can only view marksheets for your linked child.' });
+          }
+        } else {
+          return res.status(403).json({ success: false, error: 'Unauthorized to view student marksheets.' });
+        }
+      }
+    }
+
+    const { data: results, error } = await supabaseAdmin
+      .from('exam_results')
+      .select('*, exams(name, exam_date, max_marks, passing_marks)')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, student_id: studentId, results: results || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Student marksheet retrieval error.' });
+  }
+}
+
 export async function getMarksheetMetadata(req: Request, res: Response) {
   try {
     const { studentId, examId } = req.params;
+
+    // IDOR & Role Protection
+    if (req.user) {
+      const userRole = req.user.role;
+      const userId = req.user.id;
+      const isStaff = ['Teacher', 'Staff', 'Admin', 'SuperAdmin', 'HOD', 'Principal', 'Admissions Officer'].includes(userRole);
+
+      if (!isStaff) {
+        if (userRole === 'Student') {
+          const { data: std } = await supabaseAdmin
+            .from('students')
+            .select('id, user_id')
+            .eq('id', studentId)
+            .maybeSingle();
+
+          if (!std || (std.id !== studentId && std.user_id !== userId && userId !== studentId)) {
+            return res.status(403).json({ success: false, error: 'Access denied. You can only view your own marksheet.' });
+          }
+        } else if (userRole === 'Parent') {
+          const { data: link } = await supabaseAdmin
+            .from('parent_student_mappings')
+            .select('*')
+            .eq('parent_id', userId)
+            .eq('student_id', studentId)
+            .maybeSingle();
+
+          if (!link) {
+            return res.status(403).json({ success: false, error: 'Access denied. You can only view marksheets for your linked child.' });
+          }
+        } else {
+          return res.status(403).json({ success: false, error: 'Unauthorized to view student marksheets.' });
+        }
+      }
+    }
+
     const { data: results, error } = await supabaseAdmin
       .from('exam_results')
       .select('*, exams(name)')
@@ -5288,7 +5377,7 @@ export async function getMyCiaMarks(req: Request, res: Response) {
     const { data: myMarks, error: marksErr } = await supabaseAdmin
       .from('cia_marks')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', student.id)
       .in('assessment_id', assessmentIds);
 
     if (marksErr) throw marksErr;

@@ -61,8 +61,8 @@ const MEAL_TYPES = [
 const MEAL_CATEGORY_ORDER = ['Starters', 'Main', 'Meals', 'Sides', 'Snacks', 'Beverages', 'Desserts'];
 
 export default function MealSelectionPage() {
-  const [menu, setMenu] = useState<MenuItem[]>(MOCK_MENU);
-  const [subscription, setSubscription] = useState<Subscription>(MOCK_SUBSCRIPTION);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selections, setSelections] = useState<Record<string, Record<string, string[]>>>({});
   const [activeMealType, setActiveMealType] = useState('breakfast');
@@ -71,9 +71,35 @@ export default function MealSelectionPage() {
   const [saved, setSaved] = useState(false);
   const [optOut, setOptOut] = useState<Record<string, boolean>>({});
 
-  const studentId = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('iris_user_profile') || '{}').id || 's0000000-0000-0000-0000-000000000001'
-    : 's0000000-0000-0000-0000-000000000001';
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
+    try {
+      const [menuRes, subRes]: [any, any] = await Promise.all([
+        apiGet('/canteen/menu'),
+        studentId ? apiGet(`/canteen/subscriptions/${studentId}`) : Promise.resolve({ success: false })
+      ]);
+      if (menuRes.success && menuRes.menu) setMenu(menuRes.menu);
+      if (subRes.success && subRes.subscriptions?.length > 0) setSubscription(subRes.subscriptions[0]);
+    } catch (err) {
+      console.log('Failed to fetch selection data from server');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const dates = useMemo(() => {
     const result: { label: string; value: string; day: string }[] = [];
@@ -95,24 +121,7 @@ export default function MealSelectionPage() {
     if (dates.length > 0 && !selectedDate) {
       setSelectedDate(dates[0].value);
     }
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [menuRes, subRes] = await Promise.all([
-        apiGet('/canteen/menu'),
-        apiGet(`/canteen/meal-subscriptions/${studentId}`),
-      ]);
-      if (menuRes.success && menuRes.menu?.length > 0) setMenu(menuRes.menu);
-      if (subRes.success && subRes.subscription) setSubscription(subRes.subscription);
-    } catch {
-      console.log('Using mock meal selection data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [dates, selectedDate]);
 
   const groupedMenu = useMemo(() => {
     const groups: Record<string, MenuItem[]> = {};
@@ -167,6 +176,16 @@ export default function MealSelectionPage() {
 
   const handleSave = async () => {
     setSaving(true);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
       for (const mealType of MEAL_TYPES) {
         const items = selections[selectedDate]?.[mealType.id] || [];

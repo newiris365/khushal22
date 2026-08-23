@@ -49,8 +49,8 @@ const MOCK_MEALS: MealLog[] = [
 
 export default function StudentNutritionPage() {
   const router = useRouter();
-  const [totals, setTotals] = useState<DailyTotal>(MOCK_TOTALS);
-  const [meals, setMeals] = useState<MealLog[]>(MOCK_MEALS);
+  const [totals, setTotals] = useState<DailyTotal>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [meals, setMeals] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -59,15 +59,30 @@ export default function StudentNutritionPage() {
 
   const loadNutrition = async () => {
     setLoading(true);
-    const mockStudentId = 's0000000-0000-0000-0000-000000000001';
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
+
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await apiGet(`/canteen/nutrition/${mockStudentId}`);
+      const res = await apiGet(`/canteen/nutrition/${studentId}`);
       if (res.success && res.nutrition) {
-        setTotals(res.nutrition.totals || MOCK_TOTALS);
-        setMeals(res.nutrition.meals || MOCK_MEALS);
+        setTotals(res.nutrition.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 });
+        setMeals(res.nutrition.meals || []);
       }
     } catch (err) {
-      console.log('Using mock nutrition data');
+      console.log('Failed to fetch nutrition logs from server');
     } finally {
       setLoading(false);
     }

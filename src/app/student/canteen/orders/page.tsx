@@ -17,37 +17,6 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: any; emoj
   Cancelled: { color: 'text-red-400', bg: 'bg-red-500/10', icon: AlertCircle, emoji: '❌' },
 };
 
-const MOCK_ORDERS = [
-  {
-    id: 'ord-1', order_number: 'ORD-K8Z2M', status: 'Preparing',
-    items: [{ item_name: 'Masala Dosa', qty: 2, price: 80 }, { item_name: 'Cold Coffee', qty: 1, price: 60 }],
-    total_amount: 220, payment_method: 'Wallet',
-    order_time: new Date(Date.now() - 480000).toISOString(), pickup_time: null,
-    special_instructions: 'Extra chutney', discount_amount: 0
-  },
-  {
-    id: 'ord-2', order_number: 'ORD-J7Y1L', status: 'Ready',
-    items: [{ item_name: 'Veg Biryani', qty: 1, price: 130 }],
-    total_amount: 130, payment_method: 'UPI',
-    order_time: new Date(Date.now() - 900000).toISOString(), pickup_time: null,
-    special_instructions: '', discount_amount: 0
-  },
-  {
-    id: 'ord-3', order_number: 'ORD-G5W9J', status: 'Delivered',
-    items: [{ item_name: 'Paneer Tikka Roll', qty: 1, price: 120 }, { item_name: 'Gulab Jamun', qty: 2, price: 50 }],
-    total_amount: 220, payment_method: 'Wallet',
-    order_time: new Date(Date.now() - 3600000).toISOString(), pickup_time: new Date(Date.now() - 2400000).toISOString(),
-    special_instructions: 'Less spicy', discount_amount: 30
-  },
-  {
-    id: 'ord-4', order_number: 'ORD-F4V8I', status: 'Delivered',
-    items: [{ item_name: 'Samosa (2pc)', qty: 3, price: 30 }, { item_name: 'Mango Lassi', qty: 2, price: 50 }],
-    total_amount: 190, payment_method: 'Wallet',
-    order_time: new Date(Date.now() - 86400000).toISOString(), pickup_time: new Date(Date.now() - 85800000).toISOString(),
-    special_instructions: '', discount_amount: 0
-  },
-];
-
 function timeAgo(iso: string) {
   const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (secs < 60) return 'just now';
@@ -59,7 +28,7 @@ function timeAgo(iso: string) {
 }
 
 export default function StudentOrdersPage() {
-  const [orders, setOrders] = useState(MOCK_ORDERS);
+  const [orders, setOrders] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [ratingOrder, setRatingOrder] = useState<string | null>(null);
@@ -71,7 +40,7 @@ export default function StudentOrdersPage() {
   }, []);
 
   const loadOrders = async () => {
-    let studentId = '00000000-0000-0000-0000-000000000000';
+    let studentId = '';
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('iris_user_profile');
       if (userStr) {
@@ -81,10 +50,13 @@ export default function StudentOrdersPage() {
         } catch (e) {}
       }
     }
+    if (!studentId) return;
     try {
-      const res = await apiGet(`/canteen/orders/${studentId}`);
+      const res = await apiGet(`/canteen/orders/student/${studentId}`);
       if (res.success && res.orders) setOrders(res.orders);
-    } catch (err) { console.log('Using mock orders'); }
+    } catch (err) {
+      console.log('Failed to fetch canteen orders from server');
+    }
   };
 
   const activeOrders = orders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled');

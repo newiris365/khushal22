@@ -358,7 +358,10 @@ export async function getUserRoleStats(req: Request, res: Response) {
 
 export async function getDepartments(req: Request, res: Response) {
   try {
-    const institution_id = req.query.institution_id || req.user?.institution_id;
+    const institution_id = (req.user && req.user.role !== 'SuperAdmin')
+      ? req.user.institution_id
+      : (req.user?.institution_id || (req.query.institution_id as string));
+
     if (!institution_id) {
       return res.status(400).json({ success: false, error: 'institution_id required.' });
     }

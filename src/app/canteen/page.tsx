@@ -57,12 +57,8 @@ const FEATURES = [
 ];
 
 export default function CanteenHubPage() {
-  const [wallet, setWallet] = useState<WalletData>(MOCK_WALLET);
+  const [wallet, setWallet] = useState<WalletData>({ balance: 0, total_spent: 0 });
   const [loading, setLoading] = useState(true);
-
-  const studentId = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('iris_user_profile') || '{}').id || 's0000000-0000-0000-0000-000000000001'
-    : 's0000000-0000-0000-0000-000000000001';
 
   useEffect(() => {
     loadWallet();
@@ -70,13 +66,27 @@ export default function CanteenHubPage() {
 
   const loadWallet = async () => {
     setLoading(true);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await apiGet(`/canteen/wallet/${studentId}`);
-      if (res.success && res.balance != null) {
-        setWallet({ balance: res.balance, total_spent: res.total_spent || 0 });
+      if (res.success && res.wallet) {
+        setWallet({ balance: res.wallet.balance || 0, total_spent: res.wallet.total_spent || 0 });
       }
     } catch {
-      console.log('Using mock wallet data');
+      console.log('Failed to fetch wallet data from server');
     } finally {
       setLoading(false);
     }

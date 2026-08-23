@@ -54,16 +54,12 @@ const MOCK_SUBSCRIPTION: Subscription | null = {
 };
 
 export default function MealPlansPage() {
-  const [plans, setPlans] = useState<MealPlan[]>(MOCK_PLANS);
-  const [subscription, setSubscription] = useState<Subscription | null>(MOCK_SUBSCRIPTION);
+  const [plans, setPlans] = useState<MealPlan[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [subSuccess, setSubSuccess] = useState(false);
-
-  const studentId = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('iris_user_profile') || '{}').id || 's0000000-0000-0000-0000-000000000001'
-    : 's0000000-0000-0000-0000-000000000001';
 
   useEffect(() => {
     loadData();
@@ -71,17 +67,27 @@ export default function MealPlansPage() {
 
   const loadData = async () => {
     setLoading(true);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
-      const [plansRes, walletRes, subRes] = await Promise.all([
+      const [plansRes, walletRes, subRes]: [any, any, any] = await Promise.all([
         apiGet('/canteen/meal-plans'),
-        apiGet(`/canteen/wallet/${studentId}`),
-        apiGet(`/canteen/meal-subscriptions/${studentId}`),
+        studentId ? apiGet(`/canteen/wallet/${studentId}`) : Promise.resolve({ success: false }),
+        studentId ? apiGet(`/canteen/subscriptions/${studentId}`) : Promise.resolve({ success: false }),
       ]);
-      if (plansRes.success && plansRes.plans?.length > 0) setPlans(plansRes.plans);
-      if (walletRes.success && walletRes.balance != null) setWalletBalance(walletRes.balance);
-      if (subRes.success && subRes.subscription) setSubscription(subRes.subscription);
-    } catch {
-      console.log('Using mock meal plan data');
+      if (plansRes.success && plansRes.plans) setPlans(plansRes.plans);
+      if (walletRes.success && walletRes.wallet) setWalletBalance(walletRes.wallet.balance || 0);
+      if (subRes.success && subRes.subscriptions?.length > 0) setSubscription(subRes.subscriptions[0]);
+    } catch (err) {
+      console.log('Failed to fetch meal plans data from server');
     } finally {
       setLoading(false);
     }
@@ -89,6 +95,16 @@ export default function MealPlansPage() {
 
   const handleSubscribe = async (planId: string) => {
     setSubscribing(planId);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
       const res = await apiPost(`/canteen/meal-plans/${planId}/subscribe`, { student_id: studentId });
       if (res.success) {

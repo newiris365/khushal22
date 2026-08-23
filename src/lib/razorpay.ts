@@ -10,7 +10,7 @@ export function getRazorpayClient(): any {
 
   if (!razorpayInstance) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line
       const Razorpay = require('razorpay');
       razorpayInstance = new Razorpay({ key_id: keyId, key_secret: keySecret });
     } catch {

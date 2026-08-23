@@ -7,15 +7,8 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 
-const MOCK_OFFERS = [
-  { id: 'off-1', code: 'WELCOME50', title: 'Welcome Offer', description: 'Get 50% off on your first order', discount_type: 'percentage', discount_value: 50, min_order_amount: 100, max_discount: 75, usage_limit: 500, used_count: 234, valid_from: '2026-06-01', valid_until: '2026-06-30', is_active: true },
-  { id: 'off-2', code: 'FLAT30', title: 'Flat ₹30 Off', description: 'Flat ₹30 off on orders above ₹150', discount_type: 'flat', discount_value: 30, min_order_amount: 150, max_discount: 30, usage_limit: 1000, used_count: 678, valid_from: '2026-06-01', valid_until: '2026-07-31', is_active: true },
-  { id: 'off-3', code: 'COMBO20', title: 'Combo Deal', description: '20% off on combo meals', discount_type: 'percentage', discount_value: 20, min_order_amount: 200, max_discount: 50, usage_limit: 300, used_count: 299, valid_from: '2026-05-01', valid_until: '2026-05-31', is_active: false },
-  { id: 'off-4', code: 'SNACK10', title: 'Snack Time', description: '10% off between 3-5 PM on snacks', discount_type: 'percentage', discount_value: 10, min_order_amount: 50, max_discount: 25, usage_limit: 200, used_count: 89, valid_from: '2026-06-01', valid_until: '2026-12-31', is_active: true },
-];
-
 export default function AdminOffersPage() {
-  const [offers, setOffers] = useState<any[]>(MOCK_OFFERS);
+  const [offers, setOffers] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -26,8 +19,10 @@ export default function AdminOffersPage() {
   const loadOffers = async () => {
     try {
       const res = await apiGet('/canteen/offers');
-      if (res.success && res.offers?.length > 0) setOffers(res.offers);
-    } catch (err) { console.log('Using mock offers'); }
+      if (res.success && res.offers) setOffers(res.offers);
+    } catch (err) {
+      console.log('Failed to fetch canteen offers from server');
+    }
   };
 
   const handleDelete = async (id: string) => {

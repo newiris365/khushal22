@@ -37,16 +37,8 @@ export default function AdminContractorsPage() {
 
       if (contRes.success) setContractors(contRes.contractors || []);
       if (permRes.success) setPermits(permRes.permits || []);
-    } catch {
-      // Offline fallback seeds
-      setContractors([
-        { id: 'c1', company_name: 'Apex Plumbing Services', contact: '+91 99887 76655', work_types: ['Plumbing'] },
-        { id: 'c2', company_name: 'VoltTech Electricals', contact: '+91 99887 76656', work_types: ['Electricals'] }
-      ]);
-      setPermits([
-        { id: 'p1', contractor_id: 'c1', date: '2026-06-10', scope: 'Fix water pipelines', location: 'Hostel Block C', status: 'approved', flagged_suspicious: false, contractor_profiles: { company_name: 'Apex Plumbing Services' }, entry_pass_qr: 'MOCK_QR' },
-        { id: 'p2', contractor_id: 'c2', date: '2026-06-10', scope: 'Air conditioner service', location: 'Academic Block A', status: 'completed', flagged_suspicious: true, contractor_profiles: { company_name: 'VoltTech Electricals' }, entry_pass_qr: 'MOCK_QR' }
-      ]);
+    } catch (err) {
+      console.log('Failed to fetch contractor data from server');
     } finally {
       setLoading(false);
     }

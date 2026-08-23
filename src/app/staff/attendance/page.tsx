@@ -247,6 +247,7 @@ export default function FacultyAttendancePage() {
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
                   placeholder="HH:MM"
                 />
+              </div>
               {sessionMsg && (
                 <p className={`text-sm ${sessionMsg.includes('successfully') ? 'text-emerald-400' : 'text-red-400'}`}>
                   {sessionMsg}

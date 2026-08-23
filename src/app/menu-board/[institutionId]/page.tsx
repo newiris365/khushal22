@@ -41,23 +41,23 @@ export default function DigitalMenuBoard() {
   const params = useParams();
   const institutionId = params.institutionId as string;
 
-  const [menu, setMenu] = useState<MenuItem[]>(MOCK_MENU);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
   const [promoIndex, setPromoIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Load backend menu
   useEffect(() => {
     loadMenu();
-  }, []);
+  }, [institutionId]);
 
   const loadMenu = async () => {
     try {
-      const res = await apiGet('/canteen/menu');
-      if (res.success && res.menu?.length > 0) {
+      const res = await apiGet(`/canteen/menu?institution_id=${institutionId}`);
+      if (res.success && res.menu) {
         setMenu(res.menu);
       }
     } catch (err) {
-      console.log('Using mock signage menu');
+      console.log('Failed to load menu board data from server');
     }
   };
 

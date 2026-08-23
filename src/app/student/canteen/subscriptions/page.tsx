@@ -14,21 +14,8 @@ const PLAN_CONFIGS = [
   { type: 'Complete', icon: Utensils, emoji: '🍽️', color: 'from-[#6C2BD9] to-[#8B5CF6]', price_per_day: 140, description: 'All 3 meals daily' },
 ];
 
-const MOCK_SUBSCRIPTIONS = [
-  {
-    id: 'sub-1', plan_type: 'Lunch', start_date: '2026-06-01', end_date: '2026-06-30',
-    meals_remaining: 18, amount_paid: 1800,
-    created_at: new Date(Date.now() - 604800000).toISOString()
-  },
-  {
-    id: 'sub-2', plan_type: 'Complete', start_date: '2026-05-01', end_date: '2026-05-31',
-    meals_remaining: 0, amount_paid: 4340,
-    created_at: new Date(Date.now() - 2592000000).toISOString()
-  },
-];
-
 export default function StudentSubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState(MOCK_SUBSCRIPTIONS);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
@@ -36,7 +23,7 @@ export default function StudentSubscriptionsPage() {
   }, []);
 
   const loadSubscriptions = async () => {
-    let studentId = '00000000-0000-0000-0000-000000000000';
+    let studentId = '';
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('iris_user_profile');
       if (userStr) {
@@ -46,10 +33,13 @@ export default function StudentSubscriptionsPage() {
         } catch (e) {}
       }
     }
+    if (!studentId) return;
     try {
       const res = await apiGet(`/canteen/subscriptions/${studentId}`);
       if (res.success && res.subscriptions) setSubscriptions(res.subscriptions);
-    } catch (err) { console.log('Using mock subscriptions'); }
+    } catch (err) {
+      console.log('Failed to fetch subscriptions from server');
+    }
   };
 
   const handleCreate = async (form: any) => {

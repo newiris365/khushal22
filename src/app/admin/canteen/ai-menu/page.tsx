@@ -14,27 +14,6 @@ interface DailyMenu {
   dinner: { name: string; calories: number; protein: number; price: number };
 }
 
-const MOCK_PLAN: DailyMenu[] = [
-  {
-    day: 'Monday',
-    breakfast: { name: 'Poha & Jalebi', calories: 310, protein: 5, price: 30 },
-    lunch: { name: 'Gatte ki Sabzi, Roti, Rice & Buttermilk', calories: 580, protein: 16, price: 70 },
-    dinner: { name: 'Khichdi, Kadhi & Aloo Bhujia', calories: 450, protein: 12, price: 50 }
-  },
-  {
-    day: 'Tuesday',
-    breakfast: { name: 'Pyaz Kachori & Masala Chai', calories: 340, protein: 4, price: 35 },
-    lunch: { name: 'Dal Tadka, Mix Veg Sabzi, Roti & Rice', calories: 520, protein: 14, price: 60 },
-    dinner: { name: 'Sev Tamatar ki Sabzi, Paratha & Dahi', calories: 480, protein: 10, price: 55 }
-  },
-  {
-    day: 'Wednesday',
-    breakfast: { name: 'Aloo Paratha with Curd', calories: 380, protein: 8, price: 40 },
-    lunch: { name: 'Rajasthani Thali (Dal Baati Churma)', calories: 780, protein: 20, price: 90 },
-    dinner: { name: 'Paneer Bhurji & Roti', calories: 510, protein: 18, price: 65 }
-  }
-];
-
 export default function AdminAiMenuPage() {
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -51,10 +30,11 @@ export default function AdminAiMenuPage() {
       if (res.success && res.plan?.days) {
         setMenuPlan(res.plan.days);
       } else {
-        setMenuPlan(MOCK_PLAN);
+        setMenuPlan([]);
       }
     } catch (err) {
-      setMenuPlan(MOCK_PLAN);
+      console.log('Failed to generate AI menu plan');
+      setMenuPlan(null);
     } finally {
       setLoading(false);
     }

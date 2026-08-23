@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Users, CheckCircle2, XCircle, Search } from 'lucide-react';
-import { apiGet } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../lib/api';
 
 interface Student {
   student_id: string;

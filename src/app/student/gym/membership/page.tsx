@@ -11,7 +11,7 @@ const MOCK_PLANS = [
 ];
 
 export default function StudentGymMembership() {
-  const [plans, setPlans] = useState<any[]>(MOCK_PLANS);
+  const [plans, setPlans] = useState<any[]>([]);
   const [membership, setMembership] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showFreezeModal, setShowFreezeModal] = useState(false);
@@ -33,27 +33,20 @@ export default function StudentGymMembership() {
 
       // Fetch plans
       const planRes = await apiGet('/fitzone/gym/membership-plans');
-      if (planRes.success && planRes.plans?.length > 0) {
+      if (planRes.success && planRes.plans) {
         setPlans(planRes.plans);
       }
 
       // Fetch active membership
-      const membRes = await apiGet(`/fitzone/gym/memberships/${studentId}`);
-      if (membRes.success && membRes.memberships?.length > 0) {
-        const active = membRes.memberships.find((m: any) => m.status === 'active') || membRes.memberships[0];
-        setMembership(active);
+      if (studentId) {
+        const membRes = await apiGet(`/fitzone/gym/memberships/${studentId}`);
+        if (membRes.success && membRes.memberships?.length > 0) {
+          const active = membRes.memberships.find((m: any) => m.status === 'active') || membRes.memberships[0];
+          setMembership(active);
+        }
       }
     } catch (err) {
-      console.log('Error loading membership data, using mock fallbacks');
-      setMembership({
-        id: 'memb123',
-        plan: 'Annual Pro Elite',
-        status: 'active',
-        start_date: '2026-01-10',
-        end_date: '2027-01-09',
-        is_frozen: false,
-        amount_paid: 4999
-      });
+      console.log('Error loading membership data from server');
     } finally {
       setLoading(false);
     }

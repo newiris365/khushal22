@@ -367,8 +367,8 @@ router.post('/exams', requireRole(['Staff', 'Admin', 'SuperAdmin']), createExam)
 router.post('/exams/:id/results', requireRole(['Staff', 'Admin', 'SuperAdmin']), enterResults);
 router.get('/exams/:id/results', getResults);
 router.post('/exams/:id/publish', requireRole(['Staff', 'Admin', 'SuperAdmin']), publishResults);
-router.get('/exams/marksheet/:studentId', getStudentMarksheet);
-router.get('/exams/marksheet/:studentId/:examId', getMarksheetMetadata);
+router.get('/exams/marksheet/:studentId', authMiddleware, requireRole(['Student', 'Parent', 'Teacher', 'Staff', 'Admin', 'SuperAdmin', 'HOD', 'Principal', 'Admissions Officer']), getStudentMarksheet);
+router.get('/exams/marksheet/:studentId/:examId', authMiddleware, requireRole(['Student', 'Parent', 'Teacher', 'Staff', 'Admin', 'SuperAdmin', 'HOD', 'Principal', 'Admissions Officer']), getMarksheetMetadata);
 
 // =========================================================================
 // 7. ID CARDS ROUTERS

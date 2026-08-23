@@ -207,7 +207,16 @@ function getImprovementRecommendations(criteria: NaaCCriterion[]): string[] {
 }
 
 export default function HodNaacPage() {
-  const [dashboard, setDashboard] = useState<NaaCDashboard>(MOCK_NAAC_DATA);
+  const [dashboard, setDashboard] = useState<NaaCDashboard>({
+    criteria: [],
+    overallScore: 0,
+    overallMaxScore: 100,
+    estimatedGrade: 'N/A',
+    lastUpdated: new Date().toISOString(),
+    totalEvidence: 0,
+    totalDocumentsUploaded: 0,
+    totalDocumentsRequired: 0
+  });
   const [loading, setLoading] = useState(true);
   const [expandedCriterion, setExpandedCriterion] = useState<string | null>(null);
 
@@ -219,11 +228,14 @@ export default function HodNaacPage() {
         if (res.success && res.criteria) {
           setDashboard(res as any);
         } else {
-          setDashboard(MOCK_NAAC_DATA);
+          // Attempt fallback to OBE NAAC overview endpoint
+          const obeRes = await apiGet('/obe/department-naac');
+          if (obeRes.success && obeRes.dashboard) {
+            setDashboard(obeRes.dashboard);
+          }
         }
       } catch (err) {
-        console.error(err);
-        setDashboard(MOCK_NAAC_DATA);
+        console.error('Failed to load NAAC metrics:', err);
       } finally {
         setLoading(false);
       }

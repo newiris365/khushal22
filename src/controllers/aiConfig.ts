@@ -30,7 +30,10 @@ function formatProviderInfo(rawKey: string | null | undefined) {
 /** GET /api/v1/core/ai/config - Get current AI API configurations (MASKED ONLY) */
 export async function getAiConfig(req: Request, res: Response) {
   try {
-    const institutionId = req.query.institution_id as string;
+    const institutionId = (req.user && req.user.role !== 'SuperAdmin')
+      ? req.user.institution_id
+      : (req.user?.institution_id || (req.query.institution_id as string));
+
     if (!institutionId) {
       return res.status(400).json({ success: false, error: 'institution_id is required' });
     }
@@ -212,6 +215,7 @@ export interface BotConfig {
   tone: string;
   welcome_message: string | null;
   role_greetings: Record<string, string> | null;
+  system_prompt_overrides?: Record<string, string> | null;
   auto_open_on_urgent: boolean;
   escalation_mode: 'ticket' | 'live_transfer' | 'contact_info';
   escalation_contact: string | null;
@@ -226,6 +230,7 @@ export const DEFAULT_BOT_CONFIG: BotConfig = {
   tone: 'Friendly, helpful, and professional',
   welcome_message: null,
   role_greetings: null,
+  system_prompt_overrides: null,
   auto_open_on_urgent: true,
   escalation_mode: 'ticket',
   escalation_contact: null,
@@ -238,7 +243,9 @@ let localBotConfigFallback: Record<string, BotConfig> = {};
 /** GET /api/v1/core/ai/bot-config - Get bot branding configuration for an institution */
 export async function getBotConfig(req: Request, res: Response) {
   try {
-    const institutionId = (req.query.institution_id as string) || (req as any).user?.institution_id;
+    const institutionId = (req.user && req.user.role !== 'SuperAdmin')
+      ? req.user.institution_id
+      : ((req as any).user?.institution_id || (req.query.institution_id as string));
     if (!institutionId) {
       return res.status(400).json({ success: false, error: 'institution_id is required' });
     }
@@ -262,6 +269,7 @@ export async function saveBotConfig(req: Request, res: Response) {
       tone, 
       welcome_message, 
       role_greetings, 
+      system_prompt_overrides,
       auto_open_on_urgent, 
       escalation_mode, 
       escalation_contact, 
@@ -269,42 +277,44 @@ export async function saveBotConfig(req: Request, res: Response) {
       force_llm_always
     } = req.body;
 
-    const instId = institution_id || (req as any).user?.institution_id;
-    if (!instId) {
-      return res.status(400).json({ success: false, error: 'institution_id is required.' });
+    const targetInstId = (req.user && req.user.role !== 'SuperAdmin')
+      ? req.user.institution_id
+      : (institution_id || (req as any).user?.institution_id);
+
+    if (!targetInstId) {
+      return res.status(400).json({ success: false, error: 'institution_id is required' });
     }
 
-    const updatedConfig: BotConfig = {
-      name: name?.trim() || DEFAULT_BOT_CONFIG.name,
-      avatar_url: avatar_url?.trim() || null,
-      accent_color: accent_color?.trim() || DEFAULT_BOT_CONFIG.accent_color,
-      tone: tone?.trim() || DEFAULT_BOT_CONFIG.tone,
-      welcome_message: welcome_message?.trim() || null,
-      role_greetings: typeof role_greetings === 'object' ? role_greetings : null,
-      auto_open_on_urgent: typeof auto_open_on_urgent === 'boolean' ? auto_open_on_urgent : true,
-      escalation_mode: ['ticket', 'live_transfer', 'contact_info'].includes(escalation_mode) ? escalation_mode : 'ticket',
-      escalation_contact: escalation_contact?.trim() || null,
-      data_retention_days: typeof data_retention_days === 'number' ? data_retention_days : null,
-      force_llm_always: typeof force_llm_always === 'boolean' ? force_llm_always : false,
+    const existing = await getInstitutionBotConfig(targetInstId);
+    const updated: BotConfig = {
+      ...existing,
+      name: name?.trim() ?? existing.name,
+      avatar_url: avatar_url?.trim() ?? existing.avatar_url,
+      accent_color: accent_color?.trim() ?? existing.accent_color,
+      tone: tone?.trim() ?? existing.tone,
+      welcome_message: welcome_message?.trim() ?? existing.welcome_message,
+      role_greetings: role_greetings ?? existing.role_greetings,
+      system_prompt_overrides: system_prompt_overrides ?? existing.system_prompt_overrides,
+      auto_open_on_urgent: typeof auto_open_on_urgent === 'boolean' ? auto_open_on_urgent : existing.auto_open_on_urgent,
+      escalation_mode: ['ticket', 'live_transfer', 'contact_info'].includes(escalation_mode) ? escalation_mode : existing.escalation_mode,
+      escalation_contact: escalation_contact?.trim() ?? existing.escalation_contact,
+      data_retention_days: typeof data_retention_days === 'number' ? data_retention_days : existing.data_retention_days,
+      force_llm_always: typeof force_llm_always === 'boolean' ? force_llm_always : existing.force_llm_always
     };
 
-    localBotConfigFallback[instId] = updatedConfig;
+    localBotConfigFallback[targetInstId] = updated;
 
     try {
-      const { error } = await supabaseAdmin
+      await supabaseAdmin
         .from('institutions')
-        .update({ bot_config: updatedConfig })
-        .eq('id', instId);
-
-      if (error) {
-        console.warn('bot_config column missing or update failed in institutions table. Saved in session memory.');
-      }
+        .update({ bot_config: updated })
+        .eq('id', targetInstId);
     } catch {}
 
     const actorUserId = (req as any).user?.id || 'system';
-    await logAiKeyAudit(instId, actorUserId, 'bot_config_updated');
+    await logAiKeyAudit(targetInstId, actorUserId, 'bot_config_updated');
 
-    return res.json({ success: true, config: updatedConfig });
+    return res.json({ success: true, config: updated });
   } catch (err: any) {
     console.error('ERROR in saveBotConfig:', err);
     return res.status(500).json({ success: false, error: err.message });
@@ -339,7 +349,9 @@ export async function getInstitutionBotConfig(institutionId: string): Promise<Bo
 /** GET /api/v1/ai/escalations/config - Get escalation config */
 export async function getEscalationConfig(req: Request, res: Response) {
   try {
-    const institutionId = (req as any).user?.institution_id || (req.query.institution_id as string) || 'a0000000-0000-0000-0000-000000000001';
+    const institutionId = (req.user && req.user.role !== 'SuperAdmin')
+      ? req.user.institution_id
+      : ((req as any).user?.institution_id || (req.query.institution_id as string) || 'a0000000-0000-0000-0000-000000000001');
     const config = await getInstitutionBotConfig(institutionId);
     return res.status(200).json({
       success: true,
@@ -354,7 +366,9 @@ export async function getEscalationConfig(req: Request, res: Response) {
 /** POST /api/v1/ai/escalations/config - Save escalation config */
 export async function saveEscalationConfig(req: Request, res: Response) {
   try {
-    const institutionId = (req as any).user?.institution_id || req.body.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const institutionId = (req.user && req.user.role !== 'SuperAdmin')
+      ? req.user.institution_id
+      : ((req as any).user?.institution_id || req.body.institution_id || 'a0000000-0000-0000-0000-000000000001');
     const { escalation_mode, escalation_contact } = req.body;
     
     const existing = await getInstitutionBotConfig(institutionId);

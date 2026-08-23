@@ -2668,7 +2668,9 @@ export async function confirmBotAction(req: Request, res: Response) {
 /** GET /api/v1/ai/stats - Fast-Path Cost Savings Analytics */
 export async function getAiUsageStats(req: Request, res: Response) {
   try {
-    const institutionId = req.user?.institution_id || (req.query.institution_id as string) || 'a0000000-0000-0000-0000-000000000001';
+    const institutionId = (req.user?.role === 'SuperAdmin' && req.query.institution_id)
+      ? (req.query.institution_id as string)
+      : (req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001');
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);

@@ -7,18 +7,6 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 
-const MOCK_WALLET = { balance: 1250.50, student_id: 's1' };
-
-const MOCK_TRANSACTIONS = [
-  { id: 't1', type: 'debit', amount: 220, description: 'Order payment for 3 item(s)', reference_type: 'order_payment', balance_after: 1250.50, created_at: new Date(Date.now() - 480000).toISOString() },
-  { id: 't2', type: 'credit', amount: 500, description: 'Wallet top-up of ₹500.00', reference_type: 'topup', balance_after: 1470.50, created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: 't3', type: 'debit', amount: 130, description: 'Order payment for 1 item(s)', reference_type: 'order_payment', balance_after: 970.50, created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: 't4', type: 'credit', amount: 30, description: 'Refund for cancelled order ORD-X1Y2Z', reference_type: 'refund', balance_after: 1100.50, created_at: new Date(Date.now() - 10800000).toISOString() },
-  { id: 't5', type: 'debit', amount: 190, description: 'Order payment for 2 item(s)', reference_type: 'order_payment', balance_after: 1070.50, created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: 't6', type: 'credit', amount: 1000, description: 'Wallet top-up of ₹1000.00', reference_type: 'topup', balance_after: 1260.50, created_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: 't7', type: 'debit', amount: 450, description: 'Meal subscription - Lunch Plan', reference_type: 'subscription', balance_after: 260.50, created_at: new Date(Date.now() - 259200000).toISOString() },
-];
-
 const TOPUP_AMOUNTS = [100, 250, 500, 1000, 2000];
 
 function formatTime(iso: string) {
@@ -37,8 +25,8 @@ const refIcons: Record<string, string> = {
 };
 
 export default function StudentWalletPage() {
-  const [wallet, setWallet] = useState(MOCK_WALLET);
-  const [transactions, setTransactions] = useState(MOCK_TRANSACTIONS);
+  const [wallet, setWallet] = useState<{ balance: number; student_id: string }>({ balance: 0, student_id: '' });
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [showTopup, setShowTopup] = useState(false);
   const [topupAmount, setTopupAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState('');
@@ -63,7 +51,9 @@ export default function StudentWalletPage() {
       if (res.success && res.wallet) setWallet(res.wallet);
       const txRes = await apiGet(`/canteen/wallet/transactions/${studentId}`);
       if (txRes.success && txRes.transactions) setTransactions(txRes.transactions);
-    } catch (err) { console.log('Using mock wallet data'); }
+    } catch (err) {
+      console.log('Failed to fetch wallet data from server');
+    }
   };
 
   const handleTopup = async () => {

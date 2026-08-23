@@ -148,31 +148,33 @@ export default function TpoReportsManager() {
         </div>
 
         {/* Live NIRF Numbers Preview */}
-        <div className="p-6 rounded-2xl bg-[#13102A]/85 border border-white/5 flex flex-col gap-4">
-          <h3 className="font-bold text-xs text-white">NIRF Parameters Preview (Academic Year: {nirfData.academic_year})</h3>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mt-1">
-            <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-              <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Graduating Count</span>
-              <h4 className="text-lg font-extrabold text-white mt-1">{nirfData.total_graduating}</h4>
-            </div>
+        {nirfData && (
+          <div className="p-6 rounded-2xl bg-[#13102A]/85 border border-white/5 flex flex-col gap-4">
+            <h3 className="font-bold text-xs text-white">NIRF Parameters Preview (Academic Year: {nirfData.academic_year || '2026-27'})</h3>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mt-1">
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Graduating Count</span>
+                <h4 className="text-lg font-extrabold text-white mt-1">{nirfData.total_graduating || 0}</h4>
+              </div>
 
-            <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-              <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Placed Count</span>
-              <h4 className="text-lg font-extrabold text-white mt-1">{nirfData.total_placed}</h4>
-            </div>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Placed Count</span>
+                <h4 className="text-lg font-extrabold text-white mt-1">{nirfData.total_placed || 0}</h4>
+              </div>
 
-            <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-              <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Median CTC Package</span>
-              <h4 className="text-lg font-extrabold text-emerald-400 mt-1">₹{nirfData.median_salary / 100000} LPA</h4>
-            </div>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Median CTC Package</span>
+                <h4 className="text-lg font-extrabold text-emerald-400 mt-1">₹{(nirfData.median_salary || 0) / 100000} LPA</h4>
+              </div>
 
-            <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-              <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Higher Studies</span>
-              <h4 className="text-lg font-extrabold text-white mt-1">{nirfData.higher_studies_opted}</h4>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                <span className="text-[9px] uppercase font-bold text-[#C4B5FD]/50">Higher Studies</span>
+                <h4 className="text-lg font-extrabold text-white mt-1">{nirfData.higher_studies_opted || 0}</h4>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
     </main>

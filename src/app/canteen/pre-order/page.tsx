@@ -59,21 +59,50 @@ const SLOTS = [
 ];
 
 export default function PreOrderPage() {
-  const [menu, setMenu] = useState<MenuItem[]>(MOCK_MENU);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [walletBalance, setWalletBalance] = useState(0);
-  const [previousOrders, setPreviousOrders] = useState<PreOrder[]>(MOCK_ORDERS);
+  const [previousOrders, setPreviousOrders] = useState<PreOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState('');
 
-  const studentId = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('iris_user_profile') || '{}').id || 's0000000-0000-0000-0000-000000000001'
-    : 's0000000-0000-0000-0000-000000000001';
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
+    try {
+      const [menuRes, walletRes, ordersRes]: [any, any, any] = await Promise.all([
+        apiGet('/canteen/menu'),
+        studentId ? apiGet(`/canteen/wallet/${studentId}`) : Promise.resolve({ success: false }),
+        studentId ? apiGet(`/canteen/pre-orders/${studentId}`) : Promise.resolve({ success: false }),
+      ]);
+
+      if (menuRes.success && menuRes.menu) setMenu(menuRes.menu);
+      if (walletRes.success && walletRes.wallet) setWalletBalance(walletRes.wallet.balance || 0);
+      if (ordersRes.success && ordersRes.orders) setPreviousOrders(ordersRes.orders);
+    } catch (err) {
+      console.log('Failed to fetch pre-order data from server');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const dates = useMemo(() => {
     const result: { label: string; value: string; day: string }[] = [];
@@ -95,26 +124,7 @@ export default function PreOrderPage() {
     if (dates.length > 0 && !selectedDate) {
       setSelectedDate(dates[0].value);
     }
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [menuRes, walletRes, ordersRes] = await Promise.all([
-        apiGet('/canteen/menu'),
-        apiGet(`/canteen/wallet/${studentId}`),
-        apiGet(`/canteen/preorders/${studentId}`),
-      ]);
-      if (menuRes.success && menuRes.menu?.length > 0) setMenu(menuRes.menu);
-      if (walletRes.success && walletRes.balance != null) setWalletBalance(walletRes.balance);
-      if (ordersRes.success && ordersRes.orders?.length > 0) setPreviousOrders(ordersRes.orders);
-    } catch {
-      console.log('Using mock pre-order data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [dates, selectedDate]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(menu.map(i => i.category)));
@@ -155,6 +165,16 @@ export default function PreOrderPage() {
   const placeOrder = async () => {
     if (!selectedDate || !selectedSlot || cart.length === 0) return;
     setPlacing(true);
+    let studentId = '';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
       const res = await apiPost('/canteen/preorders', {
         student_id: studentId,

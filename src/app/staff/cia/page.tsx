@@ -258,6 +258,7 @@ export default function FacultyCiaPage() {
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
                 />
               </div>
+            </div>
             {createMsg && (
               <p className={`text-sm mt-3 ${createMsg.includes('successfully') ? 'text-emerald-400' : 'text-red-400'}`}>
                 {createMsg}
