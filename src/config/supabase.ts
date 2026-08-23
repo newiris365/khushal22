@@ -14,16 +14,20 @@ const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn('Supabase URL or Service Key is missing. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are configured.');
+  logger.warn('Supabase URL or Service Key is missing. Operating with fallback client configuration.');
 }
 
 // Internal admin client to bypass RLS for administrative updates
-const _supabaseAdminInternal = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+const _supabaseAdminInternal = createClient(
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseServiceKey || 'placeholder-service-key-for-test-environments',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
   }
-});
+);
 
 export let isSupabaseOffline = false;
 
