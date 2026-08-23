@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, BookOpen, Clock, RefreshCw, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function MyBorrowedBooksPage() {
   const [issues, setIssues] = useState<any[]>([]);
@@ -150,7 +151,7 @@ export default function MyBorrowedBooksPage() {
                     <div className="flex gap-4">
                       <div className="w-14 h-18 bg-white/5 rounded-xl overflow-hidden relative shadow flex-shrink-0">
                         {issue.books?.cover_image_url ? (
-                          <img src={issue.books.cover_image_url} alt={issue.books.title} className="w-full h-full object-cover" />
+                          <Image src={issue.books.cover_image_url} alt={issue.books.title} width={56} height={72} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center"><BookOpen className="w-6 h-6 text-white/20" /></div>
                         )}

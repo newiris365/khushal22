@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Settings, Save, Clock, ShieldCheck, QrCode } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 
@@ -123,7 +124,7 @@ export default function WardenSettingsPage() {
           </p>
 
           <div className="bg-slate-900 p-4 rounded-2xl border border-white/10 shadow-2xl">
-            <img src={qrUrl} alt="Check-in QR Code" className="w-48 h-48 rounded-lg" />
+            <Image src={qrUrl} alt="Check-in QR Code" width={192} height={192} className="w-48 h-48 rounded-lg" />
           </div>
 
           <p className="mt-6 text-xs text-slate-500 font-mono">

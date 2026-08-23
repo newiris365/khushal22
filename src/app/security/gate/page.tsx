@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   ScanLine, Search, CheckCircle2, XCircle, AlertTriangle, Users,
   UserCheck, Shield, Clock, Eye
@@ -172,7 +173,7 @@ export default function SecurityGatePage() {
 
           <div className="flex items-start gap-4">
             {scanResult.person?.photo_url ? (
-              <img src={scanResult.person.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
+              <Image src={scanResult.person.photo_url} alt="" width={64} height={64} className="w-16 h-16 rounded-full object-cover" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-slate-600 flex items-center justify-center text-2xl font-bold text-white">
                 {scanResult.person?.full_name?.charAt(0)}

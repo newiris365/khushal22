@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function Footer() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -23,9 +24,11 @@ export default function Footer() {
           <div className="flex items-center gap-3">
             {/* Hexagonal Iris Logo */}
             <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
-              <img 
+              <Image 
                 src={logoSrc} 
                 alt="IRIS 365 Logo" 
+                width={32}
+                height={32}
                 className="w-full h-full object-cover"
               />
             </div>

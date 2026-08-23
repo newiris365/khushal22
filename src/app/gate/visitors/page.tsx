@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, User, Phone, Mail, Award, CheckCircle, Camera, Search, UserCheck, Clock, Check, RefreshCw, X, ArrowLeft } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function VisitorIntakePage() {
   const [visitorName, setVisitorName] = useState('');
@@ -386,9 +387,11 @@ export default function VisitorIntakePage() {
                     <p className="text-[10px] text-[#A78BFA]/70 font-mono absolute bottom-4">CAMERA ON — LIVE VIEWPORTS</p>
                   </div>
                 ) : capturedPhoto ? (
-                  <img
+                  <Image
                     src={capturedPhoto}
                     alt="Captured Visitor Profile"
+                    width={200}
+                    height={200}
                     className="w-full h-full object-cover"
                   />
                 ) : (

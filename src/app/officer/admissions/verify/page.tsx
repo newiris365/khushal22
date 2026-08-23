@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { 
   FileText, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, 
@@ -341,9 +342,11 @@ function VerificationDeskContent() {
                 <span className="text-[10px] uppercase font-mono font-bold text-[#C4B5FD]/40 w-full text-left">Document Image Scan</span>
                 
                 {selectedDoc.doc_type === 'photo' ? (
-                  <img 
+                  <Image 
                     src={selectedDoc.doc_url} 
                     alt="Candidate Photo" 
+                    width={192}
+                    height={192}
                     className="w-48 h-48 rounded-2xl object-cover border border-[#6C2BD9]/30 shadow-lg shadow-[#6C2BD9]/10"
                   />
                 ) : (

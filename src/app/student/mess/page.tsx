@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { UtensilsCrossed, Clock, CreditCard, ShieldCheck, Megaphone } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
@@ -202,9 +203,11 @@ export default function CollegeMessPage() {
                     <ShieldCheck className="w-5 h-5" /> Token Generated
                   </h3>
                   <div className="bg-[#0D0A1A] p-4 rounded-xl border border-white/10 shadow-2xl">
-                    <img
+                    <Image
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${tokenCode}&bgcolor=0D0A1A&color=A78BFA`}
                       alt="Meal QR Token"
+                      width={160}
+                      height={160}
                       className="w-40 h-40 rounded-lg"
                     />
                   </div>

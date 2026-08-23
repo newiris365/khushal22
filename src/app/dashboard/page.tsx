@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { LogOut, LayoutDashboard, Users, Calendar, ClipboardList, Bell, Shield, Bus, Dumbbell, BookOpen } from 'lucide-react';
 
 export default function GenericDashboard() {
@@ -75,9 +76,11 @@ export default function GenericDashboard() {
       <header className="border-b border-[#6C2BD9]/25 bg-[#13102A]/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
-            <img 
+            <Image 
               src={logoSrc} 
               alt="IRIS 365 Logo" 
+              width={32}
+              height={32}
               className="w-full h-full object-cover"
             />
           </div>

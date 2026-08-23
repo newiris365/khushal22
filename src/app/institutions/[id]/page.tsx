@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   MapPin, Phone, Mail, Globe, ArrowLeft, GraduationCap, School,
   ExternalLink, AlertCircle, Loader2, ChevronRight, BookOpen, Building2
@@ -122,13 +123,12 @@ export default function InstitutionDetailPage() {
               {/* Logo */}
               <div className="w-20 h-20 rounded-2xl bg-[#0D0A1A] border-2 border-[#6C2BD9]/40 flex items-center justify-center overflow-hidden shadow-lg shadow-[#6C2BD9]/20 shrink-0">
                 {institution.logo_url ? (
-                  <img
+                  <Image
                     src={institution.logo_url}
                     alt={institution.name}
+                    width={80}
+                    height={80}
                     className="w-full h-full object-contain p-1.5"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
                   />
                 ) : (
                   <span className="text-3xl">{isSchool ? '🏫' : '🏛️'}</span>

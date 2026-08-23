@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, User, QrCode, Clock, RefreshCw, ArrowLeft, CheckCircle, Smartphone } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function StudentMyPassPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -123,9 +124,11 @@ export default function StudentMyPassPage() {
           {/* QR Code Canvas Frame */}
           <div className="bg-[#13102A] border border-white/5 p-4 rounded-2xl inline-block relative">
             {qrImageUrl ? (
-              <img
+              <Image
                 src={qrImageUrl}
                 alt="Gate Pass QR"
+                width={192}
+                height={192}
                 className="w-48 h-48 mx-auto rounded-lg border border-white/10"
               />
             ) : (

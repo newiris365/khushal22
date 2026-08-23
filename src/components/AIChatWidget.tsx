@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 interface Message {
@@ -663,7 +664,7 @@ export default function AIChatWidget() {
         {isOpen ? (
           <X className="w-6 h-6" />
         ) : botConfig?.avatar_url ? (
-          <img src={botConfig.avatar_url} alt="Bot Avatar" className="w-8 h-8 rounded-full object-cover" />
+          <Image src={botConfig.avatar_url} alt="Bot Avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
         ) : (
           <BrainCircuit className="w-6 h-6 animate-pulse" />
         )}
@@ -688,7 +689,7 @@ export default function AIChatWidget() {
                 className="p-1.5 rounded-lg border"
               >
                 {botConfig?.avatar_url ? (
-                  <img src={botConfig.avatar_url} alt="Bot Avatar" className="w-5 h-5 rounded-lg object-cover" />
+                  <Image src={botConfig.avatar_url} alt="Bot Avatar" width={20} height={20} className="w-5 h-5 rounded-lg object-cover" />
                 ) : (
                   <BrainCircuit className="w-5 h-5" style={{ color: accentHex }} />
                 )}

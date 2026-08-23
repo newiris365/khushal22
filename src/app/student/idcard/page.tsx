@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { CreditCard, Download, ShieldCheck } from 'lucide-react';
 import { useAcademic } from '../AcademicContext';
 import { apiGet } from '../../../lib/api';
@@ -80,9 +81,11 @@ export default function StudentIdCardPage() {
 
                   <div className="flex justify-center mt-6">
                     <div className="w-24 h-28 bg-[#1E1B4B] border-2 border-[#06B6D4] rounded-xl flex items-center justify-center overflow-hidden">
-                      <img 
+                      <Image 
                         src={studentProfile?.photo_url || cardData.student?.photo_url || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=256"} 
                         alt="Profile"
+                        width={96}
+                        height={112}
                         className="w-full h-full object-cover"
                       />
                     </div>

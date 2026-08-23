@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   Search, MapPin, GraduationCap, School, Building2, ChevronRight,
@@ -54,15 +55,12 @@ function InstitutionCard({ inst }: { inst: Institution }) {
         {/* Logo / Fallback */}
         <div className="w-14 h-14 rounded-xl bg-[#1E1A3A] border border-white/10 flex items-center justify-center shrink-0 overflow-hidden">
           {inst.logo_url ? (
-            <img
+            <Image
               src={inst.logo_url}
               alt={inst.name}
+              width={56}
+              height={56}
               className="w-full h-full object-contain p-1"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                (e.currentTarget.parentNode as HTMLElement).innerHTML =
-                  `<span style="font-size:22px">🏛️</span>`;
-              }}
             />
           ) : (
             <span className="text-2xl">{isSchool ? '🏫' : '🏛️'}</span>

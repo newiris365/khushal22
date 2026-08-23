@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Users, Award, Book, Calendar, MessageSquare, Send, Sparkles, CheckCircle, RefreshCw } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 
@@ -236,7 +237,7 @@ export default function BookClubsPage() {
                 
                 {selectedClub?.books?.cover_image_url ? (
                   <div className="w-24 aspect-[3/4] bg-white/5 rounded-xl overflow-hidden shadow-lg border border-white/10 shrink-0">
-                    <img src={selectedClub.books.cover_image_url} alt={selectedClub.books.title} className="w-full h-full object-cover" />
+                    <Image src={selectedClub.books.cover_image_url} alt={selectedClub.books.title} width={96} height={128} className="w-full h-full object-cover" />
                   </div>
                 ) : (
                   <div className="w-24 aspect-[3/4] bg-white/5 rounded-xl flex items-center justify-center text-white/20 border border-white/5 shrink-0">

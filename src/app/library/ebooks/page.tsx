@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, BookOpen, Search, Download, Eye, Bookmark, FileText, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function EbooksPortalPage() {
   const [ebooks, setEbooks] = useState<any[]>([]);
@@ -149,7 +150,7 @@ export default function EbooksPortalPage() {
               <div key={eb.id} className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-5 shadow-xl flex gap-5 hover:border-[#6C2BD9]/20 transition-all">
                 <div className="w-24 h-32 rounded-xl bg-white/5 overflow-hidden relative shadow flex-shrink-0">
                   {eb.cover_url ? (
-                    <img src={eb.cover_url} alt={eb.title} className="w-full h-full object-cover" />
+                    <Image src={eb.cover_url} alt={eb.title} width={96} height={128} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20"><FileText className="w-8 h-8" /></div>
                   )}

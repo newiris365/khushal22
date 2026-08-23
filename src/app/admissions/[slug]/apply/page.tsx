@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   User, BookOpen, GraduationCap, FileText, CheckCircle, CreditCard,
   Camera, Upload, Info, AlertTriangle, Check, RefreshCw, ChevronLeft, ChevronRight,
@@ -471,7 +472,7 @@ export default function MultiStepApplyPage() {
                   <div className="md:col-span-1 flex flex-col items-center justify-center p-4 border border-[#6C2BD9]/20 rounded-2xl bg-[#0D0A1A]/40 text-center relative">
                     <div className="w-24 h-32 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center justify-center overflow-hidden relative group">
                       {personalDetails.photo_url ? (
-                        <img src={personalDetails.photo_url} alt="Profile" className="w-full h-full object-cover" />
+                        <Image src={personalDetails.photo_url} alt="Profile" width={96} height={128} className="w-full h-full object-cover" />
                       ) : (
                         <Camera className="w-8 h-8 text-white/30" />
                       )}

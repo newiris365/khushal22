@@ -5,6 +5,7 @@ import { Image as ImageIcon, ArrowLeft, Heart, MessageCircle, AlertCircle, Maxim
 import { apiGet } from '../../../lib/api';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function PublicEventGalleryPage() {
   const params = useParams();
@@ -85,11 +86,12 @@ export default function PublicEventGalleryPage() {
                     className="rounded-2xl border border-white/5 bg-[#13102A]/80 overflow-hidden hover:border-[#6C2BD9]/30 hover:scale-[1.02] transition-all cursor-pointer group"
                   >
                     <div className="aspect-[16/10] overflow-hidden relative bg-black/40">
-                      <img
+                      <Image
                         src={p.photo_url}
                         alt={p.caption || 'Event snapshot'}
+                        width={600}
+                        height={375}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                         <span className="p-2 rounded-lg bg-[#6C2BD9] text-white">
@@ -133,9 +135,11 @@ export default function PublicEventGalleryPage() {
 
           <div className="max-w-4xl w-full flex flex-col gap-4">
             <div className="w-full aspect-[16/10] max-h-[70vh] rounded-2xl overflow-hidden border border-white/10 bg-black flex items-center justify-center">
-              <img
+              <Image
                 src={activePhoto.photo_url}
                 alt={activePhoto.caption || 'Event image'}
+                width={1000}
+                height={625}
                 className="w-full h-full object-contain"
               />
             </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, User, Check, X, ShieldAlert, ArrowLeft, Send, Clock, QrCode, FileText, Landmark, Key } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function ExitPassConsolePage() {
   const [profile, setProfile] = useState<any>(null);
@@ -198,9 +199,11 @@ export default function ExitPassConsolePage() {
                 
                 {/* Simulated QR block */}
                 <div className="bg-[#13102A] p-3.5 rounded-2xl inline-block border border-white/10 mt-2">
-                  <img
+                  <Image
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(passes.filter(p => p.status === 'approved')[0].qr_pass || 'EXIT')}&bgcolor=13102A&color=ffffff`}
                     alt="Exit Pass QR"
+                    width={128}
+                    height={128}
                     className="w-32 h-32 rounded border border-white/5"
                   />
                 </div>

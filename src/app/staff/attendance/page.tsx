@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   CalendarDays, AlertTriangle, Users, Search, CheckCircle2,
   XCircle, Clock, Filter, Download, ChevronDown
@@ -202,7 +203,7 @@ export default function FacultyAttendancePage() {
             </div>
             {qrCode && (
               <div className="bg-white p-2 rounded-lg">
-                <img src={qrCode} alt="QR Code" className="w-24 h-24" />
+                <Image src={qrCode} alt="QR Code" width={96} height={96} className="w-24 h-24" />
               </div>
             )}
           </div>

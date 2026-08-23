@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Book, Sparkles, CheckCircle, Clock, Send, AlertTriangle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function BookDetailPage({ params }: { params: { id: string } }) {
   const [book, setBook] = useState<any>(null);
@@ -117,7 +118,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
           <div className="md:col-span-1 space-y-4">
             <div className="w-full aspect-[3/4] rounded-3xl bg-[#13102A]/60 border border-white/5 overflow-hidden shadow-2xl p-4 flex items-center justify-center">
               {book.cover_image_url ? (
-                <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover rounded-2xl" />
+                <Image src={book.cover_image_url} alt={book.title} width={300} height={400} className="w-full h-full object-cover rounded-2xl" />
               ) : (
                 <Book className="w-16 h-16 text-white/20" />
               )}

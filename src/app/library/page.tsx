@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Book, Search, Filter, Sparkles, BookOpen, Clock, AlertTriangle, ArrowRight, User } from 'lucide-react';
 import { apiGet } from '../../lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function LibrarySearchPage() {
   const [books, setBooks] = useState<any[]>([]);
@@ -141,7 +142,7 @@ export default function LibrarySearchPage() {
                 <Link key={rec.id} href={`/library/books/${rec.id}`} className="group p-3 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all">
                   <div className="w-full aspect-[3/4] rounded-xl bg-white/5 overflow-hidden relative shadow-md">
                     {rec.cover_image_url ? (
-                      <img src={rec.cover_image_url} alt={rec.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      <Image src={rec.cover_image_url} alt={rec.title} width={150} height={200} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/20"><Book className="w-8 h-8" /></div>
                     )}
@@ -225,7 +226,7 @@ export default function LibrarySearchPage() {
                   <div>
                     <div className="w-full aspect-[3/4] rounded-xl bg-white/5 overflow-hidden relative shadow-md">
                       {bk.cover_image_url ? (
-                        <img src={bk.cover_image_url} alt={bk.title} className="w-full h-full object-cover group-hover:scale-102 transition-transform" />
+                        <Image src={bk.cover_image_url} alt={bk.title} width={150} height={200} className="w-full h-full object-cover group-hover:scale-102 transition-transform" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-white/20"><Book className="w-8 h-8" /></div>
                       )}

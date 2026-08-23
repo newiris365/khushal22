@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Shield, GraduationCap, Menu, X } from 'lucide-react';
 
@@ -58,9 +59,11 @@ export default function Header() {
       <Link href="/" onClick={handleHomeClick} className="flex items-center gap-4 hover:opacity-90 transition-opacity">
         {/* Stylized Hexagonal Iris Logo */}
         <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
-          <img 
+          <Image 
             src={logoSrc} 
             alt="IRIS 365 Logo" 
+            width={40}
+            height={40}
             className="w-full h-full object-cover"
           />
         </div>

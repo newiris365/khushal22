@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   Play, Video, VideoOff, Search, Compass, RefreshCw, X, Award, ExternalLink, Calendar, Heart
 } from 'lucide-react';
@@ -197,9 +198,11 @@ export default function StudentVirtualClassesPage() {
             {/* Thumbnail */}
             <div className="h-44 relative bg-black/60 overflow-hidden">
               {c.thumbnail_url ? (
-                <img 
+                <Image 
                   src={c.thumbnail_url} 
                   alt={c.title}
+                  width={400}
+                  height={176}
                   className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500 opacity-80"
                 />
               ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -611,9 +612,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md glass-panel rounded-3xl p-8 relative z-10 shadow-2xl">
         <div className="flex flex-col items-center mb-8 text-center">
           <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg shadow-purple-500/10 mb-4 border border-white/10">
-            <img 
+            <Image 
               src="/dark_logo.jpeg" 
               alt="IRIS 365 Logo" 
+              width={48}
+              height={48}
               className="w-full h-full object-cover"
             />
           </div>

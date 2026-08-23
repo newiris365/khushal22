@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   Video, PlayCircle, Plus, Clock, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck
 } from 'lucide-react';
@@ -155,8 +156,7 @@ export default function VirtualClassesPage() {
             >
               <div className="relative aspect-video bg-[#0D0A1A] flex items-center justify-center border-b border-white/10">
                 {cls.thumbnail_url ? (
-                  /* eslint-disable-next-html-img-for-jsx-a11y */
-                  <img src={cls.thumbnail_url} alt={cls.title} className="w-full h-full object-cover" />
+                  <Image src={cls.thumbnail_url} alt={cls.title} width={400} height={225} className="w-full h-full object-cover" />
                 ) : (
                   <PlayCircle className="w-12 h-12 text-[#10B981]/60" />
                 )}

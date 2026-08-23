@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   ArrowLeft, Calendar, MapPin, Clock, Users, Ticket, DollarSign, 
   Trash2, Plus, Megaphone, Image as ImageIcon, Star, Download, Edit3, 
@@ -947,7 +948,7 @@ export default function ManageEventPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {photos.map(ph => (
                       <div key={ph.id} className="relative group rounded-xl overflow-hidden border border-white/5 bg-[#13102A]">
-                        <img src={ph.photo_url} alt={ph.caption} className="w-full h-40 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        <Image src={ph.photo_url} alt={ph.caption} width={300} height={160} className="w-full h-40 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex flex-col justify-end p-3">
                           <p className="text-[10px] text-white font-bold truncate">{ph.caption}</p>
                           {ph.is_featured && <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#6C2BD9] text-white w-fit mt-1">Featured</span>}

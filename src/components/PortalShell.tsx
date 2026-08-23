@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LogOut, Shield, Menu, X, ChevronRight, Bell, Search, AlertTriangle } from 'lucide-react';
 import OnboardingTour from './OnboardingTour';
@@ -287,9 +288,11 @@ export default function PortalShell({
         <div className="p-5 border-b border-white/5 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
-              <img 
+              <Image 
                 src={logoSrc} 
                 alt="IRIS 365 Logo" 
+                width={32}
+                height={32}
                 className="w-full h-full object-cover"
               />
             </div>
