@@ -2401,14 +2401,29 @@ export async function getHostelSettings(req: Request, res: Response) {
     if (error) return res.status(500).json({ success: false, error: error.message });
     
     if (!data) {
-      return res.status(200).json({
-        success: true,
-        settings: {
+      const generatedSecret = crypto.randomBytes(16).toString('hex');
+      const { data: newSettings, error: insertErr } = await supabaseAdmin
+        .from('hostel_settings')
+        .insert({
+          institution_id,
           checkin_start_time: '19:00',
           checkin_end_time: '21:00',
-          qr_code_secret: 'WARDEN_CHECKIN_DEFAULT'
-        }
-      });
+          qr_code_secret: generatedSecret
+        })
+        .select()
+        .single();
+
+      if (insertErr || !newSettings) {
+        return res.status(200).json({
+          success: true,
+          settings: {
+            checkin_start_time: '19:00',
+            checkin_end_time: '21:00',
+            qr_code_secret: generatedSecret
+          }
+        });
+      }
+      return res.status(200).json({ success: true, settings: newSettings });
     }
 
     return res.status(200).json({ success: true, settings: data });
@@ -2449,7 +2464,7 @@ export async function saveHostelSettings(req: Request, res: Response) {
           institution_id,
           checkin_start_time,
           checkin_end_time,
-          qr_code_secret
+          qr_code_secret: qr_code_secret || crypto.randomBytes(16).toString('hex')
         })
         .select()
         .single();
@@ -2479,8 +2494,8 @@ export async function markHostelAttendance(req: Request, res: Response) {
 
     if (settingsErr) return res.status(500).json({ success: false, error: settingsErr.message });
 
-    const allowedSecret = settings?.qr_code_secret || 'WARDEN_CHECKIN_DEFAULT';
-    if (qr_code_secret !== allowedSecret) {
+    const allowedSecret = settings?.qr_code_secret;
+    if (!allowedSecret || qr_code_secret !== allowedSecret) {
       return res.status(400).json({ success: false, error: 'Invalid QR Code. Please scan the official code at the Warden office.' });
     }
 

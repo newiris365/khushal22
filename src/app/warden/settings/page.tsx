@@ -10,7 +10,7 @@ export default function WardenSettingsPage() {
   const [settings, setSettings] = useState({
     checkin_start_time: "19:00",
     checkin_end_time: "21:00",
-    qr_code_secret: "WARDEN_CHECKIN_DEFAULT"
+    qr_code_secret: ""
   });
 
   useEffect(() => {
