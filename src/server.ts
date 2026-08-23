@@ -55,11 +55,25 @@ const PORT = process.env.PORT || 4000;
 // Create HTTP server for Socket.io attachment
 const httpServer = http.createServer(app);
 
-// Socket.io realtime gateway
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
+
+const checkCorsOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (!origin) return callback(null, true);
+  if (process.env.NODE_ENV !== 'production') return callback(null, true);
+  if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+    return callback(null, true);
+  }
+  return callback(new Error('Blocked by CORS'));
+};
+
+// Socket.io realtime gateway with restricted CORS
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: checkCorsOrigin,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
@@ -375,19 +389,8 @@ app.set('trust proxy', 1);
 // Security and CORS middleware configuration
 app.use(helmet());
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [];
-
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-      return callback(null, true);
-    }
-    return callback(new Error('Blocked by CORS'));
-  },
+  origin: checkCorsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Device-ID'],
   credentials: true
