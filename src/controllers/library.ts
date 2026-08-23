@@ -295,7 +295,7 @@ export async function createBook(req: Request, res: Response) {
     };
     if (embedding) insertData.embedding = embedding;
 
-    console.log('[createBook] Inserting book:', { title: parse.data.title, author: parse.data.author, institution_id: institutionId });
+    logger.info('[createBook] Inserting book:', { title: parse.data.title, author: parse.data.author, institution_id: institutionId });
 
     // First try with embedding, if it fails retry without
     let { data: book, error } = await supabaseAdmin
@@ -306,7 +306,7 @@ export async function createBook(req: Request, res: Response) {
 
     // If embedding column doesn't exist, retry without it
     if (error && error.message?.includes('embedding')) {
-      console.warn('[createBook] Embedding column issue, retrying without embedding');
+      logger.warn('[createBook] Embedding column issue, retrying without embedding');
       delete insertData.embedding;
       ({ data: book, error } = await supabaseAdmin
         .from('books')
@@ -316,14 +316,14 @@ export async function createBook(req: Request, res: Response) {
     }
 
     if (error) {
-      console.error('[createBook] Supabase insert error:', error.message, error.details, error.hint);
+      logger.error('[createBook] Supabase insert error:', { message: error.message, details: error.details, hint: error.hint });
       return res.status(500).json({ success: false, error: `Database error: ${error.message}` });
     }
 
-    console.log('[createBook] Book created successfully:', book.id);
+    logger.info('[createBook] Book created successfully:', { bookId: book.id });
     return res.status(201).json({ success: true, book });
   } catch (err: any) {
-    console.error('[createBook] Unhandled error:', err.message, err.stack);
+    logger.error('[createBook] Unhandled error:', { message: err.message, stack: err.stack });
     return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
@@ -420,7 +420,7 @@ export async function importBooks(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'No institution context.' });
     }
 
-    console.log(`[importBooks] Importing ${books.length} books for institution ${institutionId}`);
+    logger.info(`[importBooks] Importing ${books.length} books for institution ${institutionId}`);
 
     const hasVector = await checkVectorExtension();
     const insertedBooks = [];
@@ -454,7 +454,7 @@ export async function importBooks(req: Request, res: Response) {
 
       // If embedding column doesn't exist, retry without it
       if (error && error.message?.includes('embedding')) {
-        console.warn(`[importBooks] Embedding column issue, retrying without embedding for "${b.title}"`);
+        logger.warn(`[importBooks] Embedding column issue, retrying without embedding for "${b.title}"`);
         ({ data, error } = await supabaseAdmin
           .from('books')
           .insert(insertData)
@@ -464,12 +464,12 @@ export async function importBooks(req: Request, res: Response) {
 
       if (data) insertedBooks.push(data);
       if (error) {
-        console.error(`[importBooks] Insert error for book ${i + 1} "${b.title}":`, error.message, error.details);
+        logger.error(`[importBooks] Insert error for book ${i + 1} "${b.title}":`, { message: error.message, details: error.details });
         errors.push(`Book "${b.title}": ${error.message}`);
       }
     }
 
-    console.log(`[importBooks] Result: ${insertedBooks.length} inserted, ${errors.length} errors`);
+    logger.info(`[importBooks] Result: ${insertedBooks.length} inserted, ${errors.length} errors`);
 
     return res.status(201).json({
       success: insertedBooks.length > 0,

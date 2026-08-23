@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { AsyncLocalStorage } from 'async_hooks';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import logger from './logger';
 
 dotenv.config();
 
@@ -47,7 +48,7 @@ async function checkConnectivity() {
     clearTimeout(timeoutId);
     if (res.ok || res.status === 404 || res.status === 401) {
       if (isSupabaseOffline) {
-        console.log('[SUPABASE CONNECTIVITY] Supabase connection restored.');
+        logger.info('[SUPABASE CONNECTIVITY] Supabase connection restored.');
       }
       isSupabaseOffline = false;
     } else {

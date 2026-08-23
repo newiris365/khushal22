@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import crypto from 'crypto';
+import logger from '../config/logger';
 
 // ============================================================
 // ZOD VALIDATION SCHEMAS
@@ -258,7 +259,7 @@ export async function listAllocations(req: Request, res: Response) {
     const { data, error } = await query;
     if (error) return res.status(500).json({ success: false, error: error.message });
 
-    console.log(`[listAllocations] DB returned ${data?.length} allocations for student ${studentId}`);
+    logger.debug(`[listAllocations] DB returned ${data?.length} allocations for student ${studentId}`);
     
     return res.status(200).json({ success: true, allocations: data || [] });
   } catch (err) {
@@ -1473,7 +1474,7 @@ export async function logIotReading(req: Request, res: Response) {
       highUsageAlert = true;
       alertDetails = `High consumption spike detected: ${reading_value} is ${(reading_value / averageDaily).toFixed(1)}x average of ${averageDaily.toFixed(2)}`;
       // Simulate pushing a notification to the warden
-      console.log(`[WARDEN ALERT] High usage alert for room ${room.room_number} (${room.hostel_blocks.name}): ${alertDetails}`);
+      logger.warn(`[WARDEN ALERT] High usage alert for room ${room.room_number} (${room.hostel_blocks.name}): ${alertDetails}`);
     }
 
     return res.status(201).json({
@@ -2039,7 +2040,7 @@ export async function logWellnessCheckin(req: Request, res: Response) {
     }
 
     if (counselorReferral) {
-      console.log(`[COUNSELOR ALERT] Wellness referral triggered for student UUID: ${is_anonymous ? 'ANONYMOUS' : studentId}. Reason: ${referralReason}`);
+      logger.info(`[COUNSELOR ALERT] Wellness referral triggered for student UUID: ${is_anonymous ? 'ANONYMOUS' : studentId}. Reason: ${referralReason}`);
     }
 
     return res.status(201).json({
