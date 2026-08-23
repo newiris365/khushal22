@@ -2,22 +2,41 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Key, User, ShieldAlert, Sparkles } from 'lucide-react';
+import { Building2, Key, User, ShieldAlert, AlertCircle } from 'lucide-react';
 
 export default function CompanyHRLogin() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [accessKey, setAccessKey] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate successful partner login check
-    setTimeout(() => {
+    setErrorMsg('');
+
+    try {
+      const res = await fetch('/api/v1/placements/company-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, access_key: accessKey })
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.token) {
+        localStorage.setItem('iris_jwt_token', data.token);
+        localStorage.setItem('iris_user_profile', JSON.stringify(data.user));
+        router.push('/company/drives');
+      } else {
+        setErrorMsg(data.error || 'Invalid credentials or access key.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Failed to connect to authentication server.');
+    } finally {
       setLoading(false);
-      router.push('/company/drives');
-    }, 1000);
+    }
   };
 
   return (
@@ -40,6 +59,13 @@ export default function CompanyHRLogin() {
           </div>
         </div>
 
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         {/* Credentials Form */}
         <form onSubmit={handleLogin} className="flex flex-col gap-4 text-xs">
           <div className="flex flex-col gap-1.5">
@@ -49,7 +75,7 @@ export default function CompanyHRLogin() {
             <input
               type="email"
               required
-              placeholder="e.g. hr@company.com"
+              placeholder="e.g. hr@google.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="px-4 py-3 bg-[#0D0A1A] border border-white/10 rounded-xl text-white placeholder:text-[#C4B5FD]/20 outline-none focus:border-[#6C2BD9]/50"

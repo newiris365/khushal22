@@ -19,6 +19,7 @@ export const ROLE_DASHBOARD_MAP: Record<string, string> = {
   Driver: '/driver/dashboard',
   Librarian: '/librarian/library',
   'Admissions Officer': '/officer/admissions',
+  'Gym Trainer': '/gymtrainer/dashboard',
 };
 
 export interface PortalAuthResult {

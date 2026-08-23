@@ -28,13 +28,24 @@ export default function FacultyLeavesPage() {
   const [remarks, setRemarks] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [saveMsg, setSaveMsg] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const fetchLeaves = async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('campusCore/faculty/leaves/pending');
-      if (res.success) setLeaves(res.leaves || []);
-    } catch (err) {
+      if (res && res.success) {
+        setLeaves(res.leaves || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load pending leave applications.');
+        setLeaves([]);
+      }
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load pending leave applications from server.');
+      setLeaves([]);
     } finally {
       setIsLoading(false);
     }
@@ -44,15 +55,22 @@ export default function FacultyLeavesPage() {
 
   const handleApprove = async (id: string) => {
     setActionLoading(true);
+    setSaveMsg('');
     try {
       const res = await apiPut(`campusCore/faculty/leaves/${id}/approve`, { remarks });
-      if (res.success) {
+      if (res && res.success) {
+        setSaveMsg('Leave request approved successfully!');
         setLeaves(leaves.filter(l => l.id !== id));
         setExpandedId(null);
         setRemarks('');
+      } else {
+        setSaveMsg(res?.error || 'Failed to approve leave request');
+        // Keep expandedId and remarks intact so faculty does not retype!
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setSaveMsg(err?.message || 'Error approving leave request');
+      // Keep expandedId and remarks intact so faculty does not retype!
     } finally {
       setActionLoading(false);
     }
@@ -60,15 +78,22 @@ export default function FacultyLeavesPage() {
 
   const handleReject = async (id: string) => {
     setActionLoading(true);
+    setSaveMsg('');
     try {
       const res = await apiPut(`campusCore/faculty/leaves/${id}/reject`, { remarks });
-      if (res.success) {
+      if (res && res.success) {
+        setSaveMsg('Leave request rejected successfully!');
         setLeaves(leaves.filter(l => l.id !== id));
         setExpandedId(null);
         setRemarks('');
+      } else {
+        setSaveMsg(res?.error || 'Failed to reject leave request');
+        // Keep expandedId and remarks intact so faculty does not retype!
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setSaveMsg(err?.message || 'Error rejecting leave request');
+      // Keep expandedId and remarks intact so faculty does not retype!
     } finally {
       setActionLoading(false);
     }
@@ -99,6 +124,22 @@ export default function FacultyLeavesPage() {
           </span>
         )}
       </h1>
+
+      {saveMsg && (
+        <div className={`p-4 rounded-xl text-sm flex items-center gap-3 border ${
+          saveMsg.includes('successfully')
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            : 'bg-red-500/10 border-red-500/30 text-red-400'
+        }`}>
+          <span>{saveMsg.includes('successfully') ? '✅' : '⚠️'} {saveMsg}</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">

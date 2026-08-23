@@ -32,7 +32,7 @@ export default function EmployeeHrDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/hr/leave/balance/d0000000-0000-0000-0000-000000000003', {
+      const res = await fetch('/api/v1/hr/leave/balance/me', {
         headers: getAuthHeaders()
       });
       const data = await res.json();

@@ -84,7 +84,6 @@ export default function ParentDashboardPage() {
     setTopping(true);
     try {
       if (topMethod === 'razorpay') {
-        // Try real Razorpay first
         if (typeof window !== 'undefined' && (window as any).Razorpay) {
           const orderId = 'order_' + Math.random().toString(36).substring(2, 12);
           const options = {
@@ -95,15 +94,21 @@ export default function ParentDashboardPage() {
             description: `Wallet top-up for ${child.student_name}`,
             order_id: orderId,
             handler: async (response: any) => {
-              const res = await apiPost('/core/parent/wallet/topup', {
-                student_id: child.student_id,
-                amount,
-                description: 'Parent wallet top-up via Razorpay',
-              });
-              if (res.success) {
-                setChild((prev: any) => ({ ...prev, wallet_balance: res.new_balance }));
-                setTopUpAmount('');
-                alert(`₹${amount} added successfully!`);
+              try {
+                const res = await apiPost('/core/parent/wallet/topup', {
+                  student_id: child.student_id,
+                  amount,
+                  description: 'Parent wallet top-up via Razorpay',
+                });
+                if (res.success) {
+                  setChild((prev: any) => ({ ...prev, wallet_balance: res.new_balance }));
+                  setTopUpAmount('');
+                  alert(`₹${amount} added successfully!`);
+                } else {
+                  alert(`Top-up failed: ${res.error || 'Please try again.'}`);
+                }
+              } catch (e) {
+                alert('Top-up failed. Please try again.');
               }
             },
             theme: { color: '#6C2BD9' },
@@ -111,7 +116,6 @@ export default function ParentDashboardPage() {
           const rzp = new (window as any).Razorpay(options);
           rzp.open();
         } else {
-          // Mock mode
           const res = await apiPost('/core/parent/wallet/topup', {
             student_id: child.student_id,
             amount,
@@ -119,21 +123,18 @@ export default function ParentDashboardPage() {
           });
           if (res.success) {
             setChild((prev: any) => ({ ...prev, wallet_balance: res.new_balance }));
+            setTopUpAmount('');
+            alert(`₹${amount} added to ${child.student_name}'s wallet successfully!`);
           } else {
-            setChild((prev: any) => ({ ...prev, wallet_balance: (prev?.wallet_balance || 0) + amount }));
+            alert(`Top-up failed: ${res.error || 'Please try again.'}`);
           }
-          setTopUpAmount('');
-          alert(`₹${amount} added to ${child.student_name}'s wallet successfully!`);
         }
       } else {
-        // Bank transfer
-        alert(`Bank Transfer Top-Up:\n\nPlease transfer ₹${amount.toLocaleString()} to:\nBank: [Institution Bank]\nAccount: [Account Number]\nIFSC: [IFSC Code]\n\nReference: ${child.student_name} Wallet\n\nThe balance will be credited after admin verification.`);
+        alert(`Bank Transfer Top-Up Instructions:\n\nPlease transfer ₹${amount.toLocaleString()} to the campus office account with reference note: ${child.student_name} Wallet.\n\nThe balance will be credited upon verification.`);
         setTopUpAmount('');
       }
     } catch (err) {
-      alert(`₹${amount} added successfully (mock).`);
-      setChild((prev: any) => ({ ...prev, wallet_balance: (prev?.wallet_balance || 0) + amount }));
-      setTopUpAmount('');
+      alert('Top-up failed. Please try again.');
     } finally {
       setTopping(false);
     }

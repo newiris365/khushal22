@@ -11,6 +11,7 @@ import { apiGet, apiPut } from '../../../lib/api';
 export default function WardenLeaveRequestsPage() {
   const [leaves, setLeaves] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -26,16 +27,18 @@ export default function WardenLeaveRequestsPage() {
 
   const loadLeaves = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('/hostel/leaves');
-      if (res.success) {
+      if (res && res.success) {
         setLeaves(res.leave_requests || []);
       } else {
-        throw new Error(res.error || 'Failed to fetch');
+        setFetchError(res?.error || 'Failed to fetch leave requests.');
+        setLeaves([]);
       }
     } catch (err: any) {
       console.error('Failed to load leave requests:', err);
-      // Fallback to mock data
+      setFetchError(err?.message || 'Unable to connect to server to fetch leave requests.');
       setLeaves([]);
     } finally {
       setLoading(false);
@@ -55,16 +58,14 @@ export default function WardenLeaveRequestsPage() {
         status: decision,
         approval_notes: notes || (decision === 'approved' ? 'Approved.' : 'Rejected.')
       });
-      if (res.success) {
+      if (res && res.success) {
         setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: decision, approval_notes: notes } : l));
         showToast(`Leave request ${decision} successfully!`, 'success');
       } else {
-        showToast(res.error || 'Failed to update.', 'error');
+        showToast(res?.error || `Failed to ${decision} leave request.`, 'error');
       }
-    } catch (err) {
-      // Mock fallback
-      setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: decision, approval_notes: notes } : l));
-      showToast(`Leave ${decision}! (Mock Mode)`, 'success');
+    } catch (err: any) {
+      showToast(err?.message || `Failed to ${decision} leave request due to network error.`, 'error');
     } finally {
       setProcessingId(null);
     }
@@ -124,6 +125,13 @@ export default function WardenLeaveRequestsPage() {
           Refresh
         </button>
       </div>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>{fetchError}</span>
+        </div>
+      )}
 
       {/* Stats Bar */}
       <div className="grid grid-cols-4 gap-3">

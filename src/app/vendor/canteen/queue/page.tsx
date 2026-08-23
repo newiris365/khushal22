@@ -79,26 +79,25 @@ export default function VendorQueuePage() {
     }
   };
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleUpdateStatus = async (orderId: string, currentStatus: string) => {
     let nextStatus: 'Received' | 'Preparing' | 'Ready' | 'Delivered' = 'Received';
     if (currentStatus === 'Received') nextStatus = 'Preparing';
     else if (currentStatus === 'Preparing') nextStatus = 'Ready';
     else if (currentStatus === 'Ready') nextStatus = 'Delivered';
 
+    setActionError(null);
     try {
       const res = await apiPut(`canteen/orders/${orderId}/status`, { status: nextStatus });
-      if (res.success) {
+      if (res && res.success) {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o).filter(o => o.status !== 'Delivered'));
       } else {
-        updateLocalState(orderId, nextStatus);
+        setActionError(res?.error || 'Could not update order status, please retry.');
       }
-    } catch (err) {
-      updateLocalState(orderId, nextStatus);
+    } catch (err: any) {
+      setActionError(err?.message || 'Could not update order status due to network error, please retry.');
     }
-  };
-
-  const updateLocalState = (orderId: string, nextStatus: 'Received' | 'Preparing' | 'Ready' | 'Delivered') => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o).filter(o => o.status !== 'Delivered'));
   };
 
   const receivedOrders = orders.filter(o => o.status === 'Received');
@@ -114,6 +113,13 @@ export default function VendorQueuePage() {
             <span>Connection lost to live kitchen feed. Retrying...</span>
           </div>
           <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+        </div>
+      )}
+
+      {actionError && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span>{actionError}</span>
         </div>
       )}
 

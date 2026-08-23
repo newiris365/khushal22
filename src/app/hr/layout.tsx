@@ -6,6 +6,7 @@ import {
   LayoutDashboard, CalendarDays, FileText, ClipboardList,
   IndianRupee, FolderOpen, Calculator, Star, UserCircle
 } from 'lucide-react';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 const hrStaffLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/hr/my/dashboard', icon: LayoutDashboard },
@@ -25,25 +26,36 @@ const hrHodLinks: SidebarLink[] = [
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
-// Determine portal mode from pathname
 function getPortalConfig(pathname: string) {
   if (pathname.startsWith('/hr/hod')) {
     return {
       name: 'HOD HR Portal',
       badge: 'HOD',
       links: hrHodLinks,
+      allowedRoles: ['HOD', 'HR Admin', 'Admin', 'SuperAdmin', 'Principal', 'Vice Principal']
     };
   }
   return {
     name: 'Staff HR Portal',
     badge: 'Staff',
     links: hrStaffLinks,
+    allowedRoles: ['Staff', 'Teacher', 'HOD', 'HR Admin', 'Admin', 'SuperAdmin', 'Principal', 'Vice Principal']
   };
 }
 
 export default function HrLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/hr/my';
   const config = getPortalConfig(pathname);
+
+  const { authorized } = usePortalAuth(config.allowedRoles);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#0A071B] flex items-center justify-center">
+        <div className="text-purple-400 animate-pulse text-sm font-medium">Verifying authorization...</div>
+      </div>
+    );
+  }
 
   return (
     <PortalShell

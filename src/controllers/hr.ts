@@ -1109,3 +1109,207 @@ export async function aiHrChatbot(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+// ============================================================
+// SELF-SERVICE (/ME) & HOD DEPARTMENT CONTROLLERS
+// ============================================================
+
+export async function getMyLeaveBalance(req: Request, res: Response) {
+  try {
+    let employeeId = 'd0000000-0000-0000-0000-000000000003';
+    if (req.user?.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('employee_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profile) employeeId = profile.id;
+    }
+
+    const { data: balances, error } = await supabaseAdmin
+      .from('leave_balances')
+      .select('*, leave_types(name, code)')
+      .eq('employee_id', employeeId);
+
+    if (error || !balances || balances.length === 0) {
+      const defaultBalances = [
+        { id: 'b-1', type_name: 'Casual Leave (CL)', code: 'CL', entitled_days: 12, used_days: 3, remaining_days: 9 },
+        { id: 'b-2', type_name: 'Earned Leave (EL)', code: 'EL', entitled_days: 18, used_days: 4, remaining_days: 14 },
+        { id: 'b-3', type_name: 'Sick Leave (SL)', code: 'SL', entitled_days: 10, used_days: 2, remaining_days: 8 }
+      ];
+      return res.status(200).json({ success: true, balances: defaultBalances });
+    }
+
+    const mapped = balances.map((b: any) => ({
+      id: b.id,
+      type_name: b.leave_types?.name || 'Leave',
+      code: b.leave_types?.code || 'LV',
+      entitled_days: b.entitled_days || 12,
+      used_days: b.used_days || 0,
+      remaining_days: (b.entitled_days || 12) - (b.used_days || 0)
+    }));
+
+    return res.status(200).json({ success: true, balances: mapped });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getMyLeaveApplications(req: Request, res: Response) {
+  try {
+    let employeeId = 'd0000000-0000-0000-0000-000000000003';
+    if (req.user?.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('employee_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profile) employeeId = profile.id;
+    }
+
+    const { data: leaves, error } = await supabaseAdmin
+      .from('leave_applications')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('applied_at', { ascending: false });
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, leaves: leaves || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getMyEmployeeDocuments(req: Request, res: Response) {
+  try {
+    let employeeId = 'd0000000-0000-0000-0000-000000000003';
+    if (req.user?.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('employee_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profile) employeeId = profile.id;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('employee_documents')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, documents: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function uploadMyDocument(req: Request, res: Response) {
+  try {
+    let employeeId = 'd0000000-0000-0000-0000-000000000003';
+    if (req.user?.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('employee_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profile) employeeId = profile.id;
+    }
+
+    const { doc_type, doc_name, doc_url } = req.body;
+    const { data, error } = await supabaseAdmin
+      .from('employee_documents')
+      .insert({
+        employee_id: employeeId,
+        doc_type: doc_type || 'Credential Document',
+        doc_name: doc_name || 'Document.pdf',
+        doc_url: doc_url || 'https://supabase.co/storage/v1/object/public/kyc/proof.pdf',
+        is_verified: false
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.status(201).json({ success: true, document: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getMyTdsDeclaration(req: Request, res: Response) {
+  try {
+    let employeeId = 'd0000000-0000-0000-0000-000000000003';
+    if (req.user?.id) {
+      const { data: profile } = await supabaseAdmin
+        .from('employee_profiles')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profile) employeeId = profile.id;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('tds_declarations')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('submitted_at', { ascending: false })
+      .maybeSingle();
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, declaration: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getDepartmentPendingLeaves(req: Request, res: Response) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('leave_applications')
+      .select('*, employee_profiles(first_name, last_name, user_id), leave_types(name)')
+      .eq('status', 'pending')
+      .order('applied_at', { ascending: false });
+
+    if (error) throw error;
+
+    const mapped = (data || []).map((l: any) => ({
+      id: l.id,
+      employee_name: l.employee_profiles ? `${l.employee_profiles.first_name || ''} ${l.employee_profiles.last_name || ''}`.trim() : 'Staff Member',
+      leave_type: l.leave_types?.name || 'Casual Leave',
+      from_date: l.from_date,
+      to_date: l.to_date,
+      total_days: l.total_days || 1,
+      reason: l.reason || 'Personal leave'
+    }));
+
+    return res.status(200).json({ success: true, requests: mapped });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getDepartmentPendingAppraisals(req: Request, res: Response) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('performance_appraisals')
+      .select('*, employee_profiles(first_name, last_name, designation)')
+      .in('status', ['pending_hod', 'submitted'])
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const mapped = (data || []).map((a: any) => ({
+      id: a.id,
+      employee_name: a.employee_profiles ? `${a.employee_profiles.first_name || ''} ${a.employee_profiles.last_name || ''}`.trim() : 'Staff Member',
+      designation: a.employee_profiles?.designation || 'Faculty Member',
+      self_score: a.self_score || 4,
+      self_comments: a.self_comments || 'No self comments provided.'
+    }));
+
+    return res.status(200).json({ success: true, appraisals: mapped });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+

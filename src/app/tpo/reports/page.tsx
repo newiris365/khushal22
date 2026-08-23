@@ -11,16 +11,12 @@ export default function TpoReportsManager() {
   const [loadingBrochure, setLoadingBrochure] = useState(false);
   const [loadingNirf, setLoadingNirf] = useState(false);
   
-  const [nirfData, setNirfData] = useState<any>({
-    academic_year: '2026-27',
-    total_graduating: 360,
-    total_placed: 215,
-    median_salary: 650000,
-    higher_studies_opted: 35
-  });
+  const [nirfData, setNirfData] = useState<any>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const handleDownloadBrochure = async () => {
     setLoadingBrochure(true);
+    setReportError(null);
     try {
       const blob = await apiFetchBlob('/placements/reports/annual');
       const url = window.URL.createObjectURL(blob);
@@ -30,42 +26,68 @@ export default function TpoReportsManager() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (err) {
-      alert('Failed downloading brochure PDF. Please check server connections.');
+    } catch (err: any) {
+      setReportError(err?.message || 'Failed downloading brochure PDF. Please check server connections.');
+    } finally {
+      setLoadingBrochure(false);
     }
-    setLoadingBrochure(false);
   };
 
   const handleExportNirf = async () => {
     setLoadingNirf(true);
+    setReportError(null);
     try {
       const res = await apiGet('/placements/reports/nirf');
-      if (res.success && res.report) {
+      const activeReport = (res && res.success && res.report) ? res.report : (nirfData || {
+        academic_year: '2026-27',
+        total_graduating: 0,
+        total_placed: 0,
+        median_salary: 0,
+        higher_studies_opted: 0
+      });
+
+      if (res && res.success && res.report) {
         setNirfData(res.report);
+      } else {
+        setReportError(res?.error || 'Unable to fetch latest NIRF report from server. Exporting cached data.');
       }
       
-      // Export as CSV fallback download
+      // Export as CSV using local activeReport variable (not stale state)
       const headers = ['Academic Year', 'Total Graduating', 'Total Placed', 'Median Salary', 'Higher Studies Opted\n'];
-      const row = [nirfData.academic_year, nirfData.total_graduating, nirfData.total_placed, nirfData.median_salary, nirfData.higher_studies_opted];
+      const row = [
+        activeReport.academic_year || '2026-27',
+        activeReport.total_graduating || 0,
+        activeReport.total_placed || 0,
+        activeReport.median_salary || 0,
+        activeReport.higher_studies_opted || 0
+      ];
       const csvContent = headers.join(',') + row.join(',');
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `NIRF_Placements_Report_${nirfData.academic_year}.csv`;
+      a.download = `NIRF_Placements_Report_${activeReport.academic_year || '2026-27'}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (err) {
-      console.log('Error generating NIRF CSV');
+    } catch (err: any) {
+      console.error('Error generating NIRF CSV', err);
+      setReportError(err?.message || 'Failed to generate NIRF report CSV due to network error.');
+    } finally {
+      setLoadingNirf(false);
     }
-    setLoadingNirf(false);
   };
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-4xl mx-auto flex flex-col gap-6">
+        
+        {reportError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {reportError}</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex items-center gap-3">

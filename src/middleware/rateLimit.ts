@@ -79,3 +79,18 @@ export const globalLimiter = rateLimit({
     error: 'Global rate limit exceeded. Please try again later.'
   }
 });
+
+// Dedicated rate limit for parent-child linking to prevent brute-force DOB guessing
+export const parentLinkLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes window
+  max: 5, // max 5 verification attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return (req as any).user?.id || req.ip;
+  },
+  message: {
+    success: false,
+    error: 'Too many child linking verification attempts. Please wait 15 minutes before trying again.'
+  }
+});

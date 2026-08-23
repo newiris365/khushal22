@@ -86,23 +86,33 @@ export default function FacultyAttendancePage() {
     if (selectedDept) fetchShortageReport();
   }, [selectedDept, selectedSubject]);
 
+  const [sessionMsg, setSessionMsg] = useState('');
+
   // Start attendance session
   const handleStartSession = async () => {
-    if (!sessionForm.department_id || !sessionForm.subject) return;
+    if (!sessionForm.department_id || !sessionForm.subject) {
+      setSessionMsg('Department and subject are required.');
+      return;
+    }
     setIsStarting(true);
+    setSessionMsg('');
     try {
       const res = await apiPost('campusCore/attendance/session/start', {
         department_id: sessionForm.department_id,
         subject: sessionForm.subject,
         time_slot: sessionForm.time_slot,
       });
-      if (res.success && res.session) {
+      if (res && res.success && res.session) {
         setActiveSession(res.session);
         setQrCode(res.qr_data_url || '');
         setShowStartSession(false);
+        setSessionMsg('');
+      } else {
+        setSessionMsg(res?.error || 'Failed to start QR attendance session');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setSessionMsg(err?.message || 'Error starting attendance session');
     } finally {
       setIsStarting(false);
     }
@@ -237,7 +247,11 @@ export default function FacultyAttendancePage() {
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
                   placeholder="HH:MM"
                 />
-              </div>
+              {sessionMsg && (
+                <p className={`text-sm ${sessionMsg.includes('successfully') ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {sessionMsg}
+                </p>
+              )}
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleStartSession}

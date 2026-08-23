@@ -21,17 +21,27 @@ export default function FacultyTimetablePage() {
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
     setSelectedDay(dayName);
 
     const load = async () => {
+      setIsLoading(true);
+      setFetchError(null);
       try {
         const res = await apiGet('campusCore/faculty/timetable');
-        if (res.success) setTimetable(res.timetable || []);
-      } catch (err) {
+        if (res && res.success) {
+          setTimetable(res.timetable || []);
+        } else {
+          setFetchError(res?.error || 'Unable to load timetable schedule.');
+          setTimetable([]);
+        }
+      } catch (err: any) {
         console.error(err);
+        setFetchError(err?.message || 'Unable to load timetable schedule from server.');
+        setTimetable([]);
       } finally {
         setIsLoading(false);
       }
@@ -59,6 +69,12 @@ export default function FacultyTimetablePage() {
         <ClipboardList size={24} className="text-blue-400" />
         My Timetable
       </h1>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Day Tabs */}
       <div className="flex flex-wrap gap-2">

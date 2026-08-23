@@ -130,9 +130,15 @@ export default function FacultyCiaPage() {
     }
   };
 
+  const [createMsg, setCreateMsg] = useState('');
+
   // Create assessment
   const handleCreate = async () => {
-    if (!createForm.name || !createForm.department_id) return;
+    if (!createForm.name || !createForm.department_id) {
+      setCreateMsg('Name and department are required.');
+      return;
+    }
+    setCreateMsg('');
     try {
       const res = await apiPost('campusCore/faculty/cia/assessments', {
         ...createForm,
@@ -140,7 +146,8 @@ export default function FacultyCiaPage() {
         weightage_pct: parseFloat(createForm.weightage_pct) || 0,
         semester: createForm.semester ? parseInt(createForm.semester) : null,
       });
-      if (res.success) {
+      if (res && res.success) {
+        setSaveMsg('Assessment created successfully!');
         setShowCreate(false);
         setCreateForm({
           name: '', assessment_type: 'CIA_1', subject: '', department_id: '',
@@ -148,9 +155,12 @@ export default function FacultyCiaPage() {
           date: new Date().toISOString().split('T')[0],
         });
         fetchAssessments();
+      } else {
+        setCreateMsg(res?.error || 'Failed to create assessment');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setCreateMsg(err?.message || 'Error creating assessment');
     }
   };
 
@@ -248,7 +258,11 @@ export default function FacultyCiaPage() {
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
                 />
               </div>
-            </div>
+            {createMsg && (
+              <p className={`text-sm mt-3 ${createMsg.includes('successfully') ? 'text-emerald-400' : 'text-red-400'}`}>
+                {createMsg}
+              </p>
+            )}
             <div className="flex gap-2 mt-4">
               <button onClick={handleCreate}
                 className="flex-1 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 text-sm"

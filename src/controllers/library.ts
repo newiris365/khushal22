@@ -1507,6 +1507,103 @@ export async function getReports(req: Request, res: Response) {
   }
 }
 
+export async function exportLibraryReportPdf(req: Request, res: Response) {
+  try {
+    const type = (req.query.type as string) || 'borrowings';
+    const PDFDocument = require('pdfkit');
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="library-${type}-report.pdf"`);
+    doc.pipe(res);
+
+    doc.fontSize(20).fillColor('#6C2BD9').text(`IRIS 365 Library ${type.toUpperCase()} Report`, { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(10).fillColor('#666').text(`Generated on ${new Date().toLocaleDateString('en-IN')}`, { align: 'center' });
+    doc.moveDown(1);
+    doc.strokeColor('#6C2BD9').lineWidth(2).moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
+    doc.moveDown(1.5);
+
+    doc.fontSize(12).fillColor('#333');
+
+    if (type === 'fines') {
+      const { data: fines } = await supabaseAdmin
+        .from('library_fines')
+        .select('*, students(name, roll_number)')
+        .order('amount', { ascending: false });
+
+      doc.text(`Total Fine Ledger Records: ${(fines || []).length}`);
+      doc.moveDown(1);
+      (fines || []).slice(0, 30).forEach((f: any, idx: number) => {
+        doc.fontSize(10).text(`${idx + 1}. Student: ${f.students?.name || 'N/A'} (${f.students?.roll_number || 'N/A'}) - Amount: ₹${f.amount} - Status: ${f.status}`);
+      });
+    } else if (type === 'utilization') {
+      const { data: rooms } = await supabaseAdmin
+        .from('study_room_bookings')
+        .select('*, study_rooms(name, capacity)')
+        .order('date', { ascending: false });
+
+      doc.text(`Total Study Room Bookings: ${(rooms || []).length}`);
+      doc.moveDown(1);
+      (rooms || []).slice(0, 30).forEach((r: any, idx: number) => {
+        doc.fontSize(10).text(`${idx + 1}. Room: ${r.study_rooms?.name || 'Room'} - Date: ${r.date} - Time: ${r.start_time} to ${r.end_time} - Status: ${r.status}`);
+      });
+    } else {
+      const { data: issues } = await supabaseAdmin
+        .from('book_issues')
+        .select('*, books(title, author), students(name, roll_number)')
+        .order('issue_date', { ascending: false });
+
+      doc.text(`Total Borrow Records: ${(issues || []).length}`);
+      doc.moveDown(1);
+      (issues || []).slice(0, 30).forEach((b: any, idx: number) => {
+        doc.fontSize(10).text(`${idx + 1}. "${b.books?.title || 'Book'}" by ${b.books?.author || 'Unknown'} - Borrower: ${b.students?.name || 'Student'} (${b.students?.roll_number || 'N/A'}) - Issued: ${b.issue_date} - Status: ${b.status}`);
+      });
+    }
+
+    doc.end();
+  } catch (err: any) {
+    console.error('Error generating library report PDF:', err);
+    return res.status(500).json({ success: false, error: 'Failed to generate library report PDF.' });
+  }
+}
+
+export async function sendOverdueReminder(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { channel } = req.body;
+
+    const { data: issue, error } = await supabaseAdmin
+      .from('book_issues')
+      .select('*, books(title), students(name, user_id, phone)')
+      .eq('id', id)
+      .single();
+
+    if (error || !issue) {
+      return res.status(404).json({ success: false, error: 'Overdue book issue record not found.' });
+    }
+
+    const title = '⚠️ Library Overdue Notice';
+    const message = `Dear ${issue.students?.name || 'Student'}, your borrowed book "${issue.books?.title || 'Book'}" is overdue. Please return it immediately to avoid accumulating fines.`;
+
+    if (issue.students?.user_id) {
+      const { sendPushNotification } = await import('../services/fcm');
+      await sendPushNotification(issue.students.user_id, title, message, {
+        type: 'library_overdue',
+        issue_id: id
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Overdue warning reminder dispatched via ${channel === 'whatsapp' ? 'WhatsApp' : 'Push Notification'}!`
+    });
+  } catch (err: any) {
+    console.error('[sendOverdueReminder] Error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to dispatch overdue notification.' });
+  }
+}
+
 // Helper to resolve student_id from logged-in user
 async function resolveStudentId(req: Request): Promise<string | null> {
   if (req.user?.role === 'Student') {

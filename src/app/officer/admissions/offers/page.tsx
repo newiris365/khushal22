@@ -36,6 +36,7 @@ export default function OfficerOffersPage() {
   const [offersLog, setOffersLog] = useState<OfferItem[]>([]);
 
   async function loadMeritLists(round: number) {
+    setError(null);
     try {
       const res = await apiGet(`/merit-list/${round}`);
       if (res.success && res.merit_lists) {
@@ -45,16 +46,16 @@ export default function OfficerOffersPage() {
         } else {
           setSelectedListId('');
         }
+      } else {
+        setError(res.error || `Couldn't load merit lists for Round ${round} — retry.`);
+        setMeritLists([]);
+        setSelectedListId('');
       }
-    } catch {
-      // Mock merit lists for selected round
-      const mockLists = [
-        { id: `ml-r${round}-1`, program_code: 'BTECH-CSE', round_number: round, list_type: 'merit', cutoff_score: 92.1 - (round - 1) * 3 },
-        { id: `ml-r${round}-2`, program_code: 'BTECH-AIDS', round_number: round, list_type: 'merit', cutoff_score: 89.6 - (round - 1) * 3 }
-      ];
-      setMeritLists(mockLists);
-      setSelectedListId(mockLists[0].id);
-      setOffersLog([]);
+    } catch (err: any) {
+      console.error(err);
+      setError(`Couldn't load merit lists for Round ${round} — retry.`);
+      setMeritLists([]);
+      setSelectedListId('');
     }
   }
 

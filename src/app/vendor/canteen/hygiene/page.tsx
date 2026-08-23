@@ -49,9 +49,12 @@ export default function VendorHygienePage() {
     setChecks(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg(null);
 
     const refNum = Number(refTemp);
     const cookNum = Number(cookTemp);
@@ -73,25 +76,30 @@ export default function VendorHygienePage() {
         compliance_score: mockScore
       });
 
-      if (res.success) {
+      if (res && res.success) {
         loadHygieneReports();
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          setRefTemp('4.0');
+          setCookTemp('74.5');
+          setChecks({
+            countersCleaned: false,
+            staffGloved: false,
+            dishesSanitized: false,
+            pestCheck: false,
+            foodCovered: false
+          });
+        }, 3000);
+      } else {
+        setErrorMsg(res?.error || 'Failed to submit hygiene inspection. Please try again.');
       }
-    } catch (err) {}
-
-    setLoading(false);
-    setSuccess(true);
-    setTimeout(() => {
-      setSuccess(false);
-      setRefTemp('4.0');
-      setCookTemp('74.5');
-      setChecks({
-        countersCleaned: false,
-        staffGloved: false,
-        dishesSanitized: false,
-        pestCheck: false,
-        foodCovered: false
-      });
-    }, 3000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err?.message || 'Error submitting hygiene inspection. Please check network connection.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isFridgeUnsafe = Number(refTemp) > 5.0 || Number(refTemp) < 0;
@@ -117,6 +125,13 @@ export default function VendorHygienePage() {
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Form Column */}

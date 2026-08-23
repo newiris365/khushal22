@@ -13,11 +13,11 @@ export default function AdminStudentsPage() {
     message: string;
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<Array<any>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [editingStudent, setEditingStudent] = useState<any | null>(null);
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedBatch, setSelectedBatch] = useState('');
   const [instituteType, setInstituteType] = useState('college');
@@ -35,7 +35,7 @@ export default function AdminStudentsPage() {
   }, []);
 
   // Form states
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -210,208 +210,13 @@ export default function AdminStudentsPage() {
   };
 
   const filtered = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.users?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.roll_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.users?.email || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <main className="min-h-screen bg-[#0D0A1A] text-white p-8">
-      <div className="max-w-7xl mx-auto flex flex-col gap-8">
-        
-        {/* Header Section */}
-        <div className="flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 flex items-center justify-center text-[#A78BFA]">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="font-heading font-extrabold text-2xl text-white">Student Enrollment Directory</h1>
-              <p className="text-xs text-[#C4B5FD]/70 font-light">Manage campus admissions, student profiles, and batch configurations.</p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <a 
-              href="/admin/import/students"
-              className="px-4 py-2.5 rounded-xl border border-violet-500/30 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 font-bold text-xs flex items-center gap-1.5 transition-all"
-            >
-              <Upload className="w-4 h-4" /> Import Students
-            </a>
-            <button 
-              onClick={() => { setEditingStudent(null); setShowAddModal(true); }}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-[#6C2BD9]/25 transition-all"
-            >
-              <PlusCircle className="w-4 h-4" /> Enroll Student
-            </button>
-          </div>
-        </div>
-
-        {/* Filters and search */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#13102A] p-4 rounded-2xl border border-white/5">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3.5 text-[#C4B5FD]/50" />
-            <input 
-              type="text" 
-              placeholder="Search by name, roll, or email..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-black/40 border border-[#6C2BD9]/20 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-white/20 outline-none focus:border-[#8B5CF6]"
-            />
-          </div>
-
-          <select 
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
-            className="bg-black/40 border border-[#6C2BD9]/20 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#8B5CF6]"
-          >
-            <option value="">All Departments</option>
-            <option value="a0000000-0000-0000-0000-000000000001">Computer Science (CSE)</option>
-          </select>
-
-          <select 
-            value={selectedBatch}
-            onChange={(e) => setSelectedBatch(e.target.value)}
-            className="bg-black/40 border border-[#6C2BD9]/20 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#8B5CF6]"
-          >
-            <option value="">All Batches</option>
-            <option value="2024-2028">2024-2028</option>
-            <option value="2023-2027">2023-2027</option>
-          </select>
-        </div>
-
-        {/* Student Directory Grid */}
-        <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-white/5 text-[#C4B5FD] font-semibold border-b border-white/5">
-                  <th className="p-4">Roll Number</th>
-                  <th className="p-4">Name</th>
-                  <th className="p-4">Email</th>
-                  <th className="p-4">{instituteType === 'school' ? 'Grade / Standard' : 'Semester'}</th>
-                  <th className="p-4">Guardian Details</th>
-                  <th className="p-4 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#C4B5FD]">Loading directory logs...</td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#C4B5FD]/50">No enrolled students match current query filters.</td>
-                  </tr>
-                ) : (
-                  filtered.map((student) => (
-                    <tr key={student.id} className="hover:bg-white/5 transition-colors">
-                      <td className="p-4 font-mono font-bold text-white">{student.roll_number}</td>
-                      <td className="p-4">
-                        <div className="font-semibold text-white">{student.name}</div>
-                        <div className="text-[10px] text-[#C4B5FD]/70">Batch: {student.batch_year}</div>
-                      </td>
-                      <td className="p-4 text-[#C4B5FD]/80">{student.users?.email || 'N/A'}</td>
-                      <td className="p-4 font-semibold text-white">{instituteType === 'school' ? `Grade ${student.semester}` : `Sem ${student.semester}`}</td>
-                      <td className="p-4">
-                        <div className="text-[#C4B5FD]">{student.guardian_name || 'N/A'}</div>
-                        <div className="text-[10px] text-[#C4B5FD]/50">{student.guardian_phone || ''}</div>
-                      </td>
-                      <td className="p-4 text-center flex items-center justify-center gap-2">
-                        <button 
-                          onClick={() => openEdit(student)}
-                          className="w-7 h-7 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 flex items-center justify-center transition-colors"
-                          title="Edit Student"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(student.id)}
-                          className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors"
-                          title="Expel Student"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-        setToast({ msg: 'Student updated successfully!', type: 'success' });
-      } else {
-        setToast({ msg: res.error || 'Failed to update student.', type: 'error' });
-      }
-    } catch (err) {
-      setToast({ msg: 'Error connecting to server.', type: 'error' });
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Remove Student',
-      message: 'Are you sure you want to remove this student and their authentication profile?',
-      onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        try {
-          const res = await apiDelete(`/core/students/${id}`);
-          if (res.success) {
-            fetchStudents();
-            setToast({ msg: 'Student profile removed.', type: 'info' });
-          }
-        } catch (err) {
-          setToast({ msg: 'Delete operation failed.', type: 'error' });
-        }
-      }
-    });
-  };
-
-  const handleBulkImportMock = async () => {
-    const mockStudents = {
-      records: [
-        {
-          name: 'Rohit Sharma',
-          email: 'rohit@siet.edu.in',
-          roll_number: 'CSE-2026-90',
-          department_id: 'a0000000-0000-0000-0000-000000000001',
-          semester: 4,
-          batch_year: '2024-2028',
-          dob: '2005-04-30',
-          gender: 'Male'
-        },
-        {
-          name: 'Pooja Vyas',
-          email: 'pooja.vyas@siet.edu.in',
-          roll_number: 'CSE-2026-91',
-          department_id: 'a0000000-0000-0000-0000-000000000001',
-          semester: 4,
-          batch_year: '2024-2028',
-          dob: '2005-11-12',
-          gender: 'Female'
-        }
-      ]
-    };
-
-    try {
-      const res = await apiPost('/core/students/import', mockStudents);
-      if (res.success) {
-        fetchStudents();
-        setToast({ msg: `Successfully imported ${res.count} student profiles in sandbox mode!`, type: 'success' });
-      }
-    } catch (err) {
-      setToast({ msg: 'Import failed.', type: 'error' });
-    }
-  };
-
-  const filtered = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.users?.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <main className="min-h-screen bg-[#0D0A1A] text-white p-8">
+    <div className="min-h-screen bg-[#0D0A1A] text-white p-8">
       <div className="max-w-7xl mx-auto flex flex-col gap-8">
         
         {/* Header Section */}
@@ -535,7 +340,6 @@ export default function AdminStudentsPage() {
             </table>
           </div>
         </div>
-
       </div>
 
       {/* Add/Edit Student Modal */}
@@ -670,6 +474,6 @@ export default function AdminStudentsPage() {
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
-    </main>
+    </div>
   );
 }

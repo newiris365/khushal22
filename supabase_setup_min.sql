@@ -11241,3 +11241,69 @@ institution_id = (SELECT u.institution_id FROM public.users u WHERE u.id = auth.
 AND (SELECT u.role FROM public.users u WHERE u.id = auth.uid()) IN ('Admin', 'SuperAdmin', 'Director')
 )
 );
+CREATE TABLE IF NOT EXISTS obe_intervention_plans (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+institution_id UUID REFERENCES institutions(id) ON DELETE CASCADE,
+department_id UUID,
+po_code VARCHAR(50) NOT NULL,
+action_plan TEXT NOT NULL,
+target_semester VARCHAR(50) NOT NULL,
+status VARCHAR(50) NOT NULL DEFAULT 'pending',
+created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE obe_intervention_plans ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated users to read obe_intervention_plans"
+ON obe_intervention_plans FOR SELECT
+TO authenticated
+USING (true);
+CREATE POLICY "Allow authenticated users to insert obe_intervention_plans"
+ON obe_intervention_plans FOR INSERT
+TO authenticated
+WITH CHECK (true);
+CREATE POLICY "Allow authenticated users to update obe_intervention_plans"
+ON obe_intervention_plans FOR UPDATE
+TO authenticated
+USING (true);
+CREATE TABLE IF NOT EXISTS public.gate_entry_logs (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+institution_id UUID REFERENCES public.institutions(id) ON DELETE CASCADE,
+person_id TEXT,
+user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+person_name TEXT NOT NULL,
+person_type TEXT NOT NULL DEFAULT 'student',
+gate_number TEXT NOT NULL DEFAULT 'Gate 1',
+scanned_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+direction TEXT NOT NULL CHECK (direction IN ('entry', 'exit')),
+scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+notes TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.gate_entry_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Gate entry logs select policy" ON public.gate_entry_logs;
+CREATE POLICY "Gate entry logs select policy"
+ON public.gate_entry_logs FOR SELECT
+USING (
+institution_id IS NULL OR institution_id = get_auth_institution_id()
+);
+DROP POLICY IF EXISTS "Gate entry logs insert policy" ON public.gate_entry_logs;
+CREATE POLICY "Gate entry logs insert policy"
+ON public.gate_entry_logs FOR INSERT
+WITH CHECK (
+institution_id IS NULL OR institution_id = get_auth_institution_id()
+);
+CREATE INDEX IF NOT EXISTS idx_gate_entry_logs_institution_scanned
+ON public.gate_entry_logs(institution_id, scanned_at DESC);
+CREATE TABLE IF NOT EXISTS public.dvv_queries (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+institution_id UUID REFERENCES public.institutions(id) ON DELETE CASCADE,
+metric_code TEXT NOT NULL,
+query_text TEXT NOT NULL,
+response_text TEXT,
+status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+resolved_at TIMESTAMPTZ
+);
+ALTER TABLE public.dvv_queries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to dvv_queries" ON public.dvv_queries FOR ALL USING (true);

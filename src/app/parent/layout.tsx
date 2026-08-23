@@ -13,7 +13,7 @@ const parentLinks: SidebarLink[] = [
   { label: 'Timetable', href: '/parent/timetable', icon: CalendarDays },
   { label: 'Hostel', href: '/hostel', icon: Home },
   { label: 'Transit GPS', href: '/transit', icon: Bus },
-  { label: 'FitZone Gym', href: '/gym', icon: Dumbbell },
+  { label: 'FitZone Gym', href: '/student/gym', icon: Dumbbell },
   { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
   { label: 'Exam Results', href: '/parent/results', icon: FileText },
   { label: 'Leave Application', href: '/parent/leave', icon: ClipboardList },

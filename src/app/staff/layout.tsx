@@ -4,7 +4,7 @@ import React from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, CalendarDays, ClipboardList, FileText,
-  BookOpen, Users, Award, Bell, UserCircle
+  BookOpen, Users, Award, Bell, UserCircle, Calendar
 } from 'lucide-react';
 import { usePortalAuth } from '../../hooks/usePortalAuth';
 
@@ -13,7 +13,9 @@ const staffLinks: SidebarLink[] = [
   { label: 'My Timetable', href: '/staff/timetable', icon: ClipboardList },
   { label: 'Attendance', href: '/staff/attendance', icon: CalendarDays },
   { label: 'CIA Marks', href: '/staff/cia', icon: FileText },
+  { label: 'Apply Leave', href: '/staff/leave', icon: Calendar },
   { label: 'Leave Approvals', href: '/staff/leaves', icon: Award },
+  { label: 'Payslips', href: '/staff/payslips', icon: FileText },
   { label: 'Study Materials', href: '/staff/study-materials', icon: BookOpen },
   { label: 'Notices', href: '/staff/notices', icon: Bell },
   { label: 'Students', href: '/staff/students', icon: Users },

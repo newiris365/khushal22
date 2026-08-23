@@ -42,7 +42,9 @@ export default function LibrarianReportsPage() {
     setSuccessMsg(`Generating PDF compilation sheet for ${activeTab} report...`);
     setTimeout(() => {
       setSuccessMsg('');
-      window.open('/api/v1/hostel/allocations/report/pdf', '_blank'); // simulated PDF report download
+      const token = localStorage.getItem('iris_jwt_token');
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+      window.open(`${API_BASE}/library/analytics/reports/pdf?type=${activeTab}&token=${token}`, '_blank');
     }, 1500);
   };
 

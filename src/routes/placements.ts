@@ -36,13 +36,18 @@ import {
   generateInternshipNoc,
   logCompanyVisit,
   getCompanyVisits,
-  updateCompanyVisit
+  updateCompanyVisit,
+  companyLogin,
+  getMyCompanyDrives
 } from '../controllers/placements';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Apply auth middleware to protect all routes
+// ──── PUBLIC RECRUITER LOGIN ──────────────────────────────────
+router.post('/company-login', companyLogin);
+
+// Apply auth middleware to protect all remaining routes
 router.use(authMiddleware);
 
 // ──── COMPANIES ────────────────────────────────────────────────
@@ -52,6 +57,7 @@ router.get('/companies/:id', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student
 router.put('/companies/:id', requireRole(['Admin', 'SuperAdmin', 'TPO']), updateCompany);
 
 // ──── PLACEMENT DRIVES ─────────────────────────────────────────
+router.get('/drives/mine', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Company HR']), getMyCompanyDrives);
 router.get('/drives', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student', 'Company HR']), getDrives);
 router.post('/drives', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Company HR']), createDrive);
 router.get('/drives/:id', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student', 'Company HR']), getDrive);
@@ -80,24 +86,22 @@ router.post('/offers/:id/decline', requireRole(['Student']), declineOffer);
 router.post('/ai/resume-score', requireRole(['Student', 'Admin', 'TPO']), aiResumeScore);
 router.post('/ai/mock-interview', requireRole(['Student']), aiMockInterview);
 router.post('/ai/jd-match', requireRole(['Student', 'Admin', 'TPO']), aiJdMatch);
-router.post('/ai/career-guidance', requireRole(['Student']), aiCareerGuidance);
+router.get('/ai/career-guidance/:studentId', requireRole(['Student']), aiCareerGuidance);
 
-// ──── ANALYTICS & REPORTS ──────────────────────────────────────
+// ──── REPORTS & ANALYTICS ──────────────────────────────────────
 router.get('/analytics/dashboard', requireRole(['Admin', 'SuperAdmin', 'TPO']), getAnalyticsDashboard);
-router.get('/reports/annual', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student']), getReportsAnnual);
+router.get('/reports/annual', requireRole(['Admin', 'SuperAdmin', 'TPO']), getReportsAnnual);
 router.get('/reports/nirf', requireRole(['Admin', 'SuperAdmin', 'TPO']), getReportsNirf);
 
-// ──── ALUMNI NETWORK ───────────────────────────────────────────
+// ──── ALUMNI NETWORK & INTERNSHIPS ─────────────────────────────
 router.get('/alumni', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student']), getAlumniList);
-router.post('/alumni/register', requireRole(['Admin', 'SuperAdmin', 'TPO']), registerAlumni);
-router.put('/alumni/:id', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Alumni']), updateAlumniProfile);
-router.post('/alumni/book', requireRole(['Student']), bookMentorshipSession);
+router.post('/alumni', requireRole(['Admin', 'SuperAdmin', 'TPO']), registerAlumni);
+router.put('/alumni/:id', requireRole(['Admin', 'SuperAdmin', 'TPO']), updateAlumniProfile);
+router.post('/alumni/mentorship-session', requireRole(['Student']), bookMentorshipSession);
 
-// ──── INTERNSHIPS ──────────────────────────────────────────────
 router.get('/internships', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student']), getInternships);
-router.get('/internships/:id/noc', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student']), generateInternshipNoc);
+router.post('/internships/noc', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student']), generateInternshipNoc);
 
-// ──── COMPANY VISITS ──────────────────────────────────────────
 router.post('/visits', requireRole(['Admin', 'SuperAdmin', 'TPO']), logCompanyVisit);
 router.get('/visits', requireRole(['Admin', 'SuperAdmin', 'TPO']), getCompanyVisits);
 router.put('/visits/:id', requireRole(['Admin', 'SuperAdmin', 'TPO']), updateCompanyVisit);

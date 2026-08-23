@@ -27,15 +27,27 @@ export default function SecurityRestrictionsPage() {
   const [persons, setPersons] = useState<any[]>([]);
   const [personSearch, setPersonSearch] = useState('');
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => { fetchRestrictions(); }, []);
 
   const fetchRestrictions = async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('campusCore/gate/restrictions');
-      if (res.success) setRestrictions(res.restrictions || []);
-    } catch (err) {
+      if (res && res.success) {
+        setRestrictions(res.restrictions || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load access restrictions.');
+        setRestrictions([]);
+      }
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load access restrictions from server.');
+      setRestrictions([]);
     } finally {
       setIsLoading(false);
     }
@@ -43,19 +55,36 @@ export default function SecurityRestrictionsPage() {
 
   const searchPersons = async (query: string) => {
     if (query.length < 2) { setPersons([]); return; }
-    const res = await apiGet(`campusCore/gate/verify/${encodeURIComponent(query)}`);
-    if (res.success) setPersons(res.persons || []);
+    try {
+      const res = await apiGet(`campusCore/gate/verify/${encodeURIComponent(query)}`);
+      if (res && res.success) setPersons(res.persons || []);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleCreate = async () => {
-    if (!form.person_id || !form.reason) return;
-    const res = await apiPost('campusCore/gate/restrictions', form);
-    if (res.success) {
-      setShowForm(false);
-      setForm({ person_type: 'student', person_id: '', restriction_type: 'suspended', reason: '', valid_until: '' });
-      setPersons([]);
-      setPersonSearch('');
-      fetchRestrictions();
+    if (!form.person_id || !form.reason) {
+      setErrorMsg('Person selection and reason are required.');
+      return;
+    }
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const res = await apiPost('campusCore/gate/restrictions', form);
+      if (res && res.success) {
+        setShowForm(false);
+        setForm({ person_type: 'student', person_id: '', restriction_type: 'suspended', reason: '', valid_until: '' });
+        setPersons([]);
+        setPersonSearch('');
+        fetchRestrictions();
+      } else {
+        setErrorMsg(res?.error || 'Failed to create restriction record.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to create restriction record due to network error.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -76,6 +105,18 @@ export default function SecurityRestrictionsPage() {
           <Plus size={16} /> Add Restriction
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {errorMsg}</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">

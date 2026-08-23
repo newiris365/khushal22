@@ -10,23 +10,30 @@ export default function DriverTripPage() {
   const [assignments, setAssignments] = useState<any>(null);
   const [todayTrip, setTodayTrip] = useState<any>(null);
   const [gpsStatus, setGpsStatus] = useState<'inactive' | 'active' | 'error'>('inactive');
+  const [serverSyncStatus, setServerSyncStatus] = useState<'synced' | 'server_error' | 'device_error' | 'inactive'>('inactive');
   const [lastGpsTime, setLastGpsTime] = useState<string>('');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
   const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const load = async () => {
-      const [assignRes, tripRes] = await Promise.all([
-        apiGet('campusCore/driver/assignments'),
-        apiGet('campusCore/driver/today-trip'),
-      ]);
-      if (assignRes.success) setAssignments(assignRes.assignments?.[0] || null);
-      if (tripRes.success) {
-        const trip = tripRes.trip || null;
-        setTodayTrip(trip);
-        if (trip?.status === 'active') startGpsEmission();
+      try {
+        const [assignRes, tripRes] = await Promise.all([
+          apiGet('campusCore/driver/assignments'),
+          apiGet('campusCore/driver/today-trip'),
+        ]);
+        if (assignRes && assignRes.success) setAssignments(assignRes.assignments?.[0] || null);
+        if (tripRes && tripRes.success) {
+          const trip = tripRes.trip || null;
+          setTodayTrip(trip);
+          if (trip?.status === 'active') startGpsEmission();
+        }
+      } catch (err: any) {
+        console.error(err);
+        setActionError('Failed to load initial trip assignment from server.');
       }
     };
     load();
@@ -36,6 +43,7 @@ export default function DriverTripPage() {
   const emitGps = useCallback(async () => {
     if (!navigator.geolocation) {
       setGpsStatus('error');
+      setServerSyncStatus('device_error');
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -47,20 +55,27 @@ export default function DriverTripPage() {
 
         // Emit via API to server which broadcasts via Socket.io
         try {
-          await apiPost('transit/location', {
+          const res = await apiPost('transit/location', {
             bus_id: assignments?.bus_id,
             latitude,
             longitude,
             speed: speed || 0,
             heading: heading || 0,
           });
+          if (res && res.success !== false) {
+            setServerSyncStatus('synced');
+          } else {
+            setServerSyncStatus('server_error');
+          }
         } catch (err) {
           console.error('GPS emit failed:', err);
+          setServerSyncStatus('server_error');
         }
       },
       (err) => {
         console.error('Geolocation error:', err);
         setGpsStatus('error');
+        setServerSyncStatus('device_error');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -82,20 +97,27 @@ export default function DriverTripPage() {
           setGpsStatus('active');
 
           try {
-            await apiPost('transit/location', {
+            const res = await apiPost('transit/location', {
               bus_id: assignments?.bus_id,
               latitude,
               longitude,
               speed: speed || 0,
               heading: heading || 0,
             });
+            if (res && res.success !== false) {
+              setServerSyncStatus('synced');
+            } else {
+              setServerSyncStatus('server_error');
+            }
           } catch (err) {
             console.error('GPS emit failed:', err);
+            setServerSyncStatus('server_error');
           }
         },
         (err) => {
           console.error('Geolocation watch error:', err);
           setGpsStatus('error');
+          setServerSyncStatus('device_error');
         },
         { enableHighAccuracy: true, maximumAge: 0 }
       );
@@ -118,6 +140,7 @@ export default function DriverTripPage() {
       gpsIntervalRef.current = null;
     }
     setGpsStatus('inactive');
+    setServerSyncStatus('inactive');
   };
 
   const stopTimer = () => {
@@ -129,24 +152,38 @@ export default function DriverTripPage() {
 
   const handleStartTrip = async () => {
     if (!assignments) return;
-    const res = await apiPost('campusCore/driver/trip/start', {
-      bus_id: assignments.bus_id,
-      route_id: assignments.route_id,
-      trip_type: new Date().getHours() < 12 ? 'morning' : 'evening',
-    });
-    if (res.success) {
-      setTodayTrip({ trip_id: res.trip_id, status: 'active' });
-      startGpsEmission();
+    setActionError(null);
+    try {
+      const res = await apiPost('campusCore/driver/trip/start', {
+        bus_id: assignments.bus_id,
+        route_id: assignments.route_id,
+        trip_type: new Date().getHours() < 12 ? 'morning' : 'evening',
+      });
+      if (res && res.success) {
+        setTodayTrip({ trip_id: res.trip_id, status: 'active' });
+        startGpsEmission();
+      } else {
+        setActionError(res?.error || 'Failed to start trip on server.');
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to start trip due to network error.');
     }
   };
 
   const handleEndTrip = async () => {
     if (!todayTrip) return;
-    const res = await apiPut(`campusCore/driver/trip/${todayTrip.trip_id}/end`, {});
-    if (res.success) {
-      setTodayTrip({ ...todayTrip, status: 'completed' });
-      stopGpsEmission();
-      stopTimer();
+    setActionError(null);
+    try {
+      const res = await apiPut(`campusCore/driver/trip/${todayTrip.trip_id}/end`, {});
+      if (res && res.success) {
+        setTodayTrip({ ...todayTrip, status: 'completed' });
+        stopGpsEmission();
+        stopTimer();
+      } else {
+        setActionError(res?.error || 'Failed to end trip on server.');
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to end trip due to network error.');
     }
   };
 
@@ -166,28 +203,39 @@ export default function DriverTripPage() {
         Trip Console
       </h1>
 
-      {/* GPS Status Banner */}
+      {actionError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm flex items-center gap-2">
+          <span>⚠️ {actionError}</span>
+        </div>
+      )}
+
+      {/* GPS & Server Delivery Status Banner */}
       <div className={`rounded-xl p-4 flex items-center justify-between ${
-        gpsStatus === 'active' ? 'bg-emerald-500/10 border border-emerald-500/30' :
-        gpsStatus === 'error' ? 'bg-red-500/10 border border-red-500/30' :
+        serverSyncStatus === 'synced' ? 'bg-emerald-500/10 border border-emerald-500/30' :
+        serverSyncStatus === 'server_error' ? 'bg-amber-500/10 border border-amber-500/30' :
+        serverSyncStatus === 'device_error' ? 'bg-red-500/10 border border-red-500/30' :
         'bg-slate-500/10 border border-slate-500/30'
       }`}>
         <div className="flex items-center gap-3">
-          {gpsStatus === 'active' ? <Wifi size={20} className="text-emerald-400" /> :
-           gpsStatus === 'error' ? <WifiOff size={20} className="text-red-400" /> :
+          {serverSyncStatus === 'synced' ? <Wifi size={20} className="text-emerald-400 animate-pulse" /> :
+           serverSyncStatus === 'server_error' ? <WifiOff size={20} className="text-amber-400 animate-bounce" /> :
+           serverSyncStatus === 'device_error' ? <WifiOff size={20} className="text-red-400" /> :
            <WifiOff size={20} className="text-slate-400" />}
           <div>
-            <p className={`font-medium ${gpsStatus === 'active' ? 'text-emerald-400' : gpsStatus === 'error' ? 'text-red-400' : 'text-slate-400'}`}>
-              GPS {gpsStatus === 'active' ? 'Broadcasting' : gpsStatus === 'error' ? 'Error' : 'Inactive'}
+            <p className={`font-medium ${
+              serverSyncStatus === 'synced' ? 'text-emerald-400' :
+              serverSyncStatus === 'server_error' ? 'text-amber-400 font-bold' :
+              serverSyncStatus === 'device_error' ? 'text-red-400' :
+              'text-slate-400'
+            }`}>
+              {serverSyncStatus === 'synced' ? 'Broadcasting Live GPS (Server Connected)' :
+               serverSyncStatus === 'server_error' ? '⚠️ GPS Locked on Device, but Server Sync Failing (Parents/Dashboard cannot see live bus)' :
+               serverSyncStatus === 'device_error' ? 'Device Location Error (Turn on GPS)' :
+               'GPS Inactive'}
             </p>
-            {lastGpsTime && <p className="text-xs text-slate-400">Last update: {lastGpsTime}</p>}
+            {lastGpsTime && <p className="text-xs text-slate-400">Last Fix: {lastGpsTime} {gpsCoords ? `(${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)})` : ''}</p>}
           </div>
         </div>
-        {gpsCoords && (
-          <div className="text-right text-xs text-slate-400">
-            <p>{gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}</p>
-          </div>
-        )}
       </div>
 
       {/* Trip Timer */}

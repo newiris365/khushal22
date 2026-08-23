@@ -24,6 +24,7 @@ export default function LibrarianEbooksPage() {
     access_level: 'all'
   });
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -33,17 +34,20 @@ export default function LibrarianEbooksPage() {
   }, []);
 
   const loadEbooks = async () => {
+    setLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('/library/ebooks');
-      if (res.success) {
+      if (res && res.success !== false) {
         setEbooks(res.ebooks || []);
+      } else {
+        setFetchError(res?.error || 'Failed to load digital resources.');
+        setEbooks([]);
       }
-    } catch {
-      // Mock Fallbacks
-      setEbooks([
-        { id: 'eb1', title: 'Algorithms Design Manual', author: 'Steven S. Skiena', category: 'Textbook', department: 'CSE', semester: '4', download_count: 42, view_count: 120, file_size_mb: 4.8 },
-        { id: 'eb2', title: 'Compilers: Principles, Techniques, & Tools', author: 'Alfred V. Aho', category: 'Textbook', department: 'CSE', semester: '5', download_count: 19, view_count: 89, file_size_mb: 12.3 }
-      ]);
+    } catch (err: any) {
+      console.error('Failed to load ebooks:', err);
+      setFetchError(err?.message || 'Unable to load digital resources from server.');
+      setEbooks([]);
     } finally {
       setLoading(false);
     }
@@ -62,7 +66,7 @@ export default function LibrarianEbooksPage() {
 
     try {
       const res = await apiPost('/library/ebooks', form);
-      if (res.success) {
+      if (res && res.success) {
         setSuccessMsg('Digital resource registered successfully.');
         setShowAddForm(false);
         setForm({
@@ -71,19 +75,10 @@ export default function LibrarianEbooksPage() {
         });
         loadEbooks();
       } else {
-        setErrorMsg(res.error || 'Failed to create ebook.');
+        setErrorMsg(res?.error || 'Failed to create ebook.');
       }
-    } catch {
-      // Mock Success
-      const mockEbook = {
-        id: 'mock-eb-' + Math.random(),
-        download_count: 0,
-        view_count: 0,
-        ...form
-      };
-      setEbooks([mockEbook, ...ebooks]);
-      setSuccessMsg('Digital resource registered successfully! (Mock Mode)');
-      setShowAddForm(false);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to register digital resource due to network error.');
     } finally {
       setSubmitting(false);
     }
@@ -124,6 +119,13 @@ export default function LibrarianEbooksPage() {
         {errorMsg && (
           <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 mb-6">
             {errorMsg}
+          </div>
+        )}
+
+        {fetchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm mb-6 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span>{fetchError}</span>
           </div>
         )}
 

@@ -17,18 +17,53 @@ export default function DriverHeadcountPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => { loadHeadcount(); }, []);
 
   const loadHeadcount = async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('campusCore/driver/headcount');
-      if (res.success) setStudents(res.students || []);
-    } catch (err) {
+      if (res && res.success) {
+        setStudents(res.students || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load headcount list.');
+        setStudents([]);
+      }
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load headcount list from server.');
+      setStudents([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleToggleBoarding = async (studentId: string, currentBoarded: boolean) => {
+    setTogglingId(studentId);
+    setActionError(null);
+    try {
+      const res = await apiPost('campusCore/driver/headcount/toggle', {
+        student_id: studentId,
+        has_boarded: !currentBoarded
+      });
+      if (res && res.success) {
+        setStudents(prev => prev.map(s => s.student_id === studentId ? {
+          ...s,
+          has_boarded: !currentBoarded,
+          boarded_at: !currentBoarded ? new Date().toISOString() : ''
+        } : s));
+      } else {
+        setActionError(res?.error || 'Failed to update student boarding status.');
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to update student boarding status due to network error.');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -54,6 +89,18 @@ export default function DriverHeadcountPage() {
         <Users size={24} className="text-violet-400" />
         Student Headcount
       </h1>
+
+      {actionError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {actionError}</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -100,7 +147,7 @@ export default function DriverHeadcountPage() {
             </div>
             <div className="divide-y divide-white/5">
               {stopStudents.map(s => (
-                <div key={s.student_id} className="flex items-center justify-between px-4 py-2">
+                <div key={s.student_id} className="flex items-center justify-between px-4 py-2 hover:bg-white/5 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                       s.has_boarded ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600 text-slate-300'
@@ -108,17 +155,29 @@ export default function DriverHeadcountPage() {
                       {s.has_boarded ? <CheckCircle2 size={16} /> : s.student_name?.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm text-white">{s.student_name}</p>
+                      <p className="text-sm text-white font-medium">{s.student_name}</p>
                       <p className="text-xs text-slate-400">{s.roll_number}</p>
                     </div>
                   </div>
-                  <div>
-                    {s.has_boarded ? (
-                      <span className="text-xs text-emerald-400">Boarded {s.boarded_at ? new Date(s.boarded_at).toLocaleTimeString() : ''}</span>
+                  <button
+                    onClick={() => handleToggleBoarding(s.student_id, s.has_boarded)}
+                    disabled={togglingId === s.student_id}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      s.has_boarded
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30'
+                        : 'bg-slate-700 text-slate-300 hover:bg-emerald-600 hover:text-white'
+                    }`}
+                  >
+                    {togglingId === s.student_id ? 'Saving...' : s.has_boarded ? (
+                      <>
+                        <CheckCircle2 size={14} /> Boarded
+                      </>
                     ) : (
-                      <XCircle size={16} className="text-red-400" />
+                      <>
+                        <XCircle size={14} /> Mark Boarded
+                      </>
                     )}
-                  </div>
+                  </button>
                 </div>
               ))}
             </div>

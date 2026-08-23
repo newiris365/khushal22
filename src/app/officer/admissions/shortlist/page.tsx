@@ -13,7 +13,7 @@ export default function AutoShortlistPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [minPercentage, setMinPercentage] = useState(70);
-  const [cycleId, setCycleId] = useState('c1111111-1111-1111-1111-111111111111');
+  const [cycleId, setCycleId] = useState('');
   
   // Results summary
   const [results, setResults] = useState<any | null>(null);

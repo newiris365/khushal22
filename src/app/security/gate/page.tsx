@@ -14,33 +14,95 @@ export default function SecurityGatePage() {
   const [error, setError] = useState('');
   const [recentScans, setRecentScans] = useState<any[]>([]);
 
-  // Visitor passes
+  // Visitor passes & Gate Activity
   const [visitors, setVisitors] = useState<any[]>([]);
   const [showVisitors, setShowVisitors] = useState(false);
+  const [gateLogs, setGateLogs] = useState<any[]>([]);
+  const [logSuccessMsg, setLogSuccessMsg] = useState('');
+  const [logErrorMsg, setLogErrorMsg] = useState('');
+  const [isLogging, setIsLogging] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadGateActivity();
+  }, []);
+
+  const loadGateActivity = async () => {
+    try {
+      const res = await apiGet('campusCore/gate/entry-logs');
+      if (res && res.success) {
+        setGateLogs(res.logs || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load today gate activity logs.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setFetchError(err?.message || 'Unable to load gate activity logs from server.');
+    }
+  };
 
   const handleScan = async () => {
     if (!searchQuery.trim()) return;
     setIsScanning(true);
     setError('');
+    setLogSuccessMsg('');
+    setLogErrorMsg('');
     setScanResult(null);
     try {
       const res = await apiGet(`campusCore/gate/scan/${encodeURIComponent(searchQuery.trim())}`);
-      if (res.success) {
+      if (res && res.success) {
         setScanResult(res);
         setRecentScans([{ ...res, query: searchQuery, time: new Date().toISOString() }, ...recentScans.slice(0, 9)]);
       } else {
-        setError(res.error || 'Scan failed');
+        setError(res?.error || 'Scan lookup failed');
       }
     } catch (err: any) {
-      setError(err.message || 'Scan failed');
+      setError(err?.message || 'Scan lookup failed due to network error.');
     } finally {
       setIsScanning(false);
     }
   };
 
+  const handleLogMovement = async (direction: 'entry' | 'exit') => {
+    if (!scanResult?.person) return;
+    setIsLogging(true);
+    setLogSuccessMsg('');
+    setLogErrorMsg('');
+    try {
+      const res = await apiPost('campusCore/gate/log-entry', {
+        person_id: scanResult.person.student_roll || scanResult.person.user_id,
+        user_id: scanResult.person.user_id,
+        person_name: scanResult.person.full_name,
+        person_type: scanResult.person.person_type || 'student',
+        gate_number: 'Gate 1',
+        direction
+      });
+
+      if (res && res.success) {
+        setLogSuccessMsg(`Successfully logged ${direction.toUpperCase()} for ${scanResult.person.full_name}!`);
+        loadGateActivity();
+      } else {
+        setLogErrorMsg(res?.error || `Failed to log ${direction}.`);
+      }
+    } catch (err: any) {
+      setLogErrorMsg(err?.message || `Failed to log ${direction} due to network error.`);
+    } finally {
+      setIsLogging(false);
+    }
+  };
+
   const loadVisitors = async () => {
-    const res = await apiGet('campusCore/gate/visitors-today');
-    if (res.success) setVisitors(res.visitors || []);
+    setFetchError(null);
+    try {
+      const res = await apiGet('campusCore/gate/visitors-today');
+      if (res && res.success) {
+        setVisitors(res.visitors || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load visitor passes.');
+      }
+    } catch (err: any) {
+      setFetchError(err?.message || 'Unable to load visitor passes from server.');
+    }
     setShowVisitors(true);
   };
 
@@ -168,6 +230,41 @@ export default function SecurityGatePage() {
               </p>
             </div>
           )}
+
+          {/* Explicit Entry / Exit Logging Controls */}
+          <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-white">Record Gate Movement for {scanResult.person?.full_name}</p>
+              <p className="text-xs text-slate-400">Select direction to persist log to gate_entry_logs</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleLogMovement('entry')}
+                disabled={isLogging}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+              >
+                <span>↓</span> Log ENTRY
+              </button>
+              <button
+                onClick={() => handleLogMovement('exit')}
+                disabled={isLogging}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+              >
+                <span>↑</span> Log EXIT
+              </button>
+            </div>
+          </div>
+
+          {logSuccessMsg && (
+            <div className="mt-3 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs font-semibold">
+              {logSuccessMsg}
+            </div>
+          )}
+          {logErrorMsg && (
+            <div className="mt-3 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-xs font-semibold">
+              {logErrorMsg}
+            </div>
+          )}
         </div>
       )}
 
@@ -225,6 +322,50 @@ export default function SecurityGatePage() {
           )}
         </div>
       )}
+
+      {fetchError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm flex items-center gap-2">
+          <AlertTriangle size={18} className="flex-shrink-0" />
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
+      {/* Today's Gate Activity Log */}
+      <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <UserCheck size={18} className="text-emerald-400" /> Today&apos;s Gate Activity Log
+          </h2>
+          <button onClick={loadGateActivity} className="text-xs text-[#C4B5FD] hover:text-white flex items-center gap-1">
+            Refresh Log
+          </button>
+        </div>
+        {gateLogs.length === 0 ? (
+          <p className="text-slate-400 text-sm">No person movement logs recorded yet today.</p>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {gateLogs.map((log: any) => (
+              <div key={log.id} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/5 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                    log.direction === 'entry' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  }`}>
+                    {log.direction === 'entry' ? '↓ ENTRY' : '↑ EXIT'}
+                  </span>
+                  <div>
+                    <span className="text-white font-medium">{log.person_name}</span>
+                    <span className="text-xs text-slate-400 ml-2">({log.person_type} {log.person_id ? `• ${log.person_id}` : ''})</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-300 font-medium">{log.gate_number || 'Gate 1'}</span>
+                  <p className="text-[10px] text-slate-400">{new Date(log.scanned_at).toLocaleTimeString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Recent Scans */}
       {recentScans.length > 0 && (

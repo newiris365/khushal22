@@ -16,7 +16,7 @@ interface Department {
 }
 
 export default function AdminDepartmentsPage() {
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departments, setDepartments] = useState<Array<Department>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -172,15 +172,6 @@ export default function AdminDepartmentsPage() {
         </div>
       </div>
 
-      {/* Message */}
-      {msg && (
-        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-          msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'
-        }`}>
-          {msg.type === 'success' ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
-          {msg.text}
-        </div>
-      )}
 
       {/* Search */}
       <div className="flex items-center gap-3">
@@ -314,6 +305,8 @@ export default function AdminDepartmentsPage() {
             </div>
           </div>
         </div>
+      )}
+
       {/* Toast & Confirm Modal */}
       <Toast toast={toast} onClose={() => setToast(null)} />
       <ConfirmModal

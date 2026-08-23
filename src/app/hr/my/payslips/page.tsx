@@ -28,7 +28,7 @@ export default function EmployeePayslipHistory() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/hr/payslips/d0000000-0000-0000-0000-000000000003', {
+      const res = await fetch('/api/v1/hr/payslips/me', {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -125,7 +125,7 @@ export default function EmployeePayslipHistory() {
                 Export History (CSV)
               </button>
               <button
-                onClick={() => window.open('/api/v1/hr/payroll/reports/form16/d0000000-0000-0000-0000-000000000003', '_blank')}
+                onClick={() => window.open('/api/v1/hr/payroll/reports/form16/me', '_blank')}
                 className="px-3.5 py-2 rounded-xl bg-[#6C2BD9]/20 hover:bg-[#6C2BD9]/45 border border-[#6C2BD9]/40 text-xs text-[#A78BFA] font-bold hover:bg-white/10 transition-all flex items-center gap-1.5"
               >
                 <FileText className="w-4 h-4" /> Download Form 16 (FY26)

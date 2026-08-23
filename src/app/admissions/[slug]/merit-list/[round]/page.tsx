@@ -1,11 +1,27 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   Award, FileText, ChevronRight, Download, Users, 
-  MapPin, ShieldCheck, ArrowRight
+  MapPin, ShieldCheck, ArrowRight, RefreshCw, AlertCircle
 } from 'lucide-react';
+import { apiGet } from '@/lib/api';
+
+interface ProgramOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface MeritEntry {
+  rank: number;
+  appNo: string;
+  name: string;
+  score: number;
+  category: string;
+  status: string;
+}
 
 export default function PublicMeritListsPage() {
   const params = useParams();
@@ -13,27 +29,83 @@ export default function PublicMeritListsPage() {
   const round = params.round as string;
   const router = useRouter();
 
-  const [selectedProgramId, setSelectedProgramId] = useState('a1111111-1111-1111-1111-111111111111');
+  const [institutionName, setInstitutionName] = useState('');
+  const [programs, setPrograms] = useState<ProgramOption[]>([]);
+  const [selectedProgramId, setSelectedProgramId] = useState('');
   const [selectedRound, setSelectedRound] = useState(round || '1');
+  const [loading, setLoading] = useState(false);
 
-  // Programs reference
-  const programs = [
-    { id: 'a1111111-1111-1111-1111-111111111111', name: 'B.Tech Computer Science (B.Tech CSE)', code: 'BTECH-CSE' },
-    { id: 'a1111111-1111-1111-1111-111111111112', name: 'B.Tech Artificial Intelligence (B.Tech AI-DS)', code: 'BTECH-AIDS' },
-    { id: 'a1111111-1111-1111-1111-111111111113', name: 'Master of Business Administration (MBA)', code: 'MBA-CORE' }
-  ];
+  const [cutoffs, setCutoffs] = useState<{ [cat: string]: number }>({});
+  const [entries, setEntries] = useState<MeritEntry[]>([]);
 
-  // Mock cutoffs
-  const cutoffs: { [progId: string]: { [cat: string]: number } } = {
-    'a1111111-1111-1111-1111-111111111111': { General: 84.5, OBC: 78.2, SC: 69.5, ST: 62.0, EWS: 81.4 },
-    'a1111111-1111-1111-1111-111111111112': { General: 81.2, OBC: 75.0, SC: 66.8, ST: 60.5, EWS: 78.0 },
-    'a1111111-1111-1111-1111-111111111113': { General: 75.6, OBC: 70.2, SC: 62.0, ST: 58.5, EWS: 72.8 }
-  };
+  // 1. Fetch institution details & programs on mount
+  useEffect(() => {
+    if (!slug) return;
+    async function loadPrograms() {
+      try {
+        const instRes = await apiGet(`/admissions/${slug}`);
+        if (instRes.success && instRes.institution) {
+          setInstitutionName(instRes.institution.name);
+        }
 
-  // Mock list entries
-  const entries = [];
+        const res = await apiGet(`/admissions/${slug}/programs`);
+        if (res.success && Array.isArray(res.programs)) {
+          const progs: ProgramOption[] = res.programs.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            code: p.code || p.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
+          }));
+          setPrograms(progs);
+          if (progs.length > 0 && !selectedProgramId) {
+            setSelectedProgramId(progs[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed loading admissions programs for merit list:', err);
+      }
+    }
+    loadPrograms();
+  }, [slug]);
 
-  const currentCutoffs = cutoffs[selectedProgramId] || {};
+  // 2. Fetch published merit list for round & program
+  useEffect(() => {
+    if (!slug || !selectedRound) return;
+    async function loadMeritList() {
+      setLoading(true);
+      try {
+        let url = `/admissions/merit-list/${selectedRound}?slug=${encodeURIComponent(slug)}`;
+        if (selectedProgramId) {
+          url += `&program_id=${encodeURIComponent(selectedProgramId)}`;
+        }
+        const res = await apiGet(url);
+        if (res.success && Array.isArray(res.merit_lists) && res.merit_lists.length > 0) {
+          const ml = res.merit_lists[0];
+          setCutoffs(ml.cutoff_score ? { Minimum: ml.cutoff_score } : {});
+          
+          const mappedEntries: MeritEntry[] = (ml.merit_list_entries || []).map((e: any) => ({
+            rank: e.rank,
+            appNo: e.applicants?.application_number || e.applicant_id?.slice(0, 8) || 'N/A',
+            name: e.applicants ? `${e.applicants.first_name || ''} ${e.applicants.last_name || ''}`.trim() : 'Candidate',
+            score: e.merit_score || 0,
+            category: e.category || 'General',
+            status: e.status || 'listed'
+          }));
+          setEntries(mappedEntries);
+        } else {
+          setCutoffs({});
+          setEntries([]);
+        }
+      } catch (err) {
+        console.warn('Failed loading published merit list:', err);
+        setCutoffs({});
+        setEntries([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadMeritList();
+  }, [slug, selectedRound, selectedProgramId]);
+
   const currentProgram = programs.find(p => p.id === selectedProgramId);
 
   return (
@@ -51,11 +123,11 @@ export default function PublicMeritListsPage() {
               Official Admissions Merit Lists
             </h1>
             <p className="text-[#A78BFA]/70 mt-1">
-              Select program and round index parameters to audit published rankings & category cutoffs.
+              {institutionName ? `${institutionName} — ` : ''}Select program and round to view published rankings & cutoffs.
             </p>
           </div>
           <button 
-            onClick={() => alert('PDF Merit List generated successfully.')}
+            onClick={() => alert('PDF Merit List download initiated.')}
             className="px-5 py-2.5 bg-[#6C2BD9]/25 hover:bg-[#6C2BD9]/45 border border-[#6C2BD9]/45 text-[#A78BFA] hover:text-white font-bold rounded-xl transition-all flex items-center gap-1.5 text-xs shrink-0"
           >
             <Download className="w-4 h-4" /> Download PDF List
@@ -67,20 +139,24 @@ export default function PublicMeritListsPage() {
           <div className="md:col-span-2 bg-[#13102A]/50 backdrop-blur-md rounded-2xl border border-[#6C2BD9]/15 p-5">
             <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Select Degree Program</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-              {programs.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedProgramId(p.id)}
-                  className={`px-4 py-3 rounded-xl border text-xs font-semibold text-left transition-all ${
-                    selectedProgramId === p.id 
-                      ? 'bg-[#6C2BD9]/20 border-[#8B5CF6] text-white' 
-                      : 'bg-[#0D0A1A]/40 border-white/5 text-white/50 hover:bg-[#6C2BD9]/5'
-                  }`}
-                >
-                  <span className="block font-bold">{p.code}</span>
-                  <span className="block mt-0.5 text-[10px] opacity-80 truncate">{p.name.replace(/Bachelor of Technology in |Master of /,'')}</span>
-                </button>
-              ))}
+              {programs.length > 0 ? (
+                programs.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedProgramId(p.id)}
+                    className={`px-4 py-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                      selectedProgramId === p.id 
+                        ? 'bg-[#6C2BD9]/20 border-[#8B5CF6] text-white' 
+                        : 'bg-[#0D0A1A]/40 border-white/5 text-white/50 hover:bg-[#6C2BD9]/5'
+                    }`}
+                  >
+                    <span className="block font-bold">{p.code}</span>
+                    <span className="block mt-0.5 text-[10px] opacity-80 truncate">{p.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-3 text-xs text-[#A78BFA]/50 py-2">Loading programs...</div>
+              )}
             </div>
           </div>
 
@@ -105,17 +181,19 @@ export default function PublicMeritListsPage() {
         </div>
 
         {/* Cutoff Criteria */}
-        <div className="bg-[#13102A]/50 backdrop-blur-md rounded-2xl border border-[#6C2BD9]/15 p-5">
-          <span className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-widest block mb-4">Round {selectedRound} Cutoff Percentiles — {currentProgram?.code}</span>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            {Object.keys(currentCutoffs).map((cat) => (
-              <div key={cat} className="p-4 rounded-xl bg-[#0D0A1A]/50 border border-[#6C2BD9]/10 text-center">
-                <span className="text-[10px] text-[#A78BFA]/50 uppercase font-bold tracking-wider">{cat}</span>
-                <span className="block text-xl font-mono font-black text-white mt-1">{currentCutoffs[cat]}%</span>
-              </div>
-            ))}
+        {Object.keys(cutoffs).length > 0 && (
+          <div className="bg-[#13102A]/50 backdrop-blur-md rounded-2xl border border-[#6C2BD9]/15 p-5">
+            <span className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-widest block mb-4">Round {selectedRound} Cutoff Percentiles — {currentProgram?.code}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              {Object.keys(cutoffs).map((cat) => (
+                <div key={cat} className="p-4 rounded-xl bg-[#0D0A1A]/50 border border-[#6C2BD9]/10 text-center">
+                  <span className="text-[10px] text-[#A78BFA]/50 uppercase font-bold tracking-wider">{cat}</span>
+                  <span className="block text-xl font-mono font-black text-white mt-1">{cutoffs[cat]}%</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Ranks Table */}
         <div className="bg-[#13102A]/50 backdrop-blur-md rounded-3xl border border-[#6C2BD9]/20 overflow-hidden shadow-xl">
@@ -124,42 +202,56 @@ export default function PublicMeritListsPage() {
               <Users className="w-4 h-4 text-[#A78BFA]" />
               Ranked Candidates List
             </span>
-            <span className="text-[10px] font-mono text-[#A78BFA]/60">Showing 7 entries matched cutoff</span>
+            <span className="text-[10px] font-mono text-[#A78BFA]/60">
+              {loading ? 'Loading...' : `Showing ${entries.length} entries`}
+            </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#6C2BD9]/10 text-[10px] uppercase font-bold text-[#A78BFA]/60 bg-[#0D0A1A]/20">
-                  <th className="py-3.5 px-6">Overall Rank</th>
-                  <th className="py-3.5 px-6">Application ID</th>
-                  <th className="py-3.5 px-6">Candidate Name</th>
-                  <th className="py-3.5 px-6">Merit Score</th>
-                  <th className="py-3.5 px-6">Category</th>
-                  <th className="py-3.5 px-6">Offer Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#6C2BD9]/10 text-xs">
-                {entries.map((entry) => (
-                  <tr key={entry.rank} className="hover:bg-[#6C2BD9]/5 transition-colors">
-                    <td className="py-4 px-6 font-mono font-bold text-white">#{entry.rank}</td>
-                    <td className="py-4 px-6 font-mono text-[#A78BFA]">{entry.appNo}</td>
-                    <td className="py-4 px-6 font-bold">{entry.name}</td>
-                    <td className="py-4 px-6 font-mono font-bold text-emerald-400">{entry.score}%</td>
-                    <td className="py-4 px-6">{entry.category}</td>
-                    <td className="py-4 px-6">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        entry.status === 'offered' 
-                          ? 'bg-amber-500/15 text-amber-400' 
-                          : 'bg-white/5 text-white/50'
-                      }`}>
-                        {entry.status}
-                      </span>
-                    </td>
+            {loading ? (
+              <div className="p-8 text-center text-xs text-[#A78BFA]/60 flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Fetching published merit list...
+              </div>
+            ) : entries.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#6C2BD9]/10 text-[10px] uppercase font-bold text-[#A78BFA]/60 bg-[#0D0A1A]/20">
+                    <th className="py-3.5 px-6">Overall Rank</th>
+                    <th className="py-3.5 px-6">Application ID</th>
+                    <th className="py-3.5 px-6">Candidate Name</th>
+                    <th className="py-3.5 px-6">Merit Score</th>
+                    <th className="py-3.5 px-6">Category</th>
+                    <th className="py-3.5 px-6">Offer Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[#6C2BD9]/10 text-xs">
+                  {entries.map((entry) => (
+                    <tr key={entry.rank} className="hover:bg-[#6C2BD9]/5 transition-colors">
+                      <td className="py-4 px-6 font-mono font-bold text-white">#{entry.rank}</td>
+                      <td className="py-4 px-6 font-mono text-[#A78BFA]">{entry.appNo}</td>
+                      <td className="py-4 px-6 font-bold">{entry.name}</td>
+                      <td className="py-4 px-6 font-mono font-bold text-emerald-400">{entry.score}%</td>
+                      <td className="py-4 px-6">{entry.category}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          entry.status === 'offered' || entry.status === 'admitted' 
+                            ? 'bg-amber-500/15 text-amber-400' 
+                            : 'bg-white/5 text-white/50'
+                        }`}>
+                          {entry.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-12 text-center text-xs text-[#A78BFA]/50 space-y-2">
+                <AlertCircle className="w-8 h-8 text-[#A78BFA]/40 mx-auto" />
+                <p className="font-semibold text-white">No Published Merit List Found</p>
+                <p>Round {selectedRound} merit list has not been published for this program yet.</p>
+              </div>
+            )}
           </div>
         </div>
 

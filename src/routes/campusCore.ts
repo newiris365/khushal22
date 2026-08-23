@@ -43,6 +43,7 @@ import {
   createFeeStructure,
   initiatePayment,
   verifyPayment,
+  submitManualFeePayment,
   getStudentFees,
   getFeesReport,
   createConcession,
@@ -156,6 +157,8 @@ import {
   getRoomTransferRequests,
   verifyPersonAtGate,
   gateScanLookup,
+  logGateEntry,
+  getGateEntryLogs,
   getApprovedVisitorsToday,
   checkPersonRestricted,
   createAccessRestriction,
@@ -169,6 +172,7 @@ import {
   startBusTrip,
   endBusTrip,
   getDriverHeadcount,
+  toggleStudentBoarding,
   getDriverStopSchedule,
   markStopReached,
   reportBusIncident,
@@ -241,7 +245,6 @@ router.use('/leaves', requireFeature('students'));
 router.use('/wallet', requireFeature('fees'));
 router.use('/transit', requireFeature('transit'));
 router.use('/parent', requireFeature('parent_portal'));
-router.use('/parent-link-child', requireFeature('parent_portal'));
 router.use('/admissions', requireFeature('admissions'));
 router.use('/calendar', requireFeature('timetable'));
 router.use('/hostel', requireFeature('hostel'));
@@ -336,6 +339,7 @@ router.post('/fees/structures', requireRole(['Admin', 'SuperAdmin']), createFeeS
 router.post('/fees/structures/clone', requireRole(['Admin', 'SuperAdmin']), cloneFeeStructures);
 router.post('/fees/payment/initiate', requireRole(['Student', 'Parent']), initiatePayment);
 router.post('/fees/payment/verify', requireRole(['Student', 'Parent']), verifyPayment);
+router.post('/fees/payment/manual', requireRole(['Student', 'Parent']), submitManualFeePayment);
 router.post('/fees/refund', requireRole(['Admin', 'SuperAdmin']), processFeeRefund);
 router.get('/fees/student/:studentId', getStudentFees);
 router.get('/fees/report', requireRole(['Admin', 'SuperAdmin']), getFeesReport);
@@ -417,11 +421,6 @@ router.post('/lost-found', requireRole(['Admin', 'SuperAdmin', 'Security']), cre
 router.post('/lost-found/:id/claim', requireRole(['Student']), claimLostFoundItem);
 
 // =========================================================================
-// 14. PARENT LINK ROUTER
-// =========================================================================
-router.post('/parent-link-child', requireRole(['Parent']), linkParentToChild);
-
-// =========================================================================
 // 15. NOTICE READ RECEIPTS ROUTERS
 // =========================================================================
 router.get('/notices/:id/read-stats', requireRole(['Admin', 'SuperAdmin', 'Director']), getNoticeReadStats);
@@ -447,6 +446,8 @@ router.get('/leaves/my', requireRole(['Student']), getMyLeaves);
 router.get('/leaves/my-staff', requireRole(['Staff', 'HOD', 'Teacher', 'Driver', 'SuperAdmin', 'Admin']), getMyStaffLeaves);
 router.post('/leaves/my-staff', requireRole(['Staff', 'HOD', 'Teacher', 'Driver', 'SuperAdmin', 'Admin']), applyStaffLeave);
 router.get('/leaves/department', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'HOD']), getDepartmentLeaves);
+router.post('/leaves/:id/approve', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'HOD', 'Staff', 'Principal']), approveLeaveFaculty);
+router.post('/leaves/:id/reject', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'HOD', 'Staff', 'Principal']), rejectLeaveFaculty);
 
 // =========================================================================
 // 19. WALLET ROUTERS
@@ -541,10 +542,12 @@ router.put('/hostel/transfers/:id/complete', requireRole(['Admin', 'SuperAdmin']
 // =========================================================================
 router.get('/gate/verify/:identifier', requireRole(['Security', 'Admin', 'SuperAdmin', 'Warden']), verifyPersonAtGate);
 router.get('/gate/scan/:identifier', requireRole(['Security', 'Admin', 'SuperAdmin']), gateScanLookup);
+router.post('/gate/log-entry', requireRole(['Security', 'Admin', 'SuperAdmin']), logGateEntry);
+router.get('/gate/entry-logs', requireRole(['Security', 'Admin', 'SuperAdmin']), getGateEntryLogs);
 router.get('/gate/visitors-today', requireRole(['Security', 'Admin', 'SuperAdmin', 'Warden']), getApprovedVisitorsToday);
 router.get('/gate/restricted/:personId', requireRole(['Security', 'Admin', 'SuperAdmin']), checkPersonRestricted);
 router.get('/gate/restrictions', requireRole(['Security', 'Admin', 'SuperAdmin']), getAccessRestrictions);
-router.post('/gate/restrictions', requireRole(['Admin', 'SuperAdmin']), createAccessRestriction);
+router.post('/gate/restrictions', requireRole(['Security', 'Admin', 'SuperAdmin']), createAccessRestriction);
 router.post('/gate/vehicle/entry', requireRole(['Security', 'Admin', 'SuperAdmin']), vehicleEntry);
 router.put('/gate/vehicle/:id/exit', requireRole(['Security', 'Admin', 'SuperAdmin']), vehicleExit);
 router.get('/gate/vehicle-logs', requireRole(['Security', 'Admin', 'SuperAdmin']), getVehicleLogs);
@@ -558,6 +561,7 @@ router.get('/driver/today-trip', requireRole(['Driver']), getDriverTodayTrip);
 router.post('/driver/trip/start', requireRole(['Driver']), startBusTrip);
 router.put('/driver/trip/:id/end', requireRole(['Driver']), endBusTrip);
 router.get('/driver/headcount', requireRole(['Driver']), getDriverHeadcount);
+router.post('/driver/headcount/toggle', requireRole(['Driver']), toggleStudentBoarding);
 router.get('/driver/stops', requireRole(['Driver']), getDriverStopSchedule);
 router.post('/driver/stops/reach', requireRole(['Driver']), markStopReached);
 router.post('/driver/incident', requireRole(['Driver']), reportBusIncident);

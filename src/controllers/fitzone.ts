@@ -433,9 +433,26 @@ export async function checkinGymBooking(req: Request, res: Response) {
 export async function getSlotBookings(req: Request, res: Response) {
   try {
     const { slotId } = req.params;
+    const instId = req.user?.institution_id;
+
+    // Verify slot exists & matches trainer's institution
+    const { data: slot, error: slotErr } = await supabaseAdmin
+      .from('gym_slots')
+      .select('id, institution_id')
+      .eq('id', slotId)
+      .maybeSingle();
+
+    if (slotErr || !slot) {
+      return res.status(404).json({ success: false, error: 'Gym slot not found.' });
+    }
+
+    if (instId && slot.institution_id && slot.institution_id !== instId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to view bookings for another institution.' });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('gym_bookings')
-      .select('*, students(name, roll_number, department)')
+      .select('*, students(name, roll_number, departments(name))')
       .eq('slot_id', slotId);
 
     if (error) return res.status(500).json({ success: false, error: error.message });

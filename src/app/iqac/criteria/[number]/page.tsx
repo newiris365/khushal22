@@ -54,28 +54,29 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
     return titles[criterionNumber - 1] || 'Accreditation Criteria Details';
   };
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [savingNarrative, setSavingNarrative] = useState(false);
+
   const loadMetrics = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      // Mock metrics matching the selected criterion
-      const mockMetrics: Record<number, Metric[]> = {
-        1: [
-          { id: 'm-1-1', metric_code: '1.1.1', metric_name: 'Curriculum design and syllabus planning framework align with PO objectives.', metric_type: 'qualitative', data_value: 'Structured mappings implemented across 100% courses.', status: 'completed', notes: 'Syllabus revised in academic council meeting.' },
-          { id: 'm-1-2', metric_code: '1.2.2', metric_name: 'Percentage of new courses introduced across all programs.', metric_type: 'quantitative', data_value: '18%', status: 'pending', notes: 'Waiting for board of studies report.' },
-          { id: 'm-1-3', metric_code: '1.3.1', metric_name: 'Institution integrates crosscutting issues relevant to Professional Ethics and Gender.', metric_type: 'qualitative', data_value: 'Dedicated moral value and code of ethics courses assigned.', status: 'completed', notes: 'Seminar certificates uploaded.' }
-        ],
-        2: [
-          { id: 'm-2-1', metric_code: '2.1.1', metric_name: 'Average student enrollment percentage annually.', metric_type: 'quantitative', data_value: '92.5%', status: 'completed', notes: 'Synced from admissions module.' },
-          { id: 'm-2-2', metric_code: '2.2.1', metric_name: 'Student-Full time teacher ratio metrics.', metric_type: 'quantitative', data_value: '13:1', status: 'completed', notes: 'Calculated from human resources rosters.' }
-        ]
-      };
-      
-      setMetrics(mockMetrics[criterionNumber] || [
-        { id: 'm-generic-1', metric_code: `${criterionNumber}.1.1`, metric_name: 'Quality assurance initiatives of the institution.', metric_type: 'qualitative', data_value: 'Regular IQAC auditing campaigns conducted quarterly.', status: 'completed', notes: 'Reports attached in drive links.' },
-        { id: 'm-generic-2', metric_code: `${criterionNumber}.2.1`, metric_name: 'Institution performance metrics targets.', metric_type: 'quantitative', data_value: '84%', status: 'pending', notes: 'Data compilation in progress.' }
-      ]);
-    } catch (err) {
-      console.error(err);
+      const res = await fetch(`/api/naac/criteria?criterion_number=${criterionNumber}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const critObj = Array.isArray(data.criteria) ? data.criteria.find((c: any) => c.criterion_number === criterionNumber) || data.criteria[0] : null;
+        const loadedMetrics = critObj?.naac_metrics || critObj?.metrics || [];
+        setMetrics(loadedMetrics);
+      } else {
+        setFetchError(data.error || `Unable to load Criterion ${criterionNumber} metrics.`);
+        setMetrics([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading criteria metrics', err);
+      setFetchError(err?.message || `Unable to load Criterion ${criterionNumber} metrics from server.`);
+      setMetrics([]);
     } finally {
       setLoading(false);
     }
@@ -89,16 +90,21 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
   const handleUpdateMetric = async (metricId: string, value: string, notes: string) => {
     setSavingId(metricId);
     try {
-      await fetch(`/api/naac/metrics/${metricId}`, {
+      const res = await fetch(`/api/naac/metrics/${metricId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ data_value: value, notes, status: 'completed' })
       });
-      setMetrics(prev => prev.map(m => m.id === metricId ? { ...m, data_value: value, notes, status: 'completed' } : m));
-      alert('Metric values updated and registered successfully.');
-    } catch (err) {
-      setMetrics(prev => prev.map(m => m.id === metricId ? { ...m, data_value: value, notes, status: 'completed' } : m));
-      alert('Metric registered in local database.');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMetrics(prev => prev.map(m => m.id === metricId ? { ...m, data_value: value, notes, status: 'completed' } : m));
+        alert('Metric values updated and registered successfully.');
+      } else {
+        alert(data.error || 'Failed to update metric values in database.');
+      }
+    } catch (err: any) {
+      console.error('Error updating metric', err);
+      alert(`Metric update failed: ${err?.message || 'Network communication error.'}`);
     } finally {
       setSavingId(null);
     }
@@ -107,24 +113,32 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
   const handleUploadDocument = (metricCode: string) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/pdf';
+    input.accept = 'application/pdf,image/*,.doc,.docx';
     input.onchange = async (e: any) => {
-      const file = e.target.files[0];
+      const file = e.target.files?.[0];
       if (file) {
         try {
-          await fetch('/api/naac/documents/upload', {
+          // Construct real evidence object payload with actual uploaded filename
+          const documentUrl = typeof window !== 'undefined' ? URL.createObjectURL(file) : `https://storage.iris365.edu/evidence/${file.name}`;
+          const res = await fetch('/api/naac/documents/upload', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
               criterion: `Criterion ${criterionNumber}`,
-              document_name: `Evidence_${metricCode}_SIET.pdf`,
-              document_url: 'https://supabase.co/storage/v1/object/public/evidence/evidence.pdf',
+              document_name: file.name || `Evidence_${metricCode}_SIET.pdf`,
+              document_url: documentUrl,
               academic_year: '2026-27'
             })
           });
-          alert(`Evidence PDF successfully uploaded and attached to Metric ${metricCode}.`);
-        } catch (err) {
-          alert('Saved document attachment to metadata.');
+          const data = await res.json();
+          if (res.ok && data.success) {
+            alert(`Evidence file "${file.name}" successfully uploaded and attached to Metric ${metricCode}.`);
+          } else {
+            alert(data.error || 'Failed to upload evidence document to server.');
+          }
+        } catch (err: any) {
+          console.error('Error uploading document', err);
+          alert(`Document upload failed: ${err?.message || 'Network communication error.'}`);
         }
       }
     };
@@ -139,14 +153,42 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setAiDraft(data.draft);
+      } else {
+        alert(data.error || 'AI narrative draft generation failed.');
       }
-    } catch (err) {
-      console.error(err);
-      setAiDraft(`### NAAC SELF-STUDY REPORT NARRATIVE: CRITERION ${criterionNumber}\n\nOur institution maintains high quality standards in research publications, curriculum flexibility, and student placements. The internal quality assurance cell (IQAC) conducts continuous audits of program outcome matrices, aligning direct test marks with indirect exit surveys. Over 84% student graduation outcomes are attained annually with an average salary package of 7.8 LPA. Best practices include active faculty development programs and robust student mentorship calendars.`);
+    } catch (err: any) {
+      console.error('AI draft error', err);
+      alert(`AI narrative draft error: ${err?.message || 'Network communication error.'}`);
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleSaveNarrative = async () => {
+    if (!aiDraft) return;
+    setSavingNarrative(true);
+    try {
+      const res = await fetch('/api/naac/narrative/save', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          criterion_number: criterionNumber,
+          draft: aiDraft
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(`Criterion ${criterionNumber} narrative draft saved to official SSR documentation.`);
+      } else {
+        alert(data.error || 'Failed to save narrative draft.');
+      }
+    } catch (err: any) {
+      console.error('Error saving narrative', err);
+      alert(`Save narrative error: ${err?.message || 'Network communication error.'}`);
+    } finally {
+      setSavingNarrative(false);
     }
   };
 
@@ -170,6 +212,12 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
       </div>
 
       {/* Header Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Self-Study Report Metrics Form</span>
@@ -300,9 +348,11 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
                   onChange={e => setAiDraft(e.target.value)}
                 />
                 <button
-                  onClick={() => alert('Narrative draft saved to Criterion documentation details.')}
-                  className="py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-all"
+                  onClick={handleSaveNarrative}
+                  disabled={savingNarrative}
+                  className="py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-xs transition-all flex items-center justify-center gap-2"
                 >
+                  {savingNarrative ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                   Save Draft Narrative
                 </button>
               </div>

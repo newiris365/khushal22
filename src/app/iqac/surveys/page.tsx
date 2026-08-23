@@ -32,28 +32,29 @@ export default function IqacSurveyDesk() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const loadSurveys = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch('/api/obe/surveys', {
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (data.success && data.surveys && data.surveys.length > 0) {
+      if (res.ok && data.success && data.surveys) {
         setSurveys(data.surveys);
-        setSelectedSurvey(data.surveys[0].id);
+        if (data.surveys.length > 0 && !selectedSurvey) {
+          setSelectedSurvey(data.surveys[0].id);
+        }
       } else {
-        // Fallback mock surveys
-        const demoSurveys: Survey[] = [
-          { id: 's-1', survey_type: 'Student Satisfaction Survey (SSS)', academic_year: '2026-27', is_active: true, created_at: '2026-06-11T12:00:00Z' },
-          { id: 's-2', survey_type: 'Alumni Engagement Feedback', academic_year: '2026-27', is_active: false, created_at: '2026-06-10T12:00:00Z' },
-          { id: 's-3', survey_type: 'Employer Industry Survey', academic_year: '2025-26', is_active: false, created_at: '2025-06-11T12:00:00Z' }
-        ];
-        setSurveys(demoSurveys);
-        setSelectedSurvey(demoSurveys[0].id);
+        setFetchError(data.error || 'Unable to load surveys list.');
+        setSurveys([]);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Error loading surveys', err);
+      setFetchError(err?.message || 'Unable to load surveys from server.');
+      setSurveys([]);
     } finally {
       setLoading(false);
     }
@@ -66,20 +67,13 @@ export default function IqacSurveyDesk() {
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setAnalytics(data.analytics);
+      } else {
+        setAnalytics(null);
       }
     } catch (err) {
-      // Fallback
-      setAnalytics({
-        survey_id: surveyId,
-        total_responses: 114,
-        satisfaction_index: 84.5,
-        questions_analytics: [
-          { question: 'Quality of web instruction', avg_score: 4.25, distribution: { 5: 60, 4: 30, 3: 15, 2: 7, 1: 2 } },
-          { question: 'Clarity of database schemas', avg_score: 4.05, distribution: { 5: 50, 4: 40, 3: 18, 2: 4, 1: 2 } }
-        ]
-      });
+      setAnalytics(null);
     }
   };
 
@@ -95,14 +89,20 @@ export default function IqacSurveyDesk() {
 
   const handleToggleSurvey = async (id: string, active: boolean) => {
     try {
-      await fetch(`/api/obe/surveys/${id}/activate`, {
+      const res = await fetch(`/api/obe/surveys/${id}/activate`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ is_active: active })
       });
-      setSurveys(prev => prev.map(s => s.id === id ? { ...s, is_active: active } : s));
-    } catch (err) {
-      setSurveys(prev => prev.map(s => s.id === id ? { ...s, is_active: active } : s));
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSurveys(prev => prev.map(s => s.id === id ? { ...s, is_active: active } : s));
+      } else {
+        alert(data.error || 'Failed to toggle survey activation status.');
+      }
+    } catch (err: any) {
+      console.error('Error toggling survey status', err);
+      alert(`Toggle survey failed: ${err?.message || 'Network error'}`);
     }
   };
 
@@ -115,28 +115,28 @@ export default function IqacSurveyDesk() {
         body: JSON.stringify(newSurvey)
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setShowCreate(false);
+        alert('Survey created successfully and registered in system database.');
         loadSurveys();
+      } else {
+        alert(data.error || 'Failed to create survey.');
       }
-    } catch (err) {
-      // mock create
-      const mockObj: Survey = {
-        id: `s-${Date.now()}`,
-        survey_type: newSurvey.survey_type,
-        academic_year: newSurvey.academic_year,
-        is_active: true,
-        created_at: new Date().toISOString()
-      };
-      setSurveys(prev => [mockObj, ...prev]);
-      setSelectedSurvey(mockObj.id);
-      setShowCreate(false);
+    } catch (err: any) {
+      console.error('Error creating survey', err);
+      alert(`Survey creation failed: ${err?.message || 'Network error'}`);
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
       {/* Header Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Stakeholder Auditing Desk</span>

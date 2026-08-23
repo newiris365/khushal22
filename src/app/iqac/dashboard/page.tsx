@@ -13,14 +13,15 @@ interface CriteriaProgress {
 }
 
 export default function IqacDashboard() {
-  const [cgpa, setCgpa] = useState(3.78);
-  const [grade, setGrade] = useState('A++');
+  const [cgpa, setCgpa] = useState<number | null>(null);
+  const [grade, setGrade] = useState<string | null>(null);
   const [criteria, setCriteria] = useState<CriteriaProgress[]>([]);
-  const [docsUploaded, setDocsUploaded] = useState(42);
-  const [docsRequired, setDocsRequired] = useState(50);
+  const [docsUploaded, setDocsUploaded] = useState<number | null>(null);
+  const [docsRequired, setDocsRequired] = useState<number | null>(null);
   
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const getAuthHeaders = () => ({
     'Content-Type': 'application/json',
@@ -29,37 +30,30 @@ export default function IqacDashboard() {
 
   const loadData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch('/api/naac/dashboard', {
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (data.success) {
-        setCgpa(data.cgpa_estimate);
-        setGrade(data.grade_prediction);
-        setCriteria(data.criteria_progress);
-        setDocsUploaded(data.evidence_uploaded);
-        setDocsRequired(data.evidence_required);
+      if (res.ok && data.success) {
+        setCgpa(data.cgpa_estimate ?? null);
+        setGrade(data.grade_prediction ?? null);
+        setCriteria(data.criteria_progress || []);
+        setDocsUploaded(data.evidence_uploaded ?? 0);
+        setDocsRequired(data.evidence_required ?? 70);
       } else {
-        setCriteria(getDefaultCriteria());
+        setFetchError(data.error || 'Unable to load live NAAC readiness data.');
+        setCriteria([]);
       }
-    } catch (err) {
-      console.error(err);
-      setCriteria(getDefaultCriteria());
+    } catch (err: any) {
+      console.error('Error loading NAAC dashboard data', err);
+      setFetchError(err?.message || 'Unable to load live NAAC readiness data from server.');
+      setCriteria([]);
     } finally {
       setLoading(false);
     }
   };
-
-  const getDefaultCriteria = (): CriteriaProgress[] => [
-    { criterion: 'Criterion 1: Curricular Aspects', value: 85, badge: '#8B5CF6' },
-    { criterion: 'Criterion 2: Teaching-Learning & Evaluation', value: 94, badge: '#6C2BD9' },
-    { criterion: 'Criterion 3: Research, Innovations & Extension', value: 72, badge: '#A78BFA' },
-    { criterion: 'Criterion 4: Infrastructure & Learning Resources', value: 90, badge: '#6D28D9' },
-    { criterion: 'Criterion 5: Student Support & Progression', value: 88, badge: '#7C3AED' },
-    { criterion: 'Criterion 6: Governance, Leadership & Management', value: 65, badge: '#4C1D95' },
-    { criterion: 'Criterion 7: Institutional Values & Best Practices', value: 92, badge: '#5B21B6' }
-  ];
 
   useEffect(() => {
     loadData();
@@ -73,12 +67,15 @@ export default function IqacDashboard() {
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (data.success) {
-        alert(data.message);
+      if (res.ok && data.success) {
+        alert(data.message || 'Auto-sync from modules completed.');
         loadData();
+      } else {
+        alert(data.error || 'Failed to sync NAAC modules.');
       }
-    } catch (err) {
-      alert('Modules sync complete. Synced admissions profiles, publications count, library books registers, and sports logs.');
+    } catch (err: any) {
+      console.error('Error in handleAutoSync', err);
+      alert(`Sync failed: ${err?.message || 'Network error'}`);
     } finally {
       setSyncing(false);
     }
@@ -87,6 +84,12 @@ export default function IqacDashboard() {
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
       {/* Header Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Accreditation Executive Cockpit</span>

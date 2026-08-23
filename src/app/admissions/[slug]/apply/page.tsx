@@ -1,17 +1,23 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   User, BookOpen, GraduationCap, FileText, CheckCircle, CreditCard,
   Camera, Upload, Info, AlertTriangle, Check, RefreshCw, ChevronLeft, ChevronRight,
   ShieldAlert, Sparkles, LogIn
 } from 'lucide-react';
+import { apiGet, apiPost } from '@/lib/api';
 
 export default function MultiStepApplyPage() {
   const params = useParams();
   const slug = params.slug as string;
   const router = useRouter();
+
+  // Institution & Cycle resolution state
+  const [institutionId, setInstitutionId] = useState<string>('');
+  const [cycleId, setCycleId] = useState<string>('');
+  const [institutionName, setInstitutionName] = useState<string>('');
 
   // Registration & step state
   const [registered, setRegistered] = useState(false);
@@ -30,6 +36,43 @@ export default function MultiStepApplyPage() {
   const [otpCode, setOtpCode] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Available programs state fetched from backend
+  const [availablePrograms, setAvailablePrograms] = useState<any[]>([]);
+
+  // Fetch real institution & active cycle & open programs by slug on load
+  useEffect(() => {
+    if (!slug) return;
+    async function loadInstitutionData() {
+      try {
+        const res = await apiGet(`/admissions/${slug}`);
+        if (res.success && res.institution) {
+          setInstitutionId(res.institution.id);
+          setInstitutionName(res.institution.name);
+          const activeCycle = res.institution.open_cycles?.find(
+            (c: any) => c.status === 'active' || c.status === 'open'
+          ) || res.institution.open_cycles?.[0];
+          if (activeCycle?.id) {
+            setCycleId(activeCycle.id);
+          }
+        }
+
+        const progRes = await apiGet(`/admissions/${slug}/programs`);
+        if (progRes.success && Array.isArray(progRes.programs)) {
+          const formattedProgs = progRes.programs.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            fee: p.application_fee || p.fee || 1000,
+            min_pc: p.eligibility_criteria?.min_12th_pc || p.min_pc || 60
+          }));
+          setAvailablePrograms(formattedProgs);
+        }
+      } catch (err) {
+        console.warn('Failed to load institution details for admissions apply:', err);
+      }
+    }
+    loadInstitutionData();
+  }, [slug]);
 
   // Application Data States
   const [personalDetails, setPersonalDetails] = useState({
@@ -50,15 +93,15 @@ export default function MultiStepApplyPage() {
   const [programEligibility, setProgramEligibility] = useState<{ [key: string]: { eligible: boolean; reason: string } }>({});
 
   const [academicRecords, setAcademicRecords] = useState({
-    board_10th: 'CBSE',
-    year_10th: 2024,
-    percentage_10th: 90,
-    board_12th: 'CBSE',
-    year_12th: 2026,
-    percentage_12th: 85,
-    exam_name: 'JEE Mains',
-    exam_score: 95.5,
-    exam_rank: 12500
+    board_10th: '',
+    year_10th: '' as number | string,
+    percentage_10th: '' as number | string,
+    board_12th: '',
+    year_12th: '' as number | string,
+    percentage_12th: '' as number | string,
+    exam_name: '',
+    exam_score: '' as number | string,
+    exam_rank: '' as number | string
   });
 
   const [documentsList, setDocumentsList] = useState<{ [key: string]: { url: string; file_name: string } }>({
@@ -74,51 +117,34 @@ export default function MultiStepApplyPage() {
   const [paymentInitiated, setPaymentInitiated] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [mockMode, setMockMode] = useState(false); // true when backend is unavailable
-
-  // Available programs reference
-  const availablePrograms = [
-    { id: 'a1111111-1111-1111-1111-111111111111', name: 'B.Tech Computer Science (B.Tech CSE)', fee: 1000, min_pc: 60 },
-    { id: 'a1111111-1111-1111-1111-111111111112', name: 'B.Tech Artificial Intelligence (B.Tech AI-DS)', fee: 1200, min_pc: 65 },
-    { id: 'a1111111-1111-1111-1111-111111111113', name: 'Master of Business Administration (MBA)', fee: 1500, min_pc: 50 }
-  ];
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setRegLoading(true);
     try {
-      const res = await fetch('/api/admissions/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...regForm,
-          institution_id: 'a0000000-0000-0000-0000-000000000001',
-          cycle_id: 'c1111111-1111-1111-1111-111111111111'
-        })
+      const data = await apiPost('/admissions/register', {
+        ...regForm,
+        slug,
+        institution_id: institutionId || undefined,
+        cycle_id: cycleId || undefined
       });
-      const data = await res.json();
       if (data.success) {
         setRegistered(true);
         setOtpSent(true);
-        setApplicantId(data.applicant.id);
+        setApplicantId(data.applicant?.id || '');
         setAppNumber(data.application_number);
         // Save token to localStorage for later requests
-        localStorage.setItem('iris_jwt_token', data.token);
-        const verifyToken = localStorage.getItem('iris_jwt_token');
-        if (!verifyToken) {
-          console.error('Admissions Apply: token verification failed in localStorage.');
+        if (data.token) {
+          localStorage.setItem('iris_jwt_token', data.token);
         }
       } else {
-        setErrorMsg(data.error);
+        setErrorMsg(data.error || 'Registration failed.');
       }
     } catch {
-      // Backend unavailable — enter mock mode so the form can still be demoed
-      setMockMode(true);
-      setRegistered(true);
-      setOtpSent(true);
-      setApplicantId('mock-applicant-uuid');
-      setAppNumber('SIET-2026-894723');
+      setErrorMsg("We couldn't reach the server — please check your connection and try again.");
+      setRegistered(false);
+      setOtpSent(false);
     } finally {
       setRegLoading(false);
     }
@@ -158,14 +184,17 @@ export default function MultiStepApplyPage() {
 
     const programObj = availablePrograms.find(p => p.id === val);
     if (programObj) {
-      const isEligible = academicRecords.percentage_12th >= programObj.min_pc;
+      const applicantPc = typeof academicRecords.percentage_12th === 'number'
+        ? academicRecords.percentage_12th
+        : parseFloat(academicRecords.percentage_12th) || 0;
+      const isEligible = applicantPc >= programObj.min_pc;
       setProgramEligibility(prev => ({
         ...prev,
         [val]: {
           eligible: isEligible,
           reason: isEligible 
             ? 'Meets eligibility score.' 
-            : `Requires min ${programObj.min_pc}% in 12th board, but applicant has ${academicRecords.percentage_12th}%`
+            : `Requires min ${programObj.min_pc}% in 12th board, but applicant entered ${academicRecords.percentage_12th || 0}%`
         }
       }));
     }
@@ -174,8 +203,7 @@ export default function MultiStepApplyPage() {
   // Submit step payloads to express server
   const saveStepData = async () => {
     const token = localStorage.getItem('iris_jwt_token') || '';
-    // Skip backend calls if in mock mode or no valid token available
-    if (mockMode || !token) return;
+    if (!token) return;
     try {
       if (currentStep === 1) {
         await fetch('/api/admissions/application/personal', {
@@ -211,13 +239,13 @@ export default function MultiStepApplyPage() {
           body: JSON.stringify({
             level: '12th',
             board_university: academicRecords.board_12th,
-            year_of_passing: academicRecords.year_12th,
-            percentage: academicRecords.percentage_12th
+            year_of_passing: Number(academicRecords.year_12th) || undefined,
+            percentage: Number(academicRecords.percentage_12th) || undefined
           })
         });
       }
     } catch (err) {
-      console.warn('Network error saving step data, skipping to mock mode.', err);
+      console.warn('Network error saving step data:', err);
     }
   };
 
@@ -243,12 +271,9 @@ export default function MultiStepApplyPage() {
     setSubmitting(true);
     const token = localStorage.getItem('iris_jwt_token') || '';
 
-    // If no valid token (e.g. mock/demo mode), skip backend and go directly to confirmation
-    if (mockMode || !token) {
-      setTimeout(() => {
-        setCurrentStep(6);
-        setSubmitting(false);
-      }, 800);
+    if (!token) {
+      alert('Session token missing. Please register or log in again.');
+      setSubmitting(false);
       return;
     }
 
@@ -274,11 +299,10 @@ export default function MultiStepApplyPage() {
       if (data.success) {
         setCurrentStep(6);
       } else {
-        alert(data.error);
+        alert(data.error || 'Failed to submit application.');
       }
     } catch {
-      // Network error fallback — still proceed to confirmation
-      setCurrentStep(6);
+      alert("We couldn't reach the server to submit your application. Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -659,6 +683,7 @@ export default function MultiStepApplyPage() {
                       <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Board Name</label>
                       <input 
                         type="text"
+                        placeholder="e.g. CBSE / State Board"
                         value={academicRecords.board_10th}
                         onChange={(e) => setAcademicRecords({...academicRecords, board_10th: e.target.value})}
                         className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
@@ -669,8 +694,9 @@ export default function MultiStepApplyPage() {
                         <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Passing Year</label>
                         <input 
                           type="number"
+                          placeholder="e.g. 2024"
                           value={academicRecords.year_10th}
-                          onChange={(e) => setAcademicRecords({...academicRecords, year_10th: parseInt(e.target.value)})}
+                          onChange={(e) => setAcademicRecords({...academicRecords, year_10th: e.target.value === '' ? '' : parseInt(e.target.value) || ''})}
                           className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
                         />
                       </div>
@@ -678,8 +704,9 @@ export default function MultiStepApplyPage() {
                         <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Percentage (%)</label>
                         <input 
                           type="number"
+                          placeholder="e.g. 90.0"
                           value={academicRecords.percentage_10th}
-                          onChange={(e) => setAcademicRecords({...academicRecords, percentage_10th: parseFloat(e.target.value)})}
+                          onChange={(e) => setAcademicRecords({...academicRecords, percentage_10th: e.target.value === '' ? '' : parseFloat(e.target.value) || ''})}
                           className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
                         />
                       </div>
@@ -693,6 +720,7 @@ export default function MultiStepApplyPage() {
                       <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Board Name</label>
                       <input 
                         type="text"
+                        placeholder="e.g. CBSE / State Board"
                         value={academicRecords.board_12th}
                         onChange={(e) => setAcademicRecords({...academicRecords, board_12th: e.target.value})}
                         className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
@@ -703,8 +731,9 @@ export default function MultiStepApplyPage() {
                         <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Passing Year</label>
                         <input 
                           type="number"
+                          placeholder="e.g. 2026"
                           value={academicRecords.year_12th}
-                          onChange={(e) => setAcademicRecords({...academicRecords, year_12th: parseInt(e.target.value)})}
+                          onChange={(e) => setAcademicRecords({...academicRecords, year_12th: e.target.value === '' ? '' : parseInt(e.target.value) || ''})}
                           className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
                         />
                       </div>
@@ -712,8 +741,9 @@ export default function MultiStepApplyPage() {
                         <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Percentage (%)</label>
                         <input 
                           type="number"
+                          placeholder="e.g. 85.0"
                           value={academicRecords.percentage_12th}
-                          onChange={(e) => setAcademicRecords({...academicRecords, percentage_12th: parseFloat(e.target.value)})}
+                          onChange={(e) => setAcademicRecords({...academicRecords, percentage_12th: e.target.value === '' ? '' : parseFloat(e.target.value) || ''})}
                           className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
                         />
                       </div>
@@ -729,6 +759,7 @@ export default function MultiStepApplyPage() {
                       <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">Exam Name</label>
                       <input 
                         type="text"
+                        placeholder="e.g. JEE Mains"
                         value={academicRecords.exam_name}
                         onChange={(e) => setAcademicRecords({...academicRecords, exam_name: e.target.value})}
                         className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
@@ -739,8 +770,9 @@ export default function MultiStepApplyPage() {
                       <input 
                         type="number"
                         step="0.01"
+                        placeholder="e.g. 95.5"
                         value={academicRecords.exam_score}
-                        onChange={(e) => setAcademicRecords({...academicRecords, exam_score: parseFloat(e.target.value)})}
+                        onChange={(e) => setAcademicRecords({...academicRecords, exam_score: e.target.value === '' ? '' : parseFloat(e.target.value) || ''})}
                         className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
                       />
                     </div>
@@ -748,8 +780,9 @@ export default function MultiStepApplyPage() {
                       <label className="text-[10px] uppercase font-bold text-[#A78BFA]/50 tracking-wider">All India Rank</label>
                       <input 
                         type="number"
+                        placeholder="e.g. 12500"
                         value={academicRecords.exam_rank}
-                        onChange={(e) => setAcademicRecords({...academicRecords, exam_rank: parseInt(e.target.value)})}
+                        onChange={(e) => setAcademicRecords({...academicRecords, exam_rank: e.target.value === '' ? '' : parseInt(e.target.value) || ''})}
                         className="w-full mt-1 px-4 py-2 bg-[#0D0A1A] border border-[#6C2BD9]/20 focus:border-[#8B5CF6] rounded-xl text-sm focus:outline-none"
                       />
                     </div>

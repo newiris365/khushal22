@@ -10,18 +10,25 @@ export default function VendorDashboard() {
   const [sales, setSales] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
+      setIsLoading(true);
+      setFetchError(null);
       try {
         const [salesRes, ordersRes] = await Promise.all([
           apiGet('campusCore/vendor/sales'),
           apiGet('campusCore/vendor/orders'),
         ]);
-        if (salesRes.success) setSales(salesRes);
-        if (ordersRes.success) setOrders(ordersRes.orders || []);
-      } catch (err) {
+        if (salesRes && salesRes.success) setSales(salesRes);
+        if (ordersRes && ordersRes.success) setOrders(ordersRes.orders || []);
+        if ((salesRes && !salesRes.success) || (ordersRes && !ordersRes.success)) {
+          setFetchError('Unable to load full dashboard metrics from server.');
+        }
+      } catch (err: any) {
         console.error(err);
+        setFetchError(err?.message || 'Unable to load dashboard data from server.');
       } finally {
         setIsLoading(false);
       }
@@ -42,6 +49,13 @@ export default function VendorDashboard() {
         <LayoutDashboard size={24} className="text-orange-400" />
         Canteen Dashboard
       </h1>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Today's Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

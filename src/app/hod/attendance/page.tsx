@@ -22,16 +22,23 @@ export default function HodAttendancePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
+      setFetchError(null);
       try {
         const res = await apiGet("/campusCore/attendance/report");
-        if (res?.students && Array.isArray(res.students)) setStudents(res.students);
-        if (res?.subjects && Array.isArray(res.subjects)) setSubjectStats(res.subjects);
-        if (res?.trend && Array.isArray(res.trend)) setTrendData(res.trend);
-      } catch {
-        // using mock data
+        if (res && res.success !== false) {
+          if (res.students && Array.isArray(res.students)) setStudents(res.students);
+          if (res.subjects && Array.isArray(res.subjects)) setSubjectStats(res.subjects);
+          if (res.trend && Array.isArray(res.trend)) setTrendData(res.trend);
+        } else {
+          setFetchError(res?.error || "Unable to load attendance data from campus servers.");
+        }
+      } catch (err: any) {
+        setFetchError("Unable to load attendance data. Please check network connection and try again.");
       } finally {
         setIsLoading(false);
       }
@@ -103,6 +110,13 @@ export default function HodAttendancePage() {
           </button>
         </div>
       </div>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>{fetchError}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#1A1530] border border-[#0891B2]/20 rounded-xl p-5">

@@ -24,14 +24,15 @@ export default function EmployeeDocuments() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock documents logs
-      setDocuments([
-        { id: 'd-1', doc_type: 'PAN Card', doc_name: 'PAN_Satish_Kumar.pdf', uploaded_at: '2026-06-09T12:00:00Z', is_verified: true },
-        { id: 'd-2', doc_type: 'Aadhar Card', doc_name: 'Aadhar_Satish_Kumar.pdf', uploaded_at: '2026-06-09T12:00:00Z', is_verified: true },
-        { id: 'd-3', doc_type: 'Degree Certificate', doc_name: 'PhD_Degree_Certificate.pdf', uploaded_at: '2026-06-10T08:00:00Z', is_verified: false }
-      ]);
+      const res = await fetch('/api/v1/hr/documents/me', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success && data.documents) {
+        setDocuments(data.documents);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load employee documents:', err);
     } finally {
       setLoading(false);
     }
@@ -44,13 +45,13 @@ export default function EmployeeDocuments() {
   const handleUpload = (docType: string) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/pdf';
+    input.accept = 'application/pdf,image/*';
     input.onchange = async (e: any) => {
       const file = e.target.files[0];
       if (file) {
         setLoading(true);
         try {
-          await fetch('/api/v1/hr/employees/d0000000-0000-0000-0000-000000000003/documents', {
+          const res = await fetch('/api/v1/hr/documents/me', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
@@ -59,19 +60,17 @@ export default function EmployeeDocuments() {
               doc_url: 'https://supabase.co/storage/v1/object/public/kyc/proof.pdf'
             })
           });
-          loadData();
-          alert('Document proof uploaded successfully.');
+          const data = await res.json();
+          if (data.success) {
+            alert('Document proof uploaded successfully.');
+            loadData();
+          } else {
+            alert(data.error || 'Failed to upload document.');
+          }
         } catch (err) {
-          const newDoc: EmployeeDoc = {
-            id: `d-${Date.now()}`,
-            doc_type: docType,
-            doc_name: file.name,
-            uploaded_at: new Date().toISOString(),
-            is_verified: false
-          };
-          setDocuments(prev => [...prev, newDoc]);
+          alert('Network error uploading document proof.');
+        } finally {
           setLoading(false);
-          alert('Document proof registered in session catalog.');
         }
       }
     };
@@ -107,42 +106,48 @@ export default function EmployeeDocuments() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Table */}
           <div className="lg:col-span-2 glass-panel border border-[#6C2BD9]/20 rounded-2xl overflow-hidden bg-[#13102A]/40">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/5 text-[#C4B5FD] text-[10px] uppercase font-bold tracking-wider">
-                  <th className="py-4 px-6">Document Type</th>
-                  <th className="py-4 px-6">File Name</th>
-                  <th className="py-4 px-6">Verification Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {documents.map(doc => (
-                  <tr key={doc.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors text-xs text-white">
-                    <td className="py-4 px-6 font-bold">{doc.doc_type}</td>
-                    <td className="py-4 px-6 flex items-center gap-2 text-[#C4B5FD]/90">
-                      <FileText className="w-4 h-4 text-[#8B5CF6] flex-shrink-0" />
-                      <span className="truncate max-w-[200px]" title={doc.doc_name}>{doc.doc_name}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-2.5 py-0.5 rounded text-[9px] uppercase font-extrabold ${
-                        doc.is_verified 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
-                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {doc.is_verified ? 'Verified' : 'Pending'}
-                      </span>
-                    </td>
+            {documents.length === 0 ? (
+              <div className="p-12 text-center text-xs text-[#C4B5FD]/50">
+                No verification documents uploaded yet. Use the sidebar buttons to upload proofs.
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-[#C4B5FD] text-[10px] uppercase font-bold tracking-wider">
+                    <th className="py-4 px-6">Document Type</th>
+                    <th className="py-4 px-6">File Name</th>
+                    <th className="py-4 px-6">Verification Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {documents.map(doc => (
+                    <tr key={doc.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors text-xs text-white">
+                      <td className="py-4 px-6 font-bold">{doc.doc_type}</td>
+                      <td className="py-4 px-6 flex items-center gap-2 text-[#C4B5FD]/90">
+                        <FileText className="w-4 h-4 text-[#8B5CF6] flex-shrink-0" />
+                        <span className="truncate max-w-[200px]" title={doc.doc_name}>{doc.doc_name}</span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2.5 py-0.5 rounded text-[9px] uppercase font-extrabold ${
+                          doc.is_verified 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        }`}>
+                          {doc.is_verified ? 'Verified' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Action widgets sidebar */}
           <div className="glass-panel border border-[#6C2BD9]/25 rounded-2xl p-5 bg-[#13102A]/20 flex flex-col gap-4 text-xs">
             <h3 className="font-extrabold text-sm text-white">Upload New Credential</h3>
             
-            {['Pan Card', 'Aadhar Card', 'Degree Certificate', 'Bank Passbook'].map(tName => (
+            {['PAN Card', 'Aadhar Card', 'Degree Certificate', 'Bank Passbook'].map(tName => (
               <button
                 key={tName}
                 onClick={() => handleUpload(tName)}

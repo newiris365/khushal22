@@ -17,7 +17,7 @@ const officerLinks: SidebarLink[] = [
 ];
 
 export default function OfficerLayout({ children }: { children: React.ReactNode }) {
-  const { authorized } = usePortalAuth(['Admissions Officer', 'SuperAdmin']);
+  const { authorized } = usePortalAuth(['Admin', 'SuperAdmin', 'Admissions Officer']);
 
   if (!authorized) {
     return (

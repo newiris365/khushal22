@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, AlertTriangle, Send, Phone, UserX, Clock, Mail } from 'lucide-react';
-import { apiGet } from '../../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
 
 export default function LibrarianOverduePage() {
@@ -28,9 +28,19 @@ export default function LibrarianOverduePage() {
     }
   };
 
-  const handleSendReminder = (issueId: string, type: 'whatsapp' | 'push') => {
-    setSuccessMsg(`Overdue warning reminder dispatched via ${type === 'whatsapp' ? 'WhatsApp Business' : 'FCM Push Notification'}!`);
-    setTimeout(() => setSuccessMsg(''), 3000);
+  const handleSendReminder = async (issueId: string, type: 'whatsapp' | 'push') => {
+    try {
+      const res = await apiPost(`/library/issues/${issueId}/reminder`, { channel: type });
+      if (res.success) {
+        setSuccessMsg(res.message || `Overdue warning reminder dispatched via ${type === 'whatsapp' ? 'WhatsApp' : 'Push Notification'}!`);
+      } else {
+        setSuccessMsg(`Failed to send reminder: ${res.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setSuccessMsg(`Failed to send reminder: ${err.message || 'Network error'}`);
+    } finally {
+      setTimeout(() => setSuccessMsg(''), 4000);
+    }
   };
 
   return (

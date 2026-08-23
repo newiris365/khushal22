@@ -24,30 +24,54 @@ export default function DriverStopsPage() {
   const [boardingCount, setBoardingCount] = useState(0);
   const [alightingCount, setAlightingCount] = useState(0);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => { loadStops(); }, []);
 
   const loadStops = async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('campusCore/driver/stops');
-      if (res.success) setStops(res.stops || []);
-    } catch (err) {
+      if (res && res.success) {
+        setStops(res.stops || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load route stops.');
+        setStops([]);
+      }
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load route stops from server.');
+      setStops([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleMarkReached = async (stopIndex: number) => {
-    const res = await apiPost('campusCore/driver/stops/reach', {
-      stop_index: stopIndex,
-      passengers_boarded: boardingCount,
-      passengers_alighted: alightingCount,
-    });
-    if (res.success) {
-      loadStops();
-      setBoardingCount(0);
-      setAlightingCount(0);
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      const res = await apiPost('campusCore/driver/stops/reach', {
+        stop_index: stopIndex,
+        passengers_boarded: boardingCount,
+        passengers_alighted: alightingCount,
+      });
+      if (res && res.success) {
+        loadStops();
+        setBoardingCount(0);
+        setAlightingCount(0);
+      } else {
+        setActionError(res?.error || 'Failed to mark stop reached on server.');
+        // Note: boardingCount and alightingCount are intentionally preserved for retry!
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to mark stop reached due to network error.');
+      // Note: boardingCount and alightingCount are intentionally preserved for retry!
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -61,6 +85,18 @@ export default function DriverStopsPage() {
         <MapPin size={24} className="text-blue-400" />
         Stop Schedule
       </h1>
+
+      {actionError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {actionError}</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Progress */}
       <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4">

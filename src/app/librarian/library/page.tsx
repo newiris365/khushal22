@@ -9,26 +9,27 @@ export default function LibrarianDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const [statsError, setStatsError] = useState<string | null>(null);
+
   useEffect(() => {
     loadDashboardStats();
   }, []);
 
   const loadDashboardStats = async () => {
+    setLoading(true);
+    setStatsError(null);
     try {
       const res = await apiGet('/library/analytics/overview');
-      if (res.success) {
+      if (res && res.success && res.stats) {
         setStats(res.stats);
       } else {
-        throw new Error('API Error');
+        setStatsError(res?.error || 'Unable to load live library stats.');
+        setStats(null);
       }
-    } catch {
-      // Mock Stats
-      setStats({
-        total_books: 1240,
-        active_borrowings: 84,
-        overdue_borrowings: 12,
-        pending_fines: 2350
-      });
+    } catch (err: any) {
+      console.error('Error loading library stats:', err);
+      setStatsError(err?.message || 'Unable to load live library stats from server.');
+      setStats(null);
     } finally {
       setLoading(false);
     }
@@ -61,6 +62,15 @@ export default function LibrarianDashboard() {
           </div>
         </div>
       </div>
+
+      {statsError && (
+        <div className="max-w-7xl mx-auto px-6 mt-6">
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            <span>⚠️ {statsError}</span>
+          </div>
+        </div>
+      )}
 
       {/* Stats Panel */}
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

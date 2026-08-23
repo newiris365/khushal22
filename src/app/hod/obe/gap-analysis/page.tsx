@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Sparkles, Send, ShieldAlert, CheckSquare, Plus, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Sparkles, RefreshCw } from 'lucide-react';
+import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 
 interface Recommendation {
   po: string;
   gap_percentage: string;
   interventions: string[];
+  is_example?: boolean;
 }
 
 interface InterventionPlan {
@@ -20,6 +22,7 @@ interface InterventionPlan {
 
 export default function HodGapAnalysis() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [isAiFallback, setIsAiFallback] = useState(false);
   const [plans, setPlans] = useState<InterventionPlan[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   
@@ -29,17 +32,15 @@ export default function HodGapAnalysis() {
   const [targetSem, setTargetSem] = useState('Semester 5');
   const [saving, setSaving] = useState(false);
 
-  const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
-  });
-
   const loadData = async () => {
-    // Initial mock logged intervention plans
-    setPlans([
-      { id: 'p-1', po_code: 'PO3', action_plan: 'Organize design-thinking bootcamps on Next.js backend interfaces.', target_semester: 'Semester 5', status: 'pending' },
-      { id: 'p-2', po_code: 'PO7', action_plan: 'Assign energy auditing coding tasks in database sharding classes.', target_semester: 'Semester 6', status: 'implemented' }
-    ]);
+    try {
+      const res = await apiGet('/obe/gap-analysis/intervention-plans');
+      if (res.success && Array.isArray(res.plans)) {
+        setPlans(res.plans);
+      }
+    } catch (err) {
+      console.error('Failed loading intervention plans:', err);
+    }
   };
 
   useEffect(() => {
@@ -48,19 +49,17 @@ export default function HodGapAnalysis() {
 
   const triggerAiAnalysis = async () => {
     setAiLoading(true);
+    setIsAiFallback(false);
     try {
-      const res = await fetch('/api/obe/ai/gap-analysis', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ po_data: {} })
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.recommendations)) {
-        setRecommendations(data.recommendations);
+      const res = await apiPost('/obe/ai/gap-analysis', { po_data: {} });
+      if (res.success && Array.isArray(res.recommendations) && res.recommendations.length > 0) {
+        setRecommendations(res.recommendations);
+      } else {
+        throw new Error('AI analysis offline');
       }
     } catch (err) {
       console.error(err);
-      // Fallback
+      setIsAiFallback(true);
       setRecommendations([
         {
           po: 'PO3 (Design/Development)',
@@ -69,7 +68,8 @@ export default function HodGapAnalysis() {
             'Introduce dedicated cloud database orchestration seminars.',
             'Formulate grading incentives for production-grade projects.',
             'Schedule industrial design-thinking bootcamps.'
-          ]
+          ],
+          is_example: true
         },
         {
           po: 'PO7 (Sustainability)',
@@ -78,7 +78,8 @@ export default function HodGapAnalysis() {
             'Conduct green computing server optimization contests.',
             'Analyze energy footprints of large index structures.',
             'Assign research audits on resource consumption profiles.'
-          ]
+          ],
+          is_example: true
         }
       ]);
     } finally {
@@ -91,25 +92,38 @@ export default function HodGapAnalysis() {
     if (!actionPlan.trim()) return;
     setSaving(true);
     try {
-      const newPlan: InterventionPlan = {
-        id: `p-${Date.now()}`,
+      const res = await apiPost('/obe/gap-analysis/intervention-plans', {
         po_code: poCode,
-        action_plan: actionPlan,
+        action_plan: actionPlan.trim(),
         target_semester: targetSem,
         status: 'pending'
-      };
-      setPlans(prev => [newPlan, ...prev]);
-      setActionPlan('');
-      alert('Intervention program logged successfully.');
-    } catch (err) {
-      console.error(err);
+      });
+      if (res.success) {
+        setActionPlan('');
+        alert('Intervention program logged successfully.');
+        loadData();
+      } else {
+        alert(res.error || 'Failed to log intervention plan.');
+      }
+    } catch (err: any) {
+      alert('Network error logging intervention plan. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleStatus = (id: string) => {
-    setPlans(prev => prev.map(p => p.id === id ? { ...p, status: p.status === 'pending' ? 'implemented' : 'pending' } : p));
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'pending' ? 'implemented' : 'pending';
+    try {
+      const res = await apiPut(`/obe/gap-analysis/intervention-plans/${id}/status`, { status: nextStatus });
+      if (res.success) {
+        setPlans(prev => prev.map(p => p.id === id ? { ...p, status: nextStatus as any } : p));
+      } else {
+        alert(res.error || 'Failed to update plan status.');
+      }
+    } catch (err) {
+      alert('Failed to update plan status due to network error.');
+    }
   };
 
   return (
@@ -162,15 +176,29 @@ export default function HodGapAnalysis() {
             )}
           </button>
 
+          {isAiFallback && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+              <span>⚠️ AI service offline. Showing example recommendations.</span>
+              <span className="text-[10px] font-bold uppercase bg-amber-500/20 px-2 py-0.5 rounded text-amber-200">Example</span>
+            </div>
+          )}
+
           {recommendations.length > 0 && (
-            <div className="flex flex-col gap-4 mt-4 max-h-[300px] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-4 mt-2 max-h-[300px] overflow-y-auto pr-1">
               {recommendations.map((rec, i) => (
                 <div key={i} className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-[#6C2BD9]/20 flex flex-col gap-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-[#A78BFA]">{rec.po}</span>
-                    <span className="text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
-                      -{rec.gap_percentage} Deficit
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {rec.is_example && (
+                        <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                          Example
+                        </span>
+                      )}
+                      <span className="text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded">
+                        -{rec.gap_percentage} Deficit
+                      </span>
+                    </div>
                   </div>
                   <ul className="list-disc pl-4 space-y-1.5 text-[10px] text-[#C4B5FD]/80 leading-normal">
                     {rec.interventions.map((item, idx) => (
@@ -209,19 +237,19 @@ export default function HodGapAnalysis() {
                   value={targetSem}
                   onChange={e => setTargetSem(e.target.value)}
                 >
-                  <option value="Semester 4">Semester 4 (CS-401)</option>
-                  <option value="Semester 5">Semester 5 (CS-502)</option>
-                  <option value="Semester 6">Semester 6 (CS-608)</option>
+                  <option value="Semester 3">Semester 3</option>
+                  <option value="Semester 5">Semester 5</option>
+                  <option value="Semester 6">Semester 6</option>
+                  <option value="Semester 7">Semester 7</option>
                 </select>
               </div>
 
-              <div className="flex flex-col gap-1.5 md:col-span-3">
-                <label className="text-[#C4B5FD]/70 font-semibold">Intervention Strategy Details *</label>
-                <textarea
-                  required
-                  rows={2}
-                  placeholder="e.g. Set up a special hands-on lab workshop to practice edge caching architecture templates."
-                  className="bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl p-4 text-white focus:outline-none focus:border-[#8B5CF6]"
+              <div className="md:col-span-3 flex flex-col gap-1.5">
+                <label className="text-[#C4B5FD]/70 font-semibold">Action Plan Description *</label>
+                <input
+                  type="text"
+                  placeholder="Describe specific teaching methodology, guest lecture, or lab task remediation..."
+                  className="bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
                   value={actionPlan}
                   onChange={e => setActionPlan(e.target.value)}
                 />
@@ -257,7 +285,7 @@ export default function HodGapAnalysis() {
                   </div>
                   
                   <button
-                    onClick={() => toggleStatus(p.id)}
+                    onClick={() => toggleStatus(p.id, p.status)}
                     className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-all flex-shrink-0 ${
                       p.status === 'implemented'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'

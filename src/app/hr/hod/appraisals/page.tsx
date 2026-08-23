@@ -30,12 +30,15 @@ export default function HodAppraisalReviews() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock team appraisals waiting VP feedback
-      setAppraisals([
-        { id: 'ap-rec-1', employee_name: 'Prof. Satish Kumar', designation: 'Associate Professor', self_score: 4.5, self_comments: 'Successfully published 2 research articles in IEEE journals and completed FDP on NEP compliance syllabus setups.' }
-      ]);
+      const res = await fetch('/api/v1/hr/appraisal/department-pending', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success && data.appraisals) {
+        setAppraisals(data.appraisals);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load department appraisals:', err);
     } finally {
       setLoading(false);
     }
@@ -66,12 +69,11 @@ export default function HodAppraisalReviews() {
         setSelectedReview(null);
         setHodComments('');
         alert('Appraisal review submitted to Principal desk.');
+      } else {
+        alert(data.error || 'Failed to submit appraisal review.');
       }
     } catch (err) {
-      setAppraisals(prev => prev.filter(a => a.id !== selectedReview.id));
-      setSelectedReview(null);
-      setHodComments('');
-      alert('Appraisal review submitted locally.');
+      alert('Network error submitting appraisal review.');
     } finally {
       setSaving(false);
     }
@@ -82,10 +84,10 @@ export default function HodAppraisalReviews() {
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1.5">
-          <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Vice Principal Desk</span>
+          <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Department Review Desk</span>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">Team Performance Reviews</h1>
           <p className="text-xs text-[#C4B5FD]/70">
-            Score employee self-appraisals, submit Vice Principal evaluations, and recommend monthly basic increment percentages.
+            Score employee self-appraisals, submit department evaluations, and recommend monthly basic increment percentages.
           </p>
         </div>
       </div>
@@ -101,7 +103,7 @@ export default function HodAppraisalReviews() {
           <div className="lg:col-span-2 flex flex-col gap-4">
             {appraisals.length === 0 ? (
               <div className="glass-panel p-10 rounded-2xl border border-white/5 text-center text-xs text-[#C4B5FD]/50">
-                No pending team reviews in your queue.
+                No pending team reviews in your department queue.
               </div>
             ) : (
               appraisals.map(app => (
@@ -138,7 +140,7 @@ export default function HodAppraisalReviews() {
             {selectedReview ? (
               <form onSubmit={handleHodReviewSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[#C4B5FD]/70 font-semibold">VP Rating Score (1-5) *</label>
+                  <label className="text-[#C4B5FD]/70 font-semibold">HOD Rating Score (1-5) *</label>
                   <div className="flex gap-2.5 mt-1">
                     {[1, 2, 3, 4, 5].map(val => (
                       <button
@@ -171,7 +173,7 @@ export default function HodAppraisalReviews() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[#C4B5FD]/70 font-semibold">VP Assessment Remarks *</label>
+                  <label className="text-[#C4B5FD]/70 font-semibold">HOD Assessment Remarks *</label>
                   <textarea
                     required
                     rows={3}

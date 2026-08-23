@@ -6,6 +6,7 @@ import {
   GraduationCap, Calendar, Clock, Phone, Mail, HelpCircle, 
   ChevronRight, ArrowRight, ShieldCheck, DollarSign
 } from 'lucide-react';
+import { apiGet } from '@/lib/api';
 
 interface Program {
   id: string;
@@ -26,6 +27,10 @@ export default function PublicAdmissionsLanding() {
   const params = useParams();
   const slug = params.slug as string;
   const router = useRouter();
+
+  const [institution, setInstitution] = useState<any>(null);
+  const [institutionId, setInstitutionId] = useState<string>('');
+  const [cycleId, setCycleId] = useState<string>('');
 
   const [programs, setPrograms] = useState<Program[]>([
     {
@@ -62,6 +67,28 @@ export default function PublicAdmissionsLanding() {
   const [countdown, setCountdown] = useState('30d 00h 00m 00s');
 
   useEffect(() => {
+    if (!slug) return;
+    async function loadInstitutionData() {
+      try {
+        const res = await apiGet(`/admissions/${slug}`);
+        if (res.success && res.institution) {
+          setInstitution(res.institution);
+          setInstitutionId(res.institution.id);
+          const activeCycle = res.institution.open_cycles?.find(
+            (c: any) => c.status === 'active' || c.status === 'open'
+          ) || res.institution.open_cycles?.[0];
+          if (activeCycle?.id) {
+            setCycleId(activeCycle.id);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to resolve institution details for admissions page:', err);
+      }
+    }
+    loadInstitutionData();
+  }, [slug]);
+
+  useEffect(() => {
     const target = new Date();
     target.setDate(target.getDate() + 30); // 30 days deadline
 
@@ -93,10 +120,10 @@ export default function PublicAdmissionsLanding() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#6C2BD9] to-[#8B5CF6] flex items-center justify-center font-black shadow-lg shadow-[#6C2BD9]/30">
-              I
+              {institution?.name ? institution.name.charAt(0) : 'I'}
             </div>
             <div>
-              <span className="font-extrabold text-lg tracking-tight block">SIN INSTITUTE</span>
+              <span className="font-extrabold text-lg tracking-tight block">{institution?.name || 'SIN INSTITUTE'}</span>
               <span className="text-[10px] text-[#A78BFA] tracking-widest font-mono block">CAMPUS GATEWAY</span>
             </div>
           </div>
@@ -124,7 +151,7 @@ export default function PublicAdmissionsLanding() {
           Admissions Open — Academic Cycle 2026-27
         </div>
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mt-2 bg-gradient-to-r from-white via-[#E0E7FF] to-[#A78BFA] bg-clip-text text-transparent">
-          Shape Your Future at SIN Institute
+          Shape Your Future at {institution?.name || 'SIN Institute'}
         </h1>
         <p className="text-[#A78BFA]/70 max-w-2xl mx-auto mt-6 text-base md:text-lg leading-relaxed">
           Unlock institutional excellence through next-generation curriculum programs in computer science, machine intelligence, and corporate strategy.

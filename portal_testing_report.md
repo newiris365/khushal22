@@ -86,3 +86,7 @@
 | Consolidated Defaulters | `GET /api/v1/core/reports/defaulters` | `Director` | **🟢 WORKING** (200) | N/A |
 | HR Employees | `GET /api/v1/hr/employees` | `HR Admin` | **🟢 WORKING** (200) | N/A |
 | Attendance Methods | `GET /api/v1/core/attendance/methods` | `Admin` | **🟢 WORKING** (200) | N/A |
+| Manual Fee Payment | `POST /api/v1/core/fees/payment/manual` | `Parent` | **🟢 WORKING** (200) | Manual payment pending verification flow |
+| Parent Child Linking | `POST /api/v1/auth/parent-link-child` | `Parent` | **🟢 WORKING** (200) | Rate limited (5 req / 15 min), Zod validated |
+| Parent Fee Summary | `GET /api/v1/core/parent/fee-summary` | `Parent` | **🟢 WORKING** (200) | Fee summary & pending verification badges |
+

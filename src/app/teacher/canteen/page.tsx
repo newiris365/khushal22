@@ -84,7 +84,7 @@ export default function TeacherCanteenPage() {
     });
   }, [menu, activeCategory, searchTerm, vegOnly, excludeAllergens]);
 
-  const addToCart = (item: (typeof MOCK_MENU)[0]) => {
+  const addToCart = (item: any) => {
     setCart(prev => {
       const exists = prev.find(c => c.menu_id === item.id);
       if (exists) return prev.map(c => c.menu_id === item.id ? { ...c, qty: c.qty + 1 } : c);

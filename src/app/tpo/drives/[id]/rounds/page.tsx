@@ -80,9 +80,12 @@ export default function TpoDriveRoundOperations() {
     setLoading(false);
   };
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleCreateRound = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setActionError(null);
     try {
       const payload = {
         application_id: applicationId,
@@ -99,36 +102,47 @@ export default function TpoDriveRoundOperations() {
       };
 
       const res = await apiPost('/placements/rounds', payload);
-      if (res.success && res.round) {
+      if (res && res.success) {
         alert('Interview round successfully scheduled!');
         setShowForm(false);
         loadRoundsAndApplicants();
+      } else {
+        setActionError(res?.error || 'Failed to schedule interview round.');
       }
-    } catch (err) {
-      console.log('Error scheduling round');
+    } catch (err: any) {
+      console.error('Error scheduling round', err);
+      setActionError(err?.message || 'Error scheduling interview round due to network error.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleResultUpdate = async (roundId: string, result: 'pass' | 'fail' | 'hold' | 'no_show') => {
+    setActionError(null);
     try {
       const res = await apiPut(`/placements/rounds/${roundId}/result`, {
-        result,
-        score: 85,
-        feedback: 'Candidate cleared tech questions successfully.'
+        result
       });
-      if (res.success) {
+      if (res && res.success) {
         setRounds(prev => prev.map(r => r.id === roundId ? { ...r, result, status: 'completed' } : r));
-        alert('Result recorded. Candidate round status advanced automatically.');
+      } else {
+        setActionError(res?.error || `Failed to record ${result} status for candidate.`);
       }
-    } catch (err) {
-      console.log('Error updating results');
+    } catch (err: any) {
+      console.error('Error updating results', err);
+      setActionError(err?.message || 'Failed to update interview result due to network error.');
     }
   };
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-5xl mx-auto flex flex-col gap-6">
+        
+        {actionError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {actionError}</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex items-center justify-between gap-4">

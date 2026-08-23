@@ -41,25 +41,31 @@ export default function TpoCompaniesCrm() {
 
   const [saving, setSaving] = useState(false);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     loadCompanies();
   }, []);
 
   const loadCompanies = async () => {
+    setLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('/placements/companies');
-      if (res.success && res.companies) {
-        setCompanies(res.companies);
+      if (res && res.success) {
+        setCompanies(res.companies || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load company registry.');
+        setCompanies([]);
       }
-    } catch (err) {
-      console.log('Error fetching companies list');
-    }
-
-    // fallback mock seed if empty
-    if (companies.length === 0) {
+    } catch (err: any) {
+      console.error('Error fetching companies list', err);
+      setFetchError(err?.message || 'Unable to load company registry from server.');
       setCompanies([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleEdit = (comp: Company) => {
@@ -74,6 +80,7 @@ export default function TpoCompaniesCrm() {
     setTier((comp.tier as any) || 'core');
     setNotes(comp.notes || '');
     setStatus(comp.relationship_status || 'active');
+    setActionError(null);
     setShowForm(true);
   };
 
@@ -89,12 +96,14 @@ export default function TpoCompaniesCrm() {
     setTier('core');
     setNotes('');
     setStatus('active');
+    setActionError(null);
     setShowForm(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setActionError(null);
     try {
       const payload = {
         name, website, industry, company_type: companyType,
@@ -105,27 +114,45 @@ export default function TpoCompaniesCrm() {
       if (editingId) {
         // Update company
         const res = await apiPut(`/placements/companies/${editingId}`, payload);
-        if (res.success && res.company) {
+        if (res && res.success && res.company) {
           setCompanies(prev => prev.map(c => c.id === editingId ? res.company : c));
           setShowForm(false);
+        } else {
+          setActionError(res?.error || 'Failed to update company record.');
         }
       } else {
         // Create company
         const res = await apiPost('/placements/companies', payload);
-        if (res.success && res.company) {
-          setCompanies([...companies, res.company]);
+        if (res && res.success && res.company) {
+          setCompanies(prev => [res.company, ...prev]);
           setShowForm(false);
+        } else {
+          setActionError(res?.error || 'Failed to create company record.');
         }
       }
-    } catch (err) {
-      console.log('Error saving company');
+    } catch (err: any) {
+      console.error('Error saving company', err);
+      setActionError(err?.message || 'Error saving company due to network failure.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        
+        {actionError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {actionError}</span>
+          </div>
+        )}
+
+        {fetchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {fetchError}</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex items-center justify-between gap-4">

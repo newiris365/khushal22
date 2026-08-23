@@ -24,16 +24,23 @@ const emptyData = {
 export default function HodAnalyticsPage() {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('current');
   const [selectedDept, setSelectedDept] = useState('all');
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true);
+      setFetchError(null);
       try {
-        const res = await apiGet('/director/campus-pulse');
-        if (res && res.data) setData(res.data);
-      } catch {
-        console.log('Using mock data');
+        const res = await apiGet('/obe/department-analytics');
+        if (res && res.success !== false && res.data) {
+          setData(res.data);
+        } else {
+          setFetchError(res?.error || 'Unable to load department analytics from campus servers.');
+        }
+      } catch (err) {
+        setFetchError('Unable to load department analytics. Please check network connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -60,7 +67,7 @@ export default function HodAnalyticsPage() {
               <BarChart3 className="text-teal-400" />
               Department Analytics
             </h1>
-            <p className="text-gray-400 mt-2">Comprehensive performance overview</p>
+            <p className="text-gray-400 mt-2">Comprehensive performance overview for your department</p>
           </div>
           <div className="flex gap-3">
             <div className="relative">
@@ -81,6 +88,12 @@ export default function HodAnalyticsPage() {
             </button>
           </div>
         </div>
+
+        {fetchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm mb-6 flex items-center gap-3">
+            <span>⚠️ {fetchError}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-5 gap-4 mb-8">
           {[

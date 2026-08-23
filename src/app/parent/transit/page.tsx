@@ -42,17 +42,7 @@ export default function ParentTransitPage() {
         // Handle alternative key structures
         setBusStatus(res.summary);
       } else {
-        // Mock fallback for safety and test verification
-        setBusStatus({
-          is_on_bus: true,
-          bus_name: 'Tata Starbus 40-Seater',
-          route_name: 'Jodhpur Central Route',
-          last_stop: 'Sardarpura 4th Road',
-          eta_minutes: 10,
-          latitude: 26.2912,
-          longitude: 73.0156,
-          last_updated: new Date().toISOString()
-        });
+        setBusStatus(null);
       }
     } catch (err) {
       console.error('Failed to load child transit status', err);

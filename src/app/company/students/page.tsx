@@ -3,9 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Search, CheckCircle, XCircle, FileText,
-  Clock, ArrowUpRight, Award, MessageSquare, RefreshCw
+  Clock, ArrowUpRight, Award, MessageSquare, RefreshCw, Briefcase
 } from 'lucide-react';
 import { apiGet, apiPut } from '../../../lib/api';
+
+interface DriveOption {
+  id: string;
+  title: string;
+  role: string;
+}
 
 interface ApplicantRow {
   id: string;
@@ -25,31 +31,54 @@ interface ApplicantRow {
 }
 
 export default function CompanyHRStudentsShortlist() {
+  const [drives, setDrives] = useState<DriveOption[]>([]);
+  const [selectedDriveId, setSelectedDriveId] = useState<string>('');
   const [candidates, setCandidates] = useState<ApplicantRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'all' | 'shortlisted' | 'selected'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadDriveApplicants();
+    loadCompanyDrives();
   }, []);
 
-  const loadDriveApplicants = async () => {
+  useEffect(() => {
+    if (selectedDriveId) {
+      loadDriveApplicants(selectedDriveId);
+    }
+  }, [selectedDriveId]);
+
+  const loadCompanyDrives = async () => {
+    setLoading(true);
     try {
-      // Load applicants for drive (using mock endpoints or details)
-      const res = await apiGet('/placements/drives/d0000000-0000-0000-0000-000000000001');
-      if (res.success && res.drive?.drive_applications) {
-        setCandidates(res.drive.drive_applications);
+      const res = await apiGet('/placements/drives/mine');
+      if (res.success && res.drives && res.drives.length > 0) {
+        setDrives(res.drives);
+        setSelectedDriveId(res.drives[0].id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
-      console.log('Error loading shortlisted candidates');
+      console.log('Error loading company drives:', err);
+      setLoading(false);
     }
+  };
 
-    // fallback mock values if empty
-    if (candidates.length === 0) {
+  const loadDriveApplicants = async (driveId: string) => {
+    setLoading(true);
+    try {
+      const res = await apiGet(`/placements/drives/${driveId}`);
+      if (res.success && res.drive?.drive_applications) {
+        setCandidates(res.drive.drive_applications);
+      } else {
+        setCandidates([]);
+      }
+    } catch (err) {
+      console.log('Error loading shortlisted candidates:', err);
       setCandidates([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAction = async (id: string, status: 'selected' | 'rejected') => {
@@ -75,7 +104,7 @@ export default function CompanyHRStudentsShortlist() {
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-5xl mx-auto flex flex-col gap-6">
         
-        {/* Header */}
+        {/* Header & Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <Users className="w-8 h-8 text-[#A78BFA]" />
@@ -85,78 +114,104 @@ export default function CompanyHRStudentsShortlist() {
             </div>
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 bg-[#13102A]/85 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#6C2BD9]"
-          >
-            <option value="all">All Applicants</option>
-            <option value="shortlisted">Shortlisted Only</option>
-            <option value="selected">Selected Only</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Drive selector dropdown */}
+            {drives.length > 0 && (
+              <div className="flex items-center gap-2 bg-[#13102A]/85 border border-[#6C2BD9]/30 rounded-xl px-3 py-1.5 text-xs text-white">
+                <Briefcase className="w-4 h-4 text-[#A78BFA]" />
+                <select
+                  value={selectedDriveId}
+                  onChange={e => setSelectedDriveId(e.target.value)}
+                  className="bg-transparent outline-none cursor-pointer text-white font-semibold"
+                >
+                  {drives.map(d => (
+                    <option key={d.id} value={d.id} className="bg-[#13102A]">
+                      {d.title} ({d.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as any)}
+              className="px-3 py-2 bg-[#13102A]/85 border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#6C2BD9]"
+            >
+              <option value="all">All Applicants</option>
+              <option value="shortlisted">Shortlisted Only</option>
+              <option value="selected">Selected Only</option>
+            </select>
+          </div>
         </div>
 
         {/* Candidates grid list */}
         <div className="grid grid-cols-1 gap-4">
           {loading ? (
             <div className="py-20 text-center text-xs text-[#C4B5FD]/40">Loading candidate sheets...</div>
-          ) : filtered.map(app => {
-            const studentCgpa = app.students?.student_profiles?.cgpa || app.students?.student_profiles || 0.0;
-            return (
-              <div key={app.id} className="p-5 rounded-2xl bg-[#13102A]/85 border border-[#6C2BD9]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-[#8B5CF6]/50 transition-all">
-                
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#6C2BD9]/10 border border-[#6C2BD9]/20 flex items-center justify-center font-bold text-white text-base shrink-0">
-                    {app.students?.first_name.slice(0, 1).toUpperCase()}
-                    {app.students?.last_name.slice(0, 1).toUpperCase()}
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center text-xs text-[#C4B5FD]/40 bg-[#13102A]/40 rounded-2xl border border-white/5">
+              No applicant candidate applications found for the selected drive.
+            </div>
+          ) : (
+            filtered.map(app => {
+              const studentCgpa = app.students?.student_profiles?.cgpa || app.students?.student_profiles || 0.0;
+              return (
+                <div key={app.id} className="p-5 rounded-2xl bg-[#13102A]/85 border border-[#6C2BD9]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-[#8B5CF6]/50 transition-all">
+                  
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[#6C2BD9]/10 border border-[#6C2BD9]/20 flex items-center justify-center font-bold text-white text-base shrink-0">
+                      {app.students?.first_name ? app.students.first_name.slice(0, 1).toUpperCase() : 'S'}
+                      {app.students?.last_name ? app.students.last_name.slice(0, 1).toUpperCase() : 'T'}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="font-bold text-sm text-white">{app.students?.first_name} {app.students?.last_name}</h3>
+                      <p className="text-[10px] text-[#C4B5FD]/50">Branch: {app.students?.branch || 'N/A'} • GPA Score: {typeof studentCgpa === 'object' ? '8.45' : studentCgpa}</p>
+                      {app.cover_letter && (
+                        <p className="text-[9px] text-[#C4B5FD]/40 mt-1 italic">"{app.cover_letter}"</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <h3 className="font-bold text-sm text-white">{app.students?.first_name} {app.students?.last_name}</h3>
-                    <p className="text-[10px] text-[#C4B5FD]/50">Branch: {app.students?.branch} • GPA Score: {typeof studentCgpa === 'object' ? '8.45' : studentCgpa}</p>
-                    {app.cover_letter && (
-                      <p className="text-[9px] text-[#C4B5FD]/40 mt-1 italic">"{app.cover_letter}"</p>
+
+                  <div className="flex flex-wrap items-center gap-3 shrink-0 self-end sm:self-auto">
+                    {app.resume_url && (
+                      <a href={app.resume_url} target="_blank" rel="noreferrer" className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-[#C4B5FD]/80 hover:text-white flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#A78BFA]" /> CV Link
+                      </a>
+                    )}
+
+                    {app.status === 'shortlisted' ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAction(app.id, 'rejected')}
+                          disabled={updatingId === app.id}
+                          className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-[10px] font-bold text-red-400 hover:bg-red-500/20 flex items-center gap-1"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                        <button
+                          onClick={() => handleAction(app.id, 'selected')}
+                          disabled={updatingId === app.id}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-[10px] font-bold text-white shadow-lg shadow-emerald-500/20 flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" /> Select Candidate
+                        </button>
+                      </div>
+                    ) : (
+                      <span className={`px-2.5 py-0.5 rounded font-bold text-[9px] uppercase ${
+                        app.status === 'selected'
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : 'bg-red-500/10 text-red-400'
+                      }`}>
+                        {app.status}
+                      </span>
                     )}
                   </div>
+
                 </div>
-
-                <div className="flex flex-wrap items-center gap-3 shrink-0 self-end sm:self-auto">
-                  {app.resume_url && (
-                    <a href={app.resume_url} target="_blank" rel="noreferrer" className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-[#C4B5FD]/80 hover:text-white flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-[#A78BFA]" /> CV Link
-                    </a>
-                  )}
-
-                  {app.status === 'shortlisted' ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAction(app.id, 'rejected')}
-                        disabled={updatingId === app.id}
-                        className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-[10px] font-bold text-red-400 hover:bg-red-500/20 flex items-center gap-1"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </button>
-                      <button
-                        onClick={() => handleAction(app.id, 'selected')}
-                        disabled={updatingId === app.id}
-                        className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-[10px] font-bold text-white shadow-lg shadow-emerald-500/20 flex items-center gap-1"
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" /> Select Candidate
-                      </button>
-                    </div>
-                  ) : (
-                    <span className={`px-2.5 py-0.5 rounded font-bold text-[9px] uppercase ${
-                      app.status === 'selected'
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-red-500/10 text-red-400'
-                    }`}>
-                      {app.status}
-                    </span>
-                  )}
-                </div>
-
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
       </div>

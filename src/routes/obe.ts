@@ -23,7 +23,11 @@ import {
   submitSurveyResponse,
   getSurveyAnalytics,
   createStudentAchievement,
-  getStudentAchievementsStats
+  getStudentAchievementsStats,
+  getInterventionPlans,
+  createInterventionPlan,
+  updateInterventionPlanStatus,
+  getDepartmentAnalytics
 } from '../controllers/obe';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -51,9 +55,15 @@ router.post('/marks/import', requireRole(['Admin', 'SuperAdmin', 'HOD', 'Teacher
 router.get('/co-attainment/:courseId', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD', 'Teacher']), getCoAttainment);
 router.get('/po-attainment/:programId', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD', 'Teacher']), getPoAttainment);
 
-// ──── AI TOOLS ──────────────────────────────────────────────────
+// ──── AI TOOLS & INTERVENTION PLANS ──────────────────────────────
 router.post('/ai/suggest-cos', requireRole(['Admin', 'SuperAdmin', 'HOD', 'Teacher']), aiSuggestCOs);
 router.post('/ai/gap-analysis', requireRole(['Admin', 'SuperAdmin', 'HOD']), aiGapAnalysis);
+router.get('/gap-analysis/intervention-plans', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD', 'Teacher']), getInterventionPlans);
+router.post('/gap-analysis/intervention-plans', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD']), createInterventionPlan);
+router.put('/gap-analysis/intervention-plans/:id/status', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD']), updateInterventionPlanStatus);
+
+// ──── DEPARTMENT ANALYTICS ───────────────────────────────────────
+router.get('/department-analytics', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD', 'Director']), getDepartmentAnalytics);
 
 // ──── FACULTY DEVELOPMENT & RESEARCH ───────────────────────────
 router.post('/faculty-development', requireRole(['Admin', 'SuperAdmin', 'HOD', 'Teacher']), createFacultyDevelopment);
@@ -69,7 +79,7 @@ router.post('/surveys/:id/respond', requireRole(['Student', 'Parent', 'Alumni', 
 router.get('/surveys/:id/analytics', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD']), getSurveyAnalytics);
 
 // ──── STUDENT ACHIEVEMENTS ─────────────────────────────────────
-router.post('/student-achievements', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'Student']), createStudentAchievement);
+router.post('/student-achievements', requireRole(['Admin', 'SuperAdmin', 'HOD', 'Teacher', 'Student']), createStudentAchievement);
 router.get('/student-achievements/stats', requireRole(['Admin', 'SuperAdmin', 'IQAC Coordinator', 'HOD', 'Teacher']), getStudentAchievementsStats);
 
 export default router;

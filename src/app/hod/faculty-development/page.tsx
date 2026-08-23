@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Calendar, Users, Award, DollarSign, TrendingUp, Filter, ChevronDown, FileText } from 'lucide-react';
-import { apiGet } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../lib/api';
 
 interface FDPEntry {
   id: string;
@@ -196,18 +196,37 @@ export default function FacultyDevelopmentPage() {
     }
   };
 
-  const handleAddFDP = (e: React.FormEvent) => {
+  const handleAddFDP = async (e: React.FormEvent) => {
     e.preventDefault();
-    const entry: FDPEntry = {
-      id: `fdp-${Date.now()}`,
-      ...newFDP,
-      status: 'planned',
-      participants: [],
-      budgetUtilized: 0
-    };
-    setFdpEntries([...fdpEntries, entry]);
-    setShowAddForm(false);
-    setNewFDP({ title: '', type: 'FDP', organizer: '', startDate: '', endDate: '', budget: 0, mode: 'offline' });
+    if (!newFDP.title.trim()) return;
+    try {
+      const res = await apiPost('/obe/faculty-development', {
+        program_name: newFDP.title,
+        type: newFDP.type,
+        organizer: newFDP.organizer,
+        start_date: newFDP.startDate,
+        end_date: newFDP.endDate,
+        budget: newFDP.budget,
+        mode: newFDP.mode
+      });
+      if (res.success) {
+        const entry: FDPEntry = {
+          id: res.data?.id || `fdp-${Date.now()}`,
+          ...newFDP,
+          status: 'planned',
+          participants: [],
+          budgetUtilized: 0
+        };
+        setFdpEntries([...fdpEntries, entry]);
+        setShowAddForm(false);
+        setNewFDP({ title: '', type: 'FDP', organizer: '', startDate: '', endDate: '', budget: 0, mode: 'offline' });
+        alert('Faculty Development Program logged successfully.');
+      } else {
+        alert(res.error || 'Failed to log Faculty Development Program.');
+      }
+    } catch (err: any) {
+      alert('Network error logging Faculty Development Program. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {

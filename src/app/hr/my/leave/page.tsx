@@ -14,15 +14,22 @@ interface LeaveApplication {
   applied_at: string;
 }
 
+interface LeaveType {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export default function EmployeeLeavePortal() {
   const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // New leave form states
   const [showApply, setShowApply] = useState(false);
   const [formData, setFormData] = useState({
-    leave_type_id: 'lt-1', // Default CL
+    leave_type_id: '',
     from_date: '',
     to_date: '',
     reason: '',
@@ -37,13 +44,25 @@ export default function EmployeeLeavePortal() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock leave applications history
-      setLeaves([
-        { id: 'la-1', from_date: '2026-06-12', to_date: '2026-06-13', total_days: 2, reason: 'Personal domestic work.', status: 'pending', applied_at: '2026-06-10T12:00:00Z' },
-        { id: 'la-2', from_date: '2026-05-10', to_date: '2026-05-12', total_days: 3, reason: 'Family marriage function.', status: 'approved', applied_at: '2026-05-05T08:00:00Z' }
+      const [resHistory, resTypes] = await Promise.all([
+        fetch('/api/v1/hr/leave/my-history', { headers: getAuthHeaders() }),
+        fetch('/api/v1/hr/leave/types', { headers: getAuthHeaders() })
       ]);
+
+      const dataHistory = await resHistory.json();
+      const dataTypes = await resTypes.json();
+
+      if (dataHistory.success && dataHistory.leaves) {
+        setLeaves(dataHistory.leaves);
+      }
+      if (dataTypes.success && dataTypes.leaveTypes) {
+        setLeaveTypes(dataTypes.leaveTypes);
+        if (dataTypes.leaveTypes.length > 0) {
+          setFormData(prev => ({ ...prev, leave_type_id: dataTypes.leaveTypes[0].id }));
+        }
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load leave data:', err);
     } finally {
       setLoading(false);
     }
@@ -55,13 +74,17 @@ export default function EmployeeLeavePortal() {
 
   const handleApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.leave_type_id) {
+      alert('Please select a leave type.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch('/api/v1/hr/leave/apply', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          leave_type_id: 'a0000000-0000-0000-0000-000000000001', // Mock id matching seeds
+          leave_type_id: formData.leave_type_id,
           from_date: formData.from_date,
           to_date: formData.to_date,
           reason: formData.reason
@@ -70,25 +93,13 @@ export default function EmployeeLeavePortal() {
       const data = await res.json();
       if (data.success) {
         setShowApply(false);
+        setFormData(prev => ({ ...prev, from_date: '', to_date: '', reason: '' }));
         loadData();
+      } else {
+        alert(data.error || 'Failed to submit leave application.');
       }
-    } catch (err) {
-      // Mock submit offline
-      const from = new Date(formData.from_date);
-      const to = new Date(formData.to_date);
-      const total = Math.ceil((to.getTime() - from.getTime()) / (1000 * 3600 * 24)) + 1;
-      const mockObj: LeaveApplication = {
-        id: `la-${Date.now()}`,
-        from_date: formData.from_date,
-        to_date: formData.to_date,
-        total_days: total,
-        reason: formData.reason,
-        status: 'pending',
-        applied_at: new Date().toISOString()
-      };
-      setLeaves(prev => [mockObj, ...prev]);
-      setShowApply(false);
-      alert('Leave application logged successfully.');
+    } catch (err: any) {
+      alert('Network error submitting leave application.');
     } finally {
       setSaving(false);
     }
@@ -143,33 +154,39 @@ export default function EmployeeLeavePortal() {
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/5 text-[#C4B5FD] text-[10px] uppercase font-bold tracking-wider">
-                  <th className="py-4 px-6">Leave Duration</th>
-                  <th className="py-4 px-6">Total Days</th>
-                  <th className="py-4 px-6">Reason Description</th>
-                  <th className="py-4 px-6">Status</th>
-                  <th className="py-4 px-6">Applied Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaves.map(l => (
-                  <tr key={l.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors text-xs text-white">
-                    <td className="py-4 px-6 font-bold flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#8B5CF6]" />
-                      <span>{l.from_date} to {l.to_date}</span>
-                    </td>
-                    <td className="py-4 px-6 font-bold text-white">{l.total_days} Days</td>
-                    <td className="py-4 px-6 text-[#C4B5FD]/90 font-medium">{l.reason}</td>
-                    <td className="py-4 px-6">{getStatusBadge(l.status)}</td>
-                    <td className="py-4 px-6 text-[10px] text-[#C4B5FD]/50 font-mono">
-                      {new Date(l.applied_at).toLocaleDateString()}
-                    </td>
+            {leaves.length === 0 ? (
+              <div className="p-12 text-center text-xs text-[#C4B5FD]/50">
+                No leave applications recorded. Click "Apply for Leave" to submit a request.
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-[#C4B5FD] text-[10px] uppercase font-bold tracking-wider">
+                    <th className="py-4 px-6">Leave Duration</th>
+                    <th className="py-4 px-6">Total Days</th>
+                    <th className="py-4 px-6">Reason Description</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6">Applied Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {leaves.map(l => (
+                    <tr key={l.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors text-xs text-white">
+                      <td className="py-4 px-6 font-bold flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-[#8B5CF6]" />
+                        <span>{l.from_date} to {l.to_date}</span>
+                      </td>
+                      <td className="py-4 px-6 font-bold text-white">{l.total_days} Days</td>
+                      <td className="py-4 px-6 text-[#C4B5FD]/90 font-medium">{l.reason}</td>
+                      <td className="py-4 px-6">{getStatusBadge(l.status)}</td>
+                      <td className="py-4 px-6 text-[10px] text-[#C4B5FD]/50 font-mono">
+                        {l.applied_at ? new Date(l.applied_at).toLocaleDateString() : 'N/A'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -191,9 +208,9 @@ export default function EmployeeLeavePortal() {
                   value={formData.leave_type_id}
                   onChange={e => setFormData({ ...formData, leave_type_id: e.target.value })}
                 >
-                  <option value="lt-1">Casual Leave (CL)</option>
-                  <option value="lt-2">Earned Leave (EL)</option>
-                  <option value="lt-3">Sick Leave (SL)</option>
+                  {leaveTypes.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                  ))}
                 </select>
               </div>
 
@@ -245,7 +262,7 @@ export default function EmployeeLeavePortal() {
                   disabled={saving}
                   className="px-5 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-white font-bold transition-all"
                 >
-                  Submit Application
+                  {saving ? 'Submitting...' : 'Submit Application'}
                 </button>
               </div>
             </form>

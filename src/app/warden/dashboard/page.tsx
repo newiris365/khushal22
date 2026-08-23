@@ -91,12 +91,10 @@ export default function WardenDashboard() {
         alert('Urgent mess notice sent to all hostellers!');
         setMessNotice('');
       } else {
-        alert('Notice sent successfully to all registered hostellers.');
-        setMessNotice('');
+        alert(res?.error || 'Failed to send mess notice. Please try again.');
       }
-    } catch (err) {
-      alert('Urgent mess notice broadcasted.');
-      setMessNotice('');
+    } catch (err: any) {
+      alert(err?.message || 'Error broadcasting mess notice. Please check network connection.');
     } finally {
       setIsSendingNotice(false);
     }

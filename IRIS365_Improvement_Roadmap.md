@@ -313,6 +313,10 @@
 | `src/app/admin/payment-settings/page.tsx` | New payment gateway config page | 2026-06-16 |
 | `src/app/student/fees/page.tsx` | Multi-method payment with IRIS Balance | 2026-06-16 |
 | `src/app/student/wallet/page.tsx` | Renamed to IRIS Balance with top-up | 2026-06-16 |
-| `src/app/parent/fees/page.tsx` | Parent fee payment with multi-method | 2026-06-16 |
+| `src/app/parent/fees/page.tsx` | Parent fee payment with multi-method & error handling | 2026-08-22 |
+| `src/app/parent/fees/page.tsx` | Refactored fee payment error handling, Razorpay fallback & manual verification | 2026-08-23 |
+| `src/controllers/campusCore.ts` | Added `submitManualFeePayment` controller and `/fees/payment/manual` route | 2026-08-23 |
+| `src/routes/auth.ts` & `src/routes/campusCore.ts` | Consolidated parent-child linking route & added `parentLinkLimiter` rate limiting | 2026-08-23 |
+| `src/app/parent/dashboard/page.tsx` & `wallet/page.tsx` & `leave/page.tsx` | Removed mock fallbacks on API errors & sanitized top-up state mutations | 2026-08-23 |
 | `src/components/PortalShell.tsx` | Added notification bell with unread count | 2026-06-16 |
 | `.env` | Added RAZORPAY_KEY_ID/SECRET placeholders | 2026-06-16 |

@@ -33,10 +33,13 @@ const STATUS_COLORS: Record<string, string> = {
 export default function VendorOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('active');
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
     try {
       const params: any = {};
       if (statusFilter === 'active') {
@@ -45,10 +48,17 @@ export default function VendorOrdersPage() {
         params.status = statusFilter;
       }
       const res = await apiGet('campusCore/vendor/orders', params);
-      if (res.success) setOrders(res.orders || []);
+      if (res && res.success) {
+        setOrders(res.orders || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load canteen orders.');
+        setOrders([]);
+      }
       setLastRefresh(new Date());
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load canteen orders from server.');
+      setOrders([]);
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +106,12 @@ export default function VendorOrdersPage() {
           </button>
         </div>
       </div>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Status Tabs */}
       <div className="flex flex-wrap gap-2">

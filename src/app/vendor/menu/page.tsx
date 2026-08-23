@@ -26,16 +26,26 @@ const CATEGORIES = [
 export default function VendorMenuPage() {
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const fetchMenu = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
     try {
       const params: any = {};
       if (categoryFilter !== 'all') params.category = categoryFilter;
       const res = await apiGet('campusCore/canteen-menu', params);
-      if (res.success) setMenu(res.menu || []);
-    } catch (err) {
+      if (res && res.success) {
+        setMenu(res.menu || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load canteen menu.');
+        setMenu([]);
+      }
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load canteen menu from server.');
+      setMenu([]);
     } finally {
       setIsLoading(false);
     }
@@ -82,6 +92,13 @@ export default function VendorMenuPage() {
           </button>
         ))}
       </div>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Menu Items */}
       {isLoading ? (

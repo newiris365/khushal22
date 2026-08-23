@@ -48,30 +48,12 @@ export default function CompanyHRDrives() {
 
   const loadPostedDrives = async () => {
     try {
-      const res = await apiGet('/placements/drives');
+      const res = await apiGet('/placements/drives/mine');
       if (res.success && res.drives) {
-        // Filter drives corresponding to Google India recruiter company (simulated login)
         setRequirements(res.drives);
       }
     } catch (err) {
       console.log('Error loading posted requirements');
-    }
-
-    // seed fallback if empty
-    if (requirements.length === 0) {
-      setRequirements([
-        {
-          id: 'd-1',
-          title: 'Google SWE Summer Drive 2026',
-          role: 'Software Engineer (L3)',
-          job_type: 'full_time',
-          location: ['Bangalore', 'Hyderabad'],
-          ctc_display: '32 - 42 LPA',
-          min_cgpa: 8.0,
-          status: 'open',
-          application_deadline: new Date(Date.now() + 864000000).toISOString()
-        }
-      ]);
     }
     setLoading(false);
   };
@@ -80,8 +62,12 @@ export default function CompanyHRDrives() {
     e.preventDefault();
     setSaving(true);
     try {
+      const userProfileStr = typeof window !== 'undefined' ? localStorage.getItem('iris_user_profile') : null;
+      const userProfile = userProfileStr ? JSON.parse(userProfileStr) : null;
+      const companyId = userProfile?.company_id || 'c0000000-0000-0000-0000-000000000001';
+
       const payload = {
-        company_id: 'c0000000-0000-0000-0000-000000000001', // Google India
+        company_id: companyId,
         title,
         job_description: jobDescription,
         role,
@@ -101,7 +87,7 @@ export default function CompanyHRDrives() {
 
       const res = await apiPost('/placements/drives', payload);
       if (res.success && res.drive) {
-        setRequirements([...requirements, res.drive]);
+        setRequirements(prev => [...prev, res.drive]);
         setShowForm(false);
       }
     } catch (err) {

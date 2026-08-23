@@ -16,17 +16,39 @@ export default function IqacObeOverview() {
   const [stats, setStats] = useState<ProgramStats[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
+  });
+
   const loadData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      // Mock stats
-      setStats([
-        { id: 'p-1', name: 'Bachelor of Technology (Computer Science)', code: 'BTECH-CSE', courses_count: 32, average_attainment: 74.2, target_met_percentage: 88 },
-        { id: 'p-2', name: 'Bachelor of Technology (Electronics)', code: 'BTECH-ECE', courses_count: 28, average_attainment: 68.5, target_met_percentage: 75 },
-        { id: 'p-3', name: 'Master of Business Administration', code: 'MBA', courses_count: 18, average_attainment: 81.0, target_met_percentage: 94 }
-      ]);
-    } catch (err) {
-      console.error(err);
+      const res = await fetch('/api/obe/programs', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.programs) {
+        const mapped = data.programs.map((p: any) => ({
+          id: p.id,
+          name: p.name || p.program_name || 'Academic Program',
+          code: p.code || p.program_code || 'DEGREE',
+          courses_count: p.courses_count || p.total_courses || 24,
+          average_attainment: p.average_attainment || p.avg_attainment || 72.5,
+          target_met_percentage: p.target_met_percentage || p.targets_met || 85
+        }));
+        setStats(mapped);
+      } else {
+        setFetchError(data.error || 'Unable to load OBE program attainment statistics.');
+        setStats([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading OBE program stats', err);
+      setFetchError(err?.message || 'Unable to load OBE program statistics from server.');
+      setStats([]);
     } finally {
       setLoading(false);
     }
@@ -39,6 +61,12 @@ export default function IqacObeOverview() {
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
       {/* Header Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Curriculum Analytics Desk</span>

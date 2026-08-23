@@ -32,26 +32,31 @@ export default function TpoStudentsRoster() {
   const [branchFilter, setBranchFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     loadStudents();
   }, []);
 
   const loadStudents = async () => {
+    setLoading(true);
+    setFetchError(null);
     try {
-      // Fetch TPO eligible/registered student list
-      const res = await apiGet('/placements/drives/d0000000-0000-0000-0000-000000000001/eligible-students');
-      if (res.success && res.eligible_students) {
-        setStudents(res.eligible_students);
+      // Fetch full student directory for institution
+      const res = await apiGet('campusCore/students');
+      if (res && res.success) {
+        setStudents(res.students || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load student placement directory.');
+        setStudents([]);
       }
-    } catch (err) {
-      console.log('Error loading students list');
-    }
-
-    // seed mock lists if empty
-    if (students.length === 0) {
+    } catch (err: any) {
+      console.error('Error loading students list', err);
+      setFetchError(err?.message || 'Unable to load student directory from server.');
       setStudents([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const filtered = students.filter(student => {
@@ -74,6 +79,12 @@ export default function TpoStudentsRoster() {
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        
+        {fetchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {fetchError}</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

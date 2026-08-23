@@ -48,53 +48,45 @@ export default function TpoDrivesManagement() {
 
   const [saving, setSaving] = useState(false);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     loadDrivesAndCompanies();
   }, []);
 
   const loadDrivesAndCompanies = async () => {
+    setLoading(true);
+    setFetchError(null);
     try {
       const drivesRes = await apiGet('/placements/drives');
-      if (drivesRes.success && drivesRes.drives) {
-        setDrives(drivesRes.drives);
+      if (drivesRes && drivesRes.success) {
+        setDrives(drivesRes.drives || []);
+      } else {
+        setFetchError(drivesRes?.error || 'Unable to load placement drives.');
+        setDrives([]);
       }
 
       const companiesRes = await apiGet('/placements/companies');
-      if (companiesRes.success && companiesRes.companies) {
+      if (companiesRes && companiesRes.success && companiesRes.companies) {
         setCompanies(companiesRes.companies);
         if (companiesRes.companies.length > 0) {
           setCompanyId(companiesRes.companies[0].id);
         }
       }
-    } catch (err) {
-      console.log('Error loading drives page data');
+    } catch (err: any) {
+      console.error('Error loading drives page data', err);
+      setFetchError(err?.message || 'Unable to load drives data from server.');
+      setDrives([]);
+    } finally {
+      setLoading(false);
     }
-
-    // seed mock values if empty
-    if (drives.length === 0) {
-      setDrives([
-        {
-          id: 'd-1',
-          title: 'Google SWE Summer Drive 2026',
-          role: 'Software Engineer (L3)',
-          status: 'open',
-          job_type: 'full_time',
-          location: ['Bangalore', 'Hyderabad'],
-          ctc_display: '32 - 42 LPA',
-          min_cgpa: 8.0,
-          application_deadline: new Date(Date.now() + 864000000).toISOString(),
-          companies: {
-            name: 'Google India'
-          }
-        }
-      ]);
-    }
-    setLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setActionError(null);
     try {
       const payload = {
         company_id: companyId,
@@ -116,19 +108,35 @@ export default function TpoDrivesManagement() {
       };
 
       const res = await apiPost('/placements/drives', payload);
-      if (res.success && res.drive) {
-        setDrives([...drives, res.drive]);
+      if (res && res.success && res.drive) {
+        setDrives(prev => [res.drive, ...prev]);
         setShowForm(false);
+      } else {
+        setActionError(res?.error || 'Failed to create placement drive.');
       }
-    } catch (err) {
-      console.log('Error scheduling drive');
+    } catch (err: any) {
+      console.error('Error scheduling drive', err);
+      setActionError(err?.message || 'Failed to schedule placement drive due to network error.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        
+        {actionError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {actionError}</span>
+          </div>
+        )}
+
+        {fetchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {fetchError}</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex items-center justify-between gap-4">

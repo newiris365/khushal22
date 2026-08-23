@@ -72,8 +72,7 @@ export default function ParentLeavePage() {
         alert(res.error || 'Failed to submit leave application.');
       }
     } catch (err) {
-      alert('Leave application submitted (mock).');
-      setForm({ start_date: '', end_date: '', reason: '', leave_type: 'personal' });
+      alert('Failed to submit leave application. Please check your network connection and try again.');
     } finally {
       setSubmitting(false);
     }

@@ -1,22 +1,31 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Calendar, TrendingUp, Clock, Wallet, IndianRupee } from 'lucide-react';
+import { BarChart3, Calendar, TrendingUp, Clock, Wallet, IndianRupee, AlertTriangle } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
 export default function VendorSalesPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [sales, setSales] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSales = async () => {
       setIsLoading(true);
+      setFetchError(null);
       try {
         const res = await apiGet('campusCore/vendor/sales', { date });
-        if (res.success) setSales(res);
-      } catch (err) {
+        if (res && res.success) {
+          setSales(res);
+        } else {
+          setFetchError(res?.error || 'Unable to load sales data.');
+          setSales(null);
+        }
+      } catch (err: any) {
         console.error(err);
+        setFetchError(err?.message || 'Unable to load sales data from server.');
+        setSales(null);
       } finally {
         setIsLoading(false);
       }
@@ -34,6 +43,13 @@ export default function VendorSalesPage() {
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
       </div>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-slate-400">Loading sales data...</div>

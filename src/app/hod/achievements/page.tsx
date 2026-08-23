@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Award, Plus, Trophy, Medal, Star, Filter, ChevronDown, Users, Calendar, Search } from 'lucide-react';
-import { apiGet } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../lib/api';
 
 interface Achievement {
   id: number;
@@ -100,12 +100,31 @@ export default function StudentAchievementsPage() {
     return matchesSearch && matchesCategory && matchesLevel && matchesDateFrom && matchesDateTo;
   });
 
-  const handleAddAchievement = (e: React.FormEvent) => {
+  const handleAddAchievement = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newEntry: Achievement = { ...newAchievement, id: achievements.length + 1, verified: false };
-    setAchievements([newEntry, ...achievements]);
-    setNewAchievement({ studentName: '', studentId: '', title: '', category: 'Academic', level: 'College', date: '', description: '' });
-    setShowForm(false);
+    if (!newAchievement.title.trim()) return;
+    try {
+      const res = await apiPost('/obe/student-achievements', {
+        student_name: newAchievement.studentName,
+        student_id: newAchievement.studentId,
+        title: newAchievement.title,
+        category: newAchievement.category,
+        level: newAchievement.level,
+        achievement_date: newAchievement.date,
+        description: newAchievement.description
+      });
+      if (res.success) {
+        const newEntry: Achievement = { ...newAchievement, id: achievements.length + 1, verified: true };
+        setAchievements([newEntry, ...achievements]);
+        setNewAchievement({ studentName: '', studentId: '', title: '', category: 'Academic', level: 'College', date: '', description: '' });
+        setShowForm(false);
+        alert('Student achievement logged successfully.');
+      } else {
+        alert(res.error || 'Failed to log achievement.');
+      }
+    } catch (err: any) {
+      alert('Network error logging student achievement. Please try again.');
+    }
   };
 
   return (

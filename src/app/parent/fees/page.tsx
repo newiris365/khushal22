@@ -30,7 +30,8 @@ export default function ParentFeesPage() {
   const [selectedMethod, setSelectedMethod] = useState('');
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
 
-  useEffect(() => {
+  const fetchFeeSummary = () => {
+    setIsLoading(true);
     const selectedStudentId = localStorage.getItem('iris_selected_student_id');
     const queryParam = selectedStudentId ? `?student_id=${selectedStudentId}` : '';
 
@@ -38,6 +39,10 @@ export default function ParentFeesPage() {
       if (res.success) setSummary(res.summary);
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchFeeSummary();
 
     try {
       const profile = JSON.parse(localStorage.getItem('iris_user_profile') || '{}');
@@ -52,52 +57,143 @@ export default function ParentFeesPage() {
     } catch {}
   }, []);
 
+  const [referenceNumber, setReferenceNumber] = useState('');
+
   const handlePayAll = async () => {
     if (!selectedMethod || !summary) return;
     setIsPaying(true);
-    try {
-      const selectedStudentId = localStorage.getItem('iris_selected_student_id');
-      const studentId = selectedStudentId || (await apiGet('/core/parent/child-info')).child?.student_id;
-      if (!studentId) { alert('No child linked.'); setIsPaying(false); return; }
 
-      if (selectedMethod === 'wallet') {
-        if (summary.wallet_balance < summary.pending_amount) {
-          alert(`Insufficient IRIS Balance. Available: ₹${summary.wallet_balance.toLocaleString()}`);
+    const selectedStudentId = localStorage.getItem('iris_selected_student_id');
+    let studentId = selectedStudentId;
+    if (!studentId) {
+      try {
+        const childRes = await apiGet('/core/parent/child-info');
+        studentId = childRes.child?.student_id;
+      } catch (e) {}
+    }
+    if (!studentId) {
+      alert('No child linked. Please link your child first.');
+      setIsPaying(false);
+      return;
+    }
+
+    if (selectedMethod === 'wallet') {
+      if (summary.wallet_balance < summary.pending_amount) {
+        alert(`Insufficient IRIS Balance. Available: ₹${summary.wallet_balance.toLocaleString()}`);
+        setIsPaying(false);
+        return;
+      }
+      try {
+        const res = await apiPost('/core/wallet/deduct', {
+          amount: summary.pending_amount,
+          description: 'Bulk fee payment from parent',
+          module: 'fees'
+        });
+        if (res.success) {
+          alert('Payment from IRIS Balance successful!');
+          fetchFeeSummary();
+          setShowPayModal(false);
+          setSelectedMethod('');
+        } else {
+          alert(`Payment could not be completed — no amount was deducted: ${res.error || 'Deduction failed.'}`);
+        }
+      } catch (err: any) {
+        alert('Payment could not be completed — no amount was deducted due to network error.');
+      } finally {
+        setIsPaying(false);
+      }
+    } else if (selectedMethod === 'razorpay') {
+      try {
+        const initRes = await apiPost('/core/fees/payment/initiate', {
+          student_id: studentId,
+          fee_structure_id: 'bulk',
+          amount: summary.pending_amount
+        });
+
+        if (!initRes.success || !initRes.order_id || !initRes.key_id) {
+          alert('Online payment is not configured for this institution — please use bank transfer or UPI.');
           setIsPaying(false);
           return;
         }
-        await apiPost('/core/wallet/deduct', { amount: summary.pending_amount, description: 'Bulk fee payment from parent', module: 'fees' });
-        alert('Payment from IRIS Balance successful!');
-      } else if (selectedMethod === 'razorpay') {
-        const initRes = await apiPost('/core/fees/payment/initiate', { student_id: studentId, fee_structure_id: 'bulk', amount: summary.pending_amount });
-        if (initRes.success && initRes.order_id && initRes.key_id) {
-          if (typeof window !== 'undefined' && (window as any).Razorpay) {
-            const options = {
-              key: initRes.key_id, amount: initRes.amount, currency: initRes.currency || 'INR',
-              name: 'IRIS 365', description: 'Bulk Fee Payment', order_id: initRes.order_id,
-              handler: async (response: any) => {
-                await apiPost('/core/fees/payment/verify', { ...response, student_id: studentId, fee_structure_id: 'bulk', amount_paid: summary.pending_amount });
-                alert('Payment successful!');
-              },
-              theme: { color: '#6C2BD9' },
-            };
-            const rzp = new (window as any).Razorpay(options);
-            rzp.open();
-          }
-        } else {
-          alert(`Razorpay Simulator:\nAmount: ₹${summary.pending_amount.toLocaleString()}\nClick OK to confirm.`);
+
+        if (typeof window === 'undefined' || !(window as any).Razorpay) {
+          alert('Online payment gateway (Razorpay SDK) is not loaded — please use bank transfer or UPI.');
+          setIsPaying(false);
+          return;
         }
-      } else if (selectedMethod === 'bank_transfer') {
-        alert(`Bank Transfer Details:\n\nBank: ${paymentConfig?.bank_name || 'N/A'}\nAccount: ${paymentConfig?.bank_account_number || 'N/A'}\nIFSC: ${paymentConfig?.bank_ifsc || 'N/A'}\nHolder: ${paymentConfig?.bank_holder_name || 'N/A'}\n\nAmount: ₹${summary.pending_amount.toLocaleString()}`);
-      } else if (selectedMethod === 'upi') {
-        alert(`UPI Payment:\n\nUPI ID: ${paymentConfig?.upi_id || 'N/A'}\nAmount: ₹${summary.pending_amount.toLocaleString()}`);
+
+        const options = {
+          key: initRes.key_id,
+          amount: initRes.amount,
+          currency: initRes.currency || 'INR',
+          name: 'IRIS 365',
+          description: 'Bulk Fee Payment',
+          order_id: initRes.order_id,
+          handler: async (response: any) => {
+            try {
+              const verifyRes = await apiPost('/core/fees/payment/verify', {
+                ...response,
+                student_id: studentId,
+                fee_structure_id: 'bulk',
+                amount_paid: summary.pending_amount
+              });
+              if (verifyRes.success) {
+                alert('Payment verified and completed successfully!');
+                fetchFeeSummary();
+                setShowPayModal(false);
+                setSelectedMethod('');
+              } else {
+                alert(`Payment verification failed, please contact the office before retrying: ${verifyRes.error || 'Verification error'}`);
+              }
+            } catch (err: any) {
+              alert('Payment verification failed, please contact the office before retrying.');
+            } finally {
+              setIsPaying(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setIsPaying(false);
+            }
+          },
+          theme: { color: '#6C2BD9' }
+        };
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } catch (err: any) {
+        alert('Network error initiating payment. Please try again.');
+        setIsPaying(false);
       }
-    } catch (err) {
-      alert('Payment processed.');
-    } finally {
+    } else if (selectedMethod === 'bank_transfer' || selectedMethod === 'upi') {
+      if (!referenceNumber.trim()) {
+        alert('Please enter the payment reference number / UTR ID.');
+        setIsPaying(false);
+        return;
+      }
+      try {
+        const res = await apiPost('/core/fees/payment/manual', {
+          student_id: studentId,
+          amount: summary.pending_amount,
+          payment_method: selectedMethod,
+          reference_number: referenceNumber.trim()
+        });
+        if (res.success) {
+          alert('Payment submitted successfully — pending office verification.');
+          fetchFeeSummary();
+          setShowPayModal(false);
+          setSelectedMethod('');
+          setReferenceNumber('');
+        } else {
+          alert(`Payment submission failed: ${res.error || 'Could not record manual payment.'}`);
+        }
+      } catch (err: any) {
+        alert('Payment submission failed due to network error. Please try again.');
+      } finally {
+        setIsPaying(false);
+      }
+    } else {
+      alert('Selected payment method is not supported.');
       setIsPaying(false);
-      setShowPayModal(false);
-      setSelectedMethod('');
     }
   };
 
@@ -383,10 +479,42 @@ export default function ParentFeesPage() {
               )}
             </div>
 
+            {(selectedMethod === 'bank_transfer' || selectedMethod === 'upi') && (
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-5 space-y-3">
+                {selectedMethod === 'bank_transfer' && (
+                  <div className="text-xs text-white/80 space-y-1">
+                    <p className="font-semibold text-emerald-400">Bank Transfer Account Details:</p>
+                    <p><span className="text-white/50">Bank:</span> {paymentConfig?.bank_name || 'State Bank of India'}</p>
+                    <p><span className="text-white/50">Account No:</span> {paymentConfig?.bank_account_number || '990088776655'}</p>
+                    <p><span className="text-white/50">IFSC:</span> {paymentConfig?.bank_ifsc || 'SBIN0001234'}</p>
+                    <p><span className="text-white/50">Holder:</span> {paymentConfig?.bank_holder_name || 'SIET Campus Account'}</p>
+                  </div>
+                )}
+                {selectedMethod === 'upi' && (
+                  <div className="text-xs text-white/80 space-y-1">
+                    <p className="font-semibold text-sky-400">UPI Payment Details:</p>
+                    <p><span className="text-white/50">UPI ID:</span> {paymentConfig?.upi_id || 'sietcampus@upi'}</p>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-white/10">
+                  <label className="block text-[10px] text-[#C4B5FD]/70 uppercase font-semibold mb-1">
+                    Payment Reference / UTR ID *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter UTR / Txn Reference No."
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    className="w-full bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-xs text-white placeholder-white/30 outline-none focus:border-[#8B5CF6]"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button onClick={handlePayAll} disabled={!selectedMethod || isPaying}
                 className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all">
-                {isPaying ? 'Processing...' : `Pay ₹${s.pending_amount.toLocaleString('en-IN')}`}
+                {isPaying ? 'Processing...' : (selectedMethod === 'bank_transfer' || selectedMethod === 'upi') ? 'Submit for Verification' : `Pay ₹${s.pending_amount.toLocaleString('en-IN')}`}
               </button>
               <button onClick={() => { setShowPayModal(false); setSelectedMethod(''); }}
                 className="px-4 py-3 rounded-xl bg-white/5 border border-white/5 text-white/50 font-bold text-xs hover:bg-white/10 transition-all">

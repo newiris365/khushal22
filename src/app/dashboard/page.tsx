@@ -58,6 +58,12 @@ export default function GenericDashboard() {
       { label: 'Fee Status', icon: ClipboardList, href: '/parent/fees', desc: 'View pending and completed fee payments' },
       { label: 'Exam Results', icon: BookOpen, href: '/parent/results', desc: 'Check semester marks and grades' },
       { label: 'Notices', icon: Bell, href: '/parent/dashboard', desc: 'View campus announcements' }
+    ],
+    'Gym Trainer': [
+      { label: 'Gym Operations', icon: Dumbbell, href: '/gymtrainer/dashboard', desc: 'Monitor today\'s slots & check-ins' },
+      { label: 'Trainer Sessions', icon: Calendar, href: '/gymtrainer/sessions', desc: 'Manage 1-on-1 personal training sessions' },
+      { label: 'Fitness Metrics', icon: ClipboardList, href: '/gymtrainer/metrics', desc: 'Log student weight & body measurements' },
+      { label: 'Virtual Classes', icon: BookOpen, href: '/gymtrainer/classes', desc: 'Manage workout streams & live classes' }
     ]
   };
 

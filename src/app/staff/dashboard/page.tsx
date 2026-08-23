@@ -14,25 +14,30 @@ export default function FacultyDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     const saved = localStorage.getItem('iris_user_profile');
     if (saved) { try { setProfile(JSON.parse(saved)); } catch {} }
   }, []);
 
   useEffect(() => {
-    if (!profile) return;
     const load = async () => {
+      setIsLoading(true);
+      setFetchError(null);
       try {
         const [ttRes, leavesRes] = await Promise.all([
           apiGet('campusCore/faculty/timetable'),
           apiGet('campusCore/faculty/leaves/pending'),
         ]);
-        if (ttRes.success) setTimetable(ttRes.timetable || []);
-        if (leavesRes.success) setPendingLeaves(leavesRes.leaves || []);
+        if (ttRes && ttRes.success) setTimetable(ttRes.timetable || []);
+        if (leavesRes && leavesRes.success) setPendingLeaves(leavesRes.leaves || []);
+        if (ttRes && !ttRes.success) setFetchError(ttRes?.error || 'Unable to load timetable data.');
         const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-        setTodaySessions((ttRes.timetable || []).filter((t: any) => t.day_of_week === dayName));
-      } catch (err) {
+        setTodaySessions(((ttRes && ttRes.timetable) || []).filter((t: any) => t.day_of_week === dayName));
+      } catch (err: any) {
         console.error(err);
+        setFetchError(err?.message || 'Unable to load faculty dashboard data from server.');
       } finally {
         setIsLoading(false);
       }
@@ -57,6 +62,11 @@ export default function FacultyDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Faculty Dashboard</h1>
         <span className="text-sm text-slate-400">

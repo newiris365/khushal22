@@ -7,8 +7,8 @@ import {
   CalendarDays, DoorOpen, Activity, TrendingUp, FileText, LogOut,
   Dumbbell, Bus, ShoppingBag, BookOpen, Shield, X, ChevronDown, Loader2, AlertCircle
 } from 'lucide-react';
-import { Toast, ToastMessage } from '../../components/ToastModal';
-import { SkeletonDashboard } from '../../components/Skeleton';
+import { Toast, ToastMessage } from '../../../components/ToastModal';
+import { SkeletonDashboard } from '../../../components/Skeleton';
 
 // ========== TYPE DEFINITIONS ==========
 interface OverviewData {

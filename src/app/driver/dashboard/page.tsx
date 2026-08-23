@@ -13,19 +13,26 @@ export default function DriverDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [gpsStatus, setGpsStatus] = useState<'inactive' | 'active' | 'error'>('inactive');
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   useEffect(() => {
     const load = async () => {
+      setIsLoading(true);
+      setFetchError(null);
       try {
         const [assignRes, tripRes, hcRes] = await Promise.all([
           apiGet('campusCore/driver/assignments'),
           apiGet('campusCore/driver/today-trip'),
           apiGet('campusCore/driver/headcount'),
         ]);
-        if (assignRes.success) setAssignments(assignRes.assignments?.[0] || null);
-        if (tripRes.success) setTodayTrip(tripRes.trip || null);
-        if (hcRes.success) setHeadcount(hcRes.students || []);
-      } catch (err) {
+        if (assignRes && assignRes.success) setAssignments(assignRes.assignments?.[0] || null);
+        if (tripRes && tripRes.success) setTodayTrip(tripRes.trip || null);
+        if (hcRes && hcRes.success) setHeadcount(hcRes.students || []);
+        if (assignRes && !assignRes.success) setFetchError(assignRes?.error || 'Unable to load bus assignment.');
+      } catch (err: any) {
         console.error(err);
+        setFetchError(err?.message || 'Unable to load driver dashboard data from server.');
       } finally {
         setIsLoading(false);
       }
@@ -35,21 +42,35 @@ export default function DriverDashboard() {
 
   const handleStartTrip = async () => {
     if (!assignments) return;
-    const res = await apiPost('campusCore/driver/trip/start', {
-      bus_id: assignments.bus_id,
-      route_id: assignments.route_id,
-      trip_type: new Date().getHours() < 12 ? 'morning' : 'evening',
-    });
-    if (res.success) {
-      setTodayTrip({ trip_id: res.trip_id, status: 'active' });
+    setActionError(null);
+    try {
+      const res = await apiPost('campusCore/driver/trip/start', {
+        bus_id: assignments.bus_id,
+        route_id: assignments.route_id,
+        trip_type: new Date().getHours() < 12 ? 'morning' : 'evening',
+      });
+      if (res && res.success) {
+        setTodayTrip({ trip_id: res.trip_id, status: 'active' });
+      } else {
+        setActionError(res?.error || 'Failed to start trip on server.');
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to start trip due to network error.');
     }
   };
 
   const handleEndTrip = async () => {
     if (!todayTrip) return;
-    const res = await apiPut(`campusCore/driver/trip/${todayTrip.trip_id}/end`, {});
-    if (res.success) {
-      setTodayTrip({ ...todayTrip, status: 'completed' });
+    setActionError(null);
+    try {
+      const res = await apiPut(`campusCore/driver/trip/${todayTrip.trip_id}/end`, {});
+      if (res && res.success) {
+        setTodayTrip({ ...todayTrip, status: 'completed' });
+      } else {
+        setActionError(res?.error || 'Failed to end trip on server.');
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to end trip due to network error.');
     }
   };
 
@@ -67,6 +88,18 @@ export default function DriverDashboard() {
         <Bus size={24} className="text-orange-400" />
         My Bus
       </h1>
+
+      {actionError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {actionError}</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Bus Info Card */}
       {assignments ? (

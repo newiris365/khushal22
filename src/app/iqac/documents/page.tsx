@@ -22,13 +22,26 @@ export default function IqacDocumentsVault() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const loadDocuments = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      // Mock documents database matching the user uploads
+      const res = await fetch('/api/naac/documents', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDocuments(data.documents || []);
+      } else {
+        setFetchError(data.error || 'Unable to load evidence documents.');
+        setDocuments([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading evidence documents', err);
+      setFetchError(err?.message || 'Unable to load evidence documents from server.');
       setDocuments([]);
-    } catch (err) {
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -38,15 +51,35 @@ export default function IqacDocumentsVault() {
     loadDocuments();
   }, []);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to remove this evidence file from the SSR document catalog?')) {
-      setDocuments(prev => prev.filter(d => d.id !== id));
+      try {
+        const res = await fetch(`/api/naac/documents/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setDocuments(prev => prev.filter(d => d.id !== id));
+        } else {
+          alert(data.error || 'Failed to delete evidence document.');
+        }
+      } catch (err: any) {
+        console.error('Error deleting document', err);
+        alert(`Failed to delete evidence document: ${err?.message || 'Network error'}`);
+      }
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
       {/* Header Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Evidence Archives</span>
@@ -103,7 +136,7 @@ export default function IqacDocumentsVault() {
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => alert('Downloading evidence archive file...')}
+                            onClick={() => window.open(doc.document_url || '#', '_blank')}
                             className="p-1.5 rounded bg-[#6C2BD9]/20 hover:bg-[#6C2BD9]/40 border border-[#6C2BD9]/30 text-[#A78BFA] transition-all"
                             title="Download File"
                           >

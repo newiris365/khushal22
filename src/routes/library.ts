@@ -33,6 +33,8 @@ import {
   getRecommendations,
   getOverviewStats,
   getReports,
+  exportLibraryReportPdf,
+  sendOverdueReminder,
   aiResearchTopic,
   aiSummarizeBook,
   aiCompareBooks,
@@ -78,6 +80,7 @@ router.post('/issues/:id/return', requireRole(['Staff', 'Admin', 'SuperAdmin', '
 router.post('/issues/:id/renew', renewBook);
 router.get('/issues/student/:studentId', listStudentIssues);
 router.get('/issues/overdue', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), listOverdueIssues);
+router.post('/issues/:id/reminder', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), sendOverdueReminder);
 
 // --- RESERVATIONS ---
 router.get('/reservations', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), getAllReservations);
@@ -111,6 +114,7 @@ router.get('/recommendations/:studentId', getRecommendations);
 // --- ANALYTICS ---
 router.get('/analytics/overview', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), getOverviewStats);
 router.get('/analytics/reports', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), getReports);
+router.get('/analytics/reports/pdf', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), exportLibraryReportPdf);
 
 // --- AI RESEARCH ASSISTANT ---
 router.post('/ai/research', aiResearchTopic);

@@ -17,13 +17,32 @@ export default function HodTeamOverview() {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
+  });
+
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock department team
-      setTeam([]);
+      const res = await fetch('/api/v1/hr/employees', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success && data.employees) {
+        const mapped = data.employees.map((e: any) => ({
+          id: e.id,
+          name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Employee',
+          designation: e.designation || 'Staff Member',
+          email: e.personal_email || 'staff@sin.education',
+          phone: e.personal_phone || '+91 98765 43210',
+          employee_type: e.employee_type || 'permanent',
+          shift: 'General Shift (09:00 AM - 05:00 PM)'
+        }));
+        setTeam(mapped);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load team overview:', err);
     } finally {
       setLoading(false);
     }
@@ -53,39 +72,45 @@ export default function HodTeamOverview() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {team.map(member => (
-            <div key={member.id} className="glass-panel border border-[#6C2BD9]/20 bg-[#13102A]/40 rounded-2xl p-6 flex flex-col justify-between hover:border-[#6C2BD9]/50 transition-all relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-[#8B5CF6]/5 to-transparent rounded-full -z-10"></div>
-              
-              <div className="flex flex-col gap-3.5">
-                <div className="flex justify-between items-start">
-                  <div className="w-10 h-10 rounded-xl bg-[#6C2BD9]/15 border border-[#8B5CF6]/30 flex items-center justify-center text-white">
-                    <User className="w-5 h-5 text-[#A78BFA]" />
+          {team.length === 0 ? (
+            <div className="col-span-full glass-panel p-12 text-center text-xs text-[#C4B5FD]/50 rounded-2xl border border-white/5">
+              No reporting employees registered in your department roster.
+            </div>
+          ) : (
+            team.map(member => (
+              <div key={member.id} className="glass-panel border border-[#6C2BD9]/20 bg-[#13102A]/40 rounded-2xl p-6 flex flex-col justify-between hover:border-[#6C2BD9]/50 transition-all relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-[#8B5CF6]/5 to-transparent rounded-full -z-10"></div>
+                
+                <div className="flex flex-col gap-3.5">
+                  <div className="flex justify-between items-start">
+                    <div className="w-10 h-10 rounded-xl bg-[#6C2BD9]/15 border border-[#8B5CF6]/30 flex items-center justify-center text-white">
+                      <User className="w-5 h-5 text-[#A78BFA]" />
+                    </div>
+                    <span className="text-[9px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-[#C4B5FD]">
+                      {member.employee_type}
+                    </span>
                   </div>
-                  <span className="text-[9px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-[#C4B5FD]">
-                    {member.employee_type}
-                  </span>
-                </div>
 
-                <div className="flex flex-col gap-1">
-                  <h3 className="font-extrabold text-base text-white group-hover:text-[#A78BFA] transition-colors">{member.name}</h3>
-                  <span className="text-xs text-[#C4B5FD]/60 font-semibold">{member.designation}</span>
-                </div>
+                  <div className="flex flex-col gap-1">
+                    <h3 className="font-extrabold text-base text-white group-hover:text-[#A78BFA] transition-colors">{member.name}</h3>
+                    <span className="text-xs text-[#C4B5FD]/60 font-semibold">{member.designation}</span>
+                  </div>
 
-                <div className="flex flex-col gap-2 text-[11px] text-[#C4B5FD]/75 border-t border-white/5 pt-3 mt-1 font-semibold">
-                  <span className="flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-[#8B5CF6]" /> {member.email}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-[#8B5CF6]" /> {member.phone}
-                  </span>
-                  <span className="flex items-center gap-2 mt-1.5 text-white">
-                    <Briefcase className="w-3.5 h-3.5 text-[#8B5CF6]" /> {member.shift}
-                  </span>
+                  <div className="flex flex-col gap-2 text-[11px] text-[#C4B5FD]/75 border-t border-white/5 pt-3 mt-1 font-semibold">
+                    <span className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-[#8B5CF6]" /> {member.email}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-[#8B5CF6]" /> {member.phone}
+                    </span>
+                    <span className="flex items-center gap-2 mt-1.5 text-white">
+                      <Briefcase className="w-3.5 h-3.5 text-[#8B5CF6]" /> {member.shift}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
     </div>

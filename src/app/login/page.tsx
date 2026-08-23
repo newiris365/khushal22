@@ -38,6 +38,7 @@ const getRedirectPath = (role: string): string => {
     case 'Admissions Officer': return '/officer/admissions';
     case 'TPO': return '/tpo';
     case 'Staff': return '/staff/dashboard';
+    case 'Gym Trainer': return '/gymtrainer/dashboard';
     default: return '/dashboard';
   }
 };

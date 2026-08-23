@@ -65,11 +65,13 @@ export default function VendorInventoryPage() {
     const targetQty = Math.max(0, newQty);
     try {
       const res = await apiPut(`canteen/inventory/${id}`, { qty: targetQty });
-      if (res.success) {
+      if (res && res.success) {
         setStock(prev => prev.map(s => s.id === id ? { ...s, qty: targetQty } : s));
+      } else {
+        alert(res?.error || 'Failed to update stock quantity.');
       }
-    } catch (err) {
-      setStock(prev => prev.map(s => s.id === id ? { ...s, qty: targetQty } : s));
+    } catch (err: any) {
+      alert(err?.message || 'Error updating stock quantity. Please check network connection.');
     }
   };
 

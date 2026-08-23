@@ -55,10 +55,8 @@ export default function LibrarianIssueReturnDesk() {
       } else {
         setErrorMsg(res.error || 'Failed to issue book.');
       }
-    } catch {
-      setSuccessMsg('Book checked out successfully! (Mock confirmation)');
-      setBookId('');
-      setStudentId('');
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to issue book due to network error.');
     } finally {
       setSubmitting(false);
     }
@@ -90,11 +88,8 @@ export default function LibrarianIssueReturnDesk() {
       } else {
         setErrorMsg(res.error || 'Failed to return book.');
       }
-    } catch {
-      setSuccessMsg('Book returned successfully! (Mock confirmation)');
-      setReturnIssueId('');
-      setFineAmount(0);
-      setFinePaid(false);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to return book due to network error.');
     } finally {
       setSubmitting(false);
     }

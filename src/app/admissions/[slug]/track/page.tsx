@@ -35,7 +35,7 @@ export default function TrackApplicationPage() {
     setLoading(true);
 
     try {
-      const res = await apiGet(`/admissions/track?application_number=${encodeURIComponent(appNumber)}&dob=${encodeURIComponent(dob)}`);
+      const res = await apiGet(`/admissions/track?application_number=${encodeURIComponent(appNumber)}&dob=${encodeURIComponent(dob)}&slug=${encodeURIComponent(slug)}`);
       if (res.success && res.applicant) {
         setResult(res);
       } else {

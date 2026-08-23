@@ -8,44 +8,35 @@ import {
 import { apiGet } from '../../../lib/api';
 
 export default function TpoPlacementsDashboard() {
-  const [stats, setStats] = useState<any>({
-    total_eligible: 320,
-    total_registered: 310,
-    total_placed: 215,
-    total_companies: 42,
-    avg_ctc: 7.8,
-    median_ctc: 6.5,
-    highest_ctc: 44.0,
-    lowest_ctc: 3.6,
-    branch_rates: [
-      { branch: 'CSE', rate: 92 },
-      { branch: 'AIDS', rate: 88 },
-      { branch: 'ECE', rate: 74 },
-      { branch: 'MECH', rate: 45 }
-    ],
-    ctc_segments: [
-      { range: 'Dream (>10L)', count: 48 },
-      { range: 'Core (5-10L)', count: 120 },
-      { range: 'Mass (<5L)', count: 47 }
-    ]
-  });
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDashboardStats();
   }, []);
 
   const loadDashboardStats = async () => {
+    setLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('/placements/analytics/dashboard');
-      if (res.success && res.dashboard) {
+      if (res && res.success && res.dashboard) {
         setStats(res.dashboard);
+      } else {
+        setFetchError(res?.error || 'Unable to load live placement stats from server.');
+        setStats(null);
       }
-    } catch (err) {
-      console.log('Using fallback dashboard stats');
+    } catch (err: any) {
+      console.error('Error loading placement dashboard stats', err);
+      setFetchError(err?.message || 'Unable to load live placement stats due to network error.');
+      setStats(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const placementRate = Math.round((stats.total_placed / stats.total_eligible) * 100);
+  const placementRate = stats ? Math.round(((stats.total_placed || 0) / (stats.total_eligible || 1)) * 100) : 0;
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
@@ -59,6 +50,19 @@ export default function TpoPlacementsDashboard() {
           </h1>
           <p className="text-sm text-[#C4B5FD]/70">Track annual institutional statistics, CTC brackets distributions, and drive schedules.</p>
         </div>
+
+        {fetchError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {fetchError}</span>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="text-center py-12 text-slate-400">Loading placement dashboard statistics...</div>
+        ) : !stats ? (
+          <div className="text-center py-12 text-slate-400">No placement statistics available.</div>
+        ) : (
+          <>
 
         {/* Top metrics grids */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -160,7 +164,8 @@ export default function TpoPlacementsDashboard() {
           </div>
 
         </div>
-
+        </>
+        )}
       </div>
     </main>
   );

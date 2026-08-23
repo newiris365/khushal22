@@ -40,11 +40,13 @@ export default function TpoDriveApplicationsReview() {
   const [shortlisting, setShortlisting] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const exportApplicantsCSV = () => {
     const headers = ["Student Name", "Branch", "CGPA", "Status", "Resume Link"];
     const data = applicants.map(app => {
-      const studentCgpa = app.students?.student_profiles?.cgpa || app.students?.student_profiles || 0.0;
-      const cgpaStr = typeof studentCgpa === 'object' ? '8.45' : studentCgpa;
+      const rawCgpa = app.students?.student_profiles?.cgpa;
+      const cgpaStr = typeof rawCgpa === 'number' ? rawCgpa.toString() : 'N/A';
       return {
         name: `${app.students?.first_name || ''} ${app.students?.last_name || ''}`,
         branch: app.students?.branch || '',
@@ -59,8 +61,8 @@ export default function TpoDriveApplicationsReview() {
   const exportApplicantsPDF = () => {
     const headers = ["Student Name", "Branch", "CGPA", "Status", "Resume Link"];
     const data = applicants.map(app => {
-      const studentCgpa = app.students?.student_profiles?.cgpa || app.students?.student_profiles || 0.0;
-      const cgpaStr = typeof studentCgpa === 'object' ? '8.45' : studentCgpa;
+      const rawCgpa = app.students?.student_profiles?.cgpa;
+      const cgpaStr = typeof rawCgpa === 'number' ? rawCgpa.toString() : 'N/A';
       return {
         name: `${app.students?.first_name || ''} ${app.students?.last_name || ''}`,
         branch: app.students?.branch || '',
@@ -79,62 +81,78 @@ export default function TpoDriveApplicationsReview() {
   const loadDriveDetails = async () => {
     try {
       const res = await apiGet(`/placements/drives/${driveId}`);
-      if (res.success && res.drive) {
+      if (res && res.success && res.drive) {
         setDrive(res.drive);
         setApplicants(res.drive.drive_applications || []);
       }
     } catch (err) {
-      console.log('Error loading drive applications');
+      console.error('Error loading drive applications', err);
+    } finally {
+      setLoading(false);
     }
-    
-    // Seed mock if empty
-    if (applicants.length === 0) {
-      setApplicants([]);
-    }
-    setLoading(false);
   };
 
   const handleBulkShortlist = async () => {
     setShortlisting(true);
+    setActionError(null);
     try {
       const res = await apiPost(`/placements/drives/${driveId}/bulk-shortlist`, { count_limit: bulkCount });
-      if (res.success) {
+      if (res && res.success) {
         alert(`Successfully shortlisted top ${res.shortlisted_count} candidate(s) by CGPA!`);
         loadDriveDetails();
+      } else {
+        setActionError(res?.error || 'Failed to bulk shortlist candidates.');
       }
-    } catch (err) {
-      console.log('Error bulk shortlisting');
+    } catch (err: any) {
+      console.error('Error bulk shortlisting', err);
+      setActionError(err?.message || 'Failed to bulk shortlist candidates due to network error.');
+    } finally {
+      setShortlisting(false);
     }
-    setShortlisting(false);
   };
 
   const handleNotify = async () => {
     setNotifying(true);
+    setActionError(null);
     try {
       const res = await apiPost(`/placements/drives/${driveId}/notify-eligible`, {});
-      if (res.success) {
+      if (res && res.success) {
         alert('Recruitment notifications successfully queued to whatsapp & sms campaign registers!');
+      } else {
+        setActionError(res?.error || 'Failed to queue recruitment notifications.');
       }
-    } catch (err) {
-      console.log('Error triggering campaign');
+    } catch (err: any) {
+      console.error('Error triggering campaign', err);
+      setActionError(err?.message || 'Failed to queue notifications due to network error.');
+    } finally {
+      setNotifying(false);
     }
-    setNotifying(false);
   };
 
   const handleStatusUpdate = async (appId: string, status: string) => {
+    setActionError(null);
     try {
       const res = await apiPut(`/placements/applications/${appId}/status`, { status });
-      if (res.success) {
+      if (res && res.success) {
         setApplicants(prev => prev.map(a => a.id === appId ? { ...a, status } : a));
+      } else {
+        setActionError(res?.error || 'Failed to update application status.');
       }
-    } catch (err) {
-      console.log('Error updating status');
+    } catch (err: any) {
+      console.error('Error updating status', err);
+      setActionError(err?.message || 'Failed to update application status due to network error.');
     }
   };
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-6">
+        
+        {actionError && (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+            <span>⚠️ {actionError}</span>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex items-center gap-3">

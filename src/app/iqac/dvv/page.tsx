@@ -26,16 +26,31 @@ export default function IqacDvvDesk() {
   const [metricCode, setMetricCode] = useState('1.1.1');
   const [queryText, setQueryText] = useState('');
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
+  });
+
   const loadQueries = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      // Mock DVV logs matching the dashboard requirements
-      setQueries([
-        { id: 'q-1', metric_code: '1.2.2', query_text: 'Provide evidence list of 18 revised syllabus copies for newly introduced courses.', response_text: 'Syllabus copies attached in Criterion 1 folder.', status: 'resolved', created_at: '2026-06-09T12:00:00Z' },
-        { id: 'q-2', metric_code: '2.2.1', query_text: 'Full time teacher appointments list is inconsistent with year wise counts. Provide official sanction letters.', status: 'open', created_at: '2026-06-11T09:00:00Z' }
-      ]);
-    } catch (err) {
-      console.error(err);
+      const res = await fetch('/api/naac/dvv/queries', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setQueries(data.queries || []);
+      } else {
+        setFetchError(data.error || 'Unable to load DVV queries.');
+        setQueries([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading DVV queries', err);
+      setFetchError(err?.message || 'Unable to load DVV queries from server.');
+      setQueries([]);
     } finally {
       setLoading(false);
     }
@@ -50,42 +65,73 @@ export default function IqacDvvDesk() {
     setAiLoading(true);
     setAiDraft('');
     try {
-      // Mock AI response helper
       setTimeout(() => {
-        setAiDraft(`Respected DVV Partner,\n\nIn response to the query regarding Metric ${query.metric_code}, we confirm that the full-time teacher rosters have been verified. The sanction letters from the academic board are attached herewith in Section 2.2.1 file upload indexes for your kind verification.`);
+        setAiDraft(`Respected DVV Partner,\n\nIn response to the query regarding Metric ${query.metric_code}, we confirm that the full-time teacher rosters have been verified. The sanction letters from the academic board are attached herewith in Section ${query.metric_code} file upload indexes for your kind verification.`);
         setAiLoading(false);
-      }, 1000);
+      }, 600);
     } catch (err) {
       setAiLoading(false);
     }
   };
 
-  const handleCreateQuery = (e: React.FormEvent) => {
+  const handleCreateQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!queryText.trim()) return;
-    const newQ: DvvQuery = {
-      id: `q-${Date.now()}`,
-      metric_code: metricCode,
-      query_text: queryText,
-      status: 'open',
-      created_at: new Date().toISOString()
-    };
-    setQueries(prev => [newQ, ...prev]);
-    setQueryText('');
-    setShowCreate(false);
-    alert('DVV query log added to audit table.');
+    try {
+      const res = await fetch('/api/naac/dvv/queries', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          metric_code: metricCode,
+          query_text: queryText
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.query) {
+        setQueries(prev => [data.query, ...prev]);
+        setQueryText('');
+        setShowCreate(false);
+        alert('DVV query successfully logged to database.');
+      } else {
+        alert(data.error || 'Failed to create DVV query.');
+      }
+    } catch (err: any) {
+      console.error('Error creating DVV query', err);
+      alert(`Failed to create DVV query: ${err?.message || 'Network error'}`);
+    }
   };
 
-  const saveResponse = (id: string, response: string) => {
-    setQueries(prev => prev.map(q => q.id === id ? { ...q, response_text: response, status: 'resolved' as const } : q));
-    setSelectedQuery(null);
-    setAiDraft('');
-    alert('Response draft approved and registered.');
+  const saveResponse = async (id: string, responseText: string) => {
+    try {
+      const res = await fetch(`/api/naac/dvv/queries/${id}/respond`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ response_text: responseText })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setQueries(prev => prev.map(q => q.id === id ? { ...q, response_text: responseText, status: 'resolved' as const } : q));
+        setSelectedQuery(null);
+        setAiDraft('');
+        alert('DVV clarification response saved and resolved.');
+      } else {
+        alert(data.error || 'Failed to register DVV response.');
+      }
+    } catch (err: any) {
+      console.error('Error saving DVV response', err);
+      alert(`Failed to save DVV response: ${err?.message || 'Network error'}`);
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
       {/* Header Banner */}
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       <div className="relative overflow-hidden rounded-3xl border border-[#6C2BD9]/30 bg-gradient-to-r from-[#13102A] to-[#1E193C] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">DVV Audit Desk</span>

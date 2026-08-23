@@ -30,12 +30,15 @@ export default function HodLeaveApprovals() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Mock pending leaves for HOD
-      setRequests([
-        { id: 'l-rec-1', employee_name: 'Prof. Satish Kumar', leave_type: 'Casual Leave (CL)', from_date: '2026-06-12', to_date: '2026-06-13', total_days: 2, reason: 'Out of station for domestic urgent work.' }
-      ]);
+      const res = await fetch('/api/v1/hr/leave/department-pending', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success && data.requests) {
+        setRequests(data.requests);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load pending leave requests:', err);
     } finally {
       setLoading(false);
     }
@@ -55,30 +58,33 @@ export default function HodLeaveApprovals() {
       if (data.success) {
         setRequests(prev => prev.filter(r => r.id !== id));
         alert('Leave request approved.');
+      } else {
+        alert(data.error || 'Failed to approve leave.');
       }
     } catch (err) {
-      setRequests(prev => prev.filter(r => r.id !== id));
-      alert('Leave request approved locally.');
+      alert('Network error approving leave.');
     }
   };
 
   const handleRejectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetch(`/api/v1/hr/leave/${selectedId}/reject`, {
+      const res = await fetch(`/api/v1/hr/leave/${selectedId}/reject`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ reason: rejectReason })
       });
-      setRequests(prev => prev.filter(r => r.id !== selectedId));
-      setShowReject(false);
-      setRejectReason('');
-      alert('Leave request rejected.');
+      const data = await res.json();
+      if (data.success) {
+        setRequests(prev => prev.filter(r => r.id !== selectedId));
+        setShowReject(false);
+        setRejectReason('');
+        alert('Leave request rejected.');
+      } else {
+        alert(data.error || 'Failed to reject leave.');
+      }
     } catch (err) {
-      setRequests(prev => prev.filter(r => r.id !== selectedId));
-      setShowReject(false);
-      setRejectReason('');
-      alert('Leave request rejected locally.');
+      alert('Network error rejecting leave.');
     }
   };
 

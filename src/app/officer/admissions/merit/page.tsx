@@ -26,8 +26,8 @@ export default function OfficerMeritPage() {
   const [weightEntrance, setWeightEntrance] = useState(60);
   const [weightExtra, setWeightExtra] = useState(0);
 
-  const [cycleId] = useState('c1111111-1111-1111-1111-111111111111');
-  const [programId, setProgramId] = useState('a1111111-1111-1111-1111-111111111111');
+  const [cycleId, setCycleId] = useState('');
+  const [programId, setProgramId] = useState('');
 
   // Computed rankings state
   const [rankings, setRankings] = useState<RankingEntry[]>([]);

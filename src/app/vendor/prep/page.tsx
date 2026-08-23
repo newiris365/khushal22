@@ -8,15 +8,24 @@ export default function VendorPrepPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPrep = async () => {
       setIsLoading(true);
+      setFetchError(null);
       try {
         const res = await apiGet('campusCore/vendor/prep-list', { date });
-        if (res.success) setItems(res.items || []);
-      } catch (err) {
+        if (res && res.success) {
+          setItems(res.items || []);
+        } else {
+          setFetchError(res?.error || 'Unable to load prep list.');
+          setItems([]);
+        }
+      } catch (err: any) {
         console.error(err);
+        setFetchError(err?.message || 'Unable to load prep list from server.');
+        setItems([]);
       } finally {
         setIsLoading(false);
       }
@@ -38,6 +47,13 @@ export default function VendorPrepPage() {
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500" />
       </div>
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-slate-400">Loading prep list...</div>

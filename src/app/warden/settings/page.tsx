@@ -39,8 +39,8 @@ export default function WardenSettingsPage() {
       } else {
         alert("Failed to save settings: " + (res.error || "Unknown error"));
       }
-    } catch (error) {
-      setSuccessMsg("Settings saved (local fallback)!");
+    } catch (error: any) {
+      alert("Failed to save settings: " + (error?.message || "Network error"));
     } finally {
       setLoading(false);
     }

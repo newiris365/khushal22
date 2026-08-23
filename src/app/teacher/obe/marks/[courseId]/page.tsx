@@ -232,8 +232,6 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
     })));
   };
 
-  const currentToolObj = tools.find(t => t.id === selectedTool);
-
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
       {/* Back link */}

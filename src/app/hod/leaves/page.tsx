@@ -54,35 +54,45 @@ export default function LeaveApprovalsPage() {
   const handleApprove = async (leaveId: string) => {
     const remark = remarkInputs[leaveId] || 'Approved by HOD';
     try {
-      await apiPost(`/core/leaves/${leaveId}/approve`, { remarks: remark });
-    } catch {
-      // fallback to local state
+      const res = await apiPost(`/core/leaves/${leaveId}/approve`, { remarks: remark });
+      if (res && res.success !== false) {
+        setLeaves(prev =>
+          prev.map(l =>
+            l.id === leaveId
+              ? { ...l, status: 'Approved' as const, remarks: remark, reviewedBy: 'HOD', reviewedOn: new Date().toISOString().split('T')[0] }
+              : l
+          )
+        );
+        setRemarkInputs(prev => ({ ...prev, [leaveId]: '' }));
+        alert('Leave application approved.');
+      } else {
+        alert(res?.error || 'Failed to approve leave application.');
+      }
+    } catch (err: any) {
+      alert('Network error approving leave application.');
     }
-    setLeaves(prev =>
-      prev.map(l =>
-        l.id === leaveId
-          ? { ...l, status: 'Approved' as const, remarks: remark, reviewedBy: 'HOD', reviewedOn: new Date().toISOString().split('T')[0] }
-          : l
-      )
-    );
-    setRemarkInputs(prev => ({ ...prev, [leaveId]: '' }));
   };
 
   const handleReject = async (leaveId: string) => {
     const remark = remarkInputs[leaveId] || 'Rejected by HOD';
     try {
-      await apiPost(`/core/leaves/${leaveId}/reject`, { remarks: remark });
-    } catch {
-      // fallback to local state
+      const res = await apiPost(`/core/leaves/${leaveId}/reject`, { remarks: remark });
+      if (res && res.success !== false) {
+        setLeaves(prev =>
+          prev.map(l =>
+            l.id === leaveId
+              ? { ...l, status: 'Rejected' as const, remarks: remark, reviewedBy: 'HOD', reviewedOn: new Date().toISOString().split('T')[0] }
+              : l
+          )
+        );
+        setRemarkInputs(prev => ({ ...prev, [leaveId]: '' }));
+        alert('Leave application rejected.');
+      } else {
+        alert(res?.error || 'Failed to reject leave application.');
+      }
+    } catch (err: any) {
+      alert('Network error rejecting leave application.');
     }
-    setLeaves(prev =>
-      prev.map(l =>
-        l.id === leaveId
-          ? { ...l, status: 'Rejected' as const, remarks: remark, reviewedBy: 'HOD', reviewedOn: new Date().toISOString().split('T')[0] }
-          : l
-      )
-    );
-    setRemarkInputs(prev => ({ ...prev, [leaveId]: '' }));
   };
 
   const filteredLeaves = leaves.filter(leave => {

@@ -25,16 +25,27 @@ export default function SecurityVehiclesPage() {
     driver_phone: '', purpose: '', gate_number: '1',
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchLogs = async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const params: any = {};
       if (filter === 'today') params.today = 'true';
       const res = await apiGet('campusCore/gate/vehicle-logs', params);
-      if (res.success) setLogs(res.logs || []);
-    } catch (err) {
+      if (res && res.success) {
+        setLogs(res.logs || []);
+      } else {
+        setFetchError(res?.error || 'Unable to load vehicle logs.');
+        setLogs([]);
+      }
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load vehicle logs from server.');
+      setLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -44,17 +55,36 @@ export default function SecurityVehiclesPage() {
 
   const handleEntry = async () => {
     if (!form.vehicle_number) return;
-    const res = await apiPost('campusCore/gate/vehicle/entry', form);
-    if (res.success) {
-      setShowEntryForm(false);
-      setForm({ vehicle_number: '', vehicle_type: 'four_wheeler', driver_name: '', driver_phone: '', purpose: '', gate_number: '1' });
-      fetchLogs();
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const res = await apiPost('campusCore/gate/vehicle/entry', form);
+      if (res && res.success) {
+        setShowEntryForm(false);
+        setForm({ vehicle_number: '', vehicle_type: 'four_wheeler', driver_name: '', driver_phone: '', purpose: '', gate_number: '1' });
+        fetchLogs();
+      } else {
+        setErrorMsg(res?.error || 'Failed to log vehicle entry.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to log vehicle entry due to network error.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleExit = async (id: string) => {
-    const res = await apiPut(`campusCore/gate/vehicle/${id}/exit`, {});
-    if (res.success) fetchLogs();
+    setErrorMsg(null);
+    try {
+      const res = await apiPut(`campusCore/gate/vehicle/${id}/exit`, {});
+      if (res && res.success) {
+        fetchLogs();
+      } else {
+        setErrorMsg(res?.error || 'Failed to log vehicle exit.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to log vehicle exit due to network error.');
+    }
   };
 
   const filtered = logs.filter(l =>
@@ -79,6 +109,18 @@ export default function SecurityVehiclesPage() {
           <Plus size={16} /> Log Entry
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {errorMsg}</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">

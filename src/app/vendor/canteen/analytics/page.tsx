@@ -17,6 +17,7 @@ export default function VendorAnalyticsPage() {
   const [hourlyData, setHourlyData] = useState<{ time: string; orders: number; revenue: number }[]>([]);
   const [forecasts] = useState(FORECASTS);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -24,15 +25,18 @@ export default function VendorAnalyticsPage() {
 
   const loadAnalytics = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await apiGet('canteen/analytics/hourly');
-      if (res.success && res.hourly) {
+      if (res && res.success && res.hourly) {
         setHourlyData(res.hourly);
       } else {
+        setFetchError(res?.error || 'Unable to load hourly canteen analytics.');
         setHourlyData([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setFetchError(err?.message || 'Unable to load hourly canteen analytics from server.');
       setHourlyData([]);
     } finally {
       setLoading(false);
@@ -45,6 +49,13 @@ export default function VendorAnalyticsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {fetchError && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>⚠️ {fetchError}</span>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="flex items-center justify-between bg-[#13102A]/80 border border-white/5 p-6 rounded-3xl">
         <div className="flex items-center gap-3">

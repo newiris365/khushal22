@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { login, getMe, refresh, forgotPassword, logout, parentLinkChild, parentOtp, parentVerifyOtp } from '../controllers/auth';
-import { authMiddleware } from '../middleware/auth';
-import { authLimiter, otpLimiter } from '../middleware/rateLimit';
+import { authMiddleware, requireRole } from '../middleware/auth';
+import { authLimiter, otpLimiter, parentLinkLimiter } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.post('/parent/otp', otpLimiter, parentOtp);
 router.post('/parent/verify-otp', authLimiter, parentVerifyOtp);
 
 // Parent linking endpoint (direct - no OTP required)
-router.post('/parent-link-child', authMiddleware, parentLinkChild);
+router.post('/parent-link-child', authMiddleware, requireRole(['Parent']), parentLinkLimiter, parentLinkChild);
 
 // Protected token validation endpoint
 router.get('/me', authMiddleware, getMe);
