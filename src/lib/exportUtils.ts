@@ -19,8 +19,8 @@ export function getNestedValue(obj: Record<string, unknown> | null | undefined, 
 /**
  * Exports data objects to a CSV file download.
  */
-export function exportToCSV(
-  data: Record<string, unknown>[],
+export function exportToCSV<T extends Record<string, any>>(
+  data: T[],
   filename: string,
   headers: string[],
   keys: string[]
@@ -53,9 +53,9 @@ export function exportToCSV(
 /**
  * Exports data objects to a beautiful print-ready PDF using the browser print API.
  */
-export function exportToPDF(
+export function exportToPDF<T extends Record<string, any>>(
   title: string,
-  data: Record<string, unknown>[],
+  data: T[],
   filename: string,
   headers: string[],
   keys: string[]
