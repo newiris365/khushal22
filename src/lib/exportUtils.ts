@@ -5,10 +5,13 @@
 /**
  * Resolves nested paths like 'students.first_name' from an object.
  */
-export function getNestedValue(obj: any, path: string): any {
+export function getNestedValue(obj: Record<string, unknown> | null | undefined, path: string): unknown {
   if (!obj) return '';
-  const val = path.split('.').reduce((acc, part) => {
-    return acc && acc[part] !== undefined ? acc[part] : undefined;
+  const val = path.split('.').reduce((acc: unknown, part: string) => {
+    if (acc && typeof acc === 'object' && acc !== null) {
+      return (acc as Record<string, unknown>)[part];
+    }
+    return undefined;
   }, obj);
   return val !== undefined ? val : '';
 }
@@ -17,7 +20,7 @@ export function getNestedValue(obj: any, path: string): any {
  * Exports data objects to a CSV file download.
  */
 export function exportToCSV(
-  data: any[],
+  data: Record<string, unknown>[],
   filename: string,
   headers: string[],
   keys: string[]
@@ -27,7 +30,8 @@ export function exportToCSV(
   for (const row of data) {
     const values = keys.map(key => {
       const val = getNestedValue(row, key);
-      const escaped = ('' + val).replace(/"/g, '""');
+      const stringified = typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val ?? '');
+      const escaped = stringified.replace(/"/g, '""');
       return `"${escaped}"`;
     });
     csvRows.push(values.join(','));
@@ -51,7 +55,7 @@ export function exportToCSV(
  */
 export function exportToPDF(
   title: string,
-  data: any[],
+  data: Record<string, unknown>[],
   filename: string,
   headers: string[],
   keys: string[]

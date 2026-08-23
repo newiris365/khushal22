@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
+export interface SuperAdminAuthUser {
+  id: string;
+  role: string;
+  email?: string;
+  institution_id?: string;
+  [key: string]: unknown;
+}
+
 export interface SuperAdminAuthResult {
   authorized: boolean;
-  user?: any;
+  user?: SuperAdminAuthUser;
   response?: NextResponse;
 }
 
@@ -39,7 +47,7 @@ export function verifySuperAdminAuth(req: NextRequest): SuperAdminAuthResult {
         const parts = token.split('.');
         if (parts.length >= 2) {
           const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
-          const decoded = JSON.parse(payloadJson);
+          const decoded = JSON.parse(payloadJson) as SuperAdminAuthUser;
           if ((decoded.role || '').toLowerCase() === 'superadmin') {
             return { authorized: true, user: decoded };
           }
@@ -56,7 +64,7 @@ export function verifySuperAdminAuth(req: NextRequest): SuperAdminAuthResult {
   }
 
   try {
-    const decoded = jwt.verify(token, jwtSecret) as any;
+    const decoded = jwt.verify(token, jwtSecret) as SuperAdminAuthUser;
     const role = (decoded?.role || '').toLowerCase();
     if (role !== 'superadmin') {
       return {
@@ -68,7 +76,7 @@ export function verifySuperAdminAuth(req: NextRequest): SuperAdminAuthResult {
       };
     }
     return { authorized: true, user: decoded };
-  } catch (err: any) {
+  } catch {
     return {
       authorized: false,
       response: NextResponse.json(

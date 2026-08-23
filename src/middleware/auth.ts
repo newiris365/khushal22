@@ -24,7 +24,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthenticatedUser;
-      rawBody?: any;
+      rawBody?: Buffer;
     }
   }
 }

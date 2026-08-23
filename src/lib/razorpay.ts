@@ -1,6 +1,19 @@
-let razorpayInstance: any = null;
+export interface RazorpayClient {
+  orders: {
+    create: (params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    [key: string]: unknown;
+  };
+  payments: {
+    fetch: (paymentId: string) => Promise<any>;
+    refund: (paymentId: string, params: any) => Promise<any>;
+    [key: string]: any;
+  };
+  [key: string]: unknown;
+}
 
-export function getRazorpayClient(): any {
+let razorpayInstance: RazorpayClient | null = null;
+
+export function getRazorpayClient(): RazorpayClient | null {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
