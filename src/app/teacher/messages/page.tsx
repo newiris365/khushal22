@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MessageSquare, Send, Clock, AlertCircle, CheckCircle, RefreshCw
 } from 'lucide-react';
@@ -33,7 +33,7 @@ export default function TeacherMessagesPage() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const fetchThreads = async () => {
+  const fetchThreads = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('iris_jwt_token') || '';
@@ -55,21 +55,9 @@ export default function TeacherMessagesPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchThreads();
-  }, []);
-
-  useEffect(() => {
-    if (activeThreadId) {
-      fetchThreadMessages();
-    } else {
-      setMessages([]);
-    }
   }, [activeThreadId]);
 
-  const fetchThreadMessages = async () => {
+  const fetchThreadMessages = useCallback(async () => {
     if (!activeThreadId) return;
     try {
       setLoading(true);
@@ -88,7 +76,19 @@ export default function TeacherMessagesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    fetchThreads();
+  }, [fetchThreads]);
+
+  useEffect(() => {
+    if (activeThreadId) {
+      fetchThreadMessages();
+    } else {
+      setMessages([]);
+    }
+  }, [activeThreadId, fetchThreadMessages]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !activeThreadId) return;

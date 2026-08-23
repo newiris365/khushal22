@@ -124,7 +124,7 @@ export default function TeacherAttendancePage() {
         setLoadingSchoolStudents(false);
       });
     }
-  }, [schoolGrade, instituteType]);
+  }, [schoolGrade, instituteType, formData.department_id]);
 
   // College Timer countdown hook
   useEffect(() => {

@@ -35,6 +35,8 @@ export function usePortalAuth(allowedRoles: string[]): PortalAuthResult {
   const [instituteType, setInstituteType] = useState<string>('college');
   const [userProfile, setUserProfile] = useState<any | null>(null);
 
+  const allowedRolesKey = allowedRoles.join(',');
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -96,7 +98,7 @@ export function usePortalAuth(allowedRoles: string[]): PortalAuthResult {
         }
       })
       .catch(err => console.error('Auth verification failed:', err));
-  }, []);
+  }, [allowedRolesKey]);
 
   return { authorized, userRole, instituteType, userProfile };
 }

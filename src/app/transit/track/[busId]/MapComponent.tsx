@@ -99,7 +99,7 @@ export default function MapComponent({ latitude, longitude, busLocation, stops =
     if (busMarkerRef.current && hasCoords) {
       busMarkerRef.current.setLatLng([lat!, lng!]);
     }
-  }, [lat, lng]);
+  }, [lat, lng, hasCoords]);
 
   return <div ref={mapContainerRef} className="w-full h-full min-h-[450px] rounded-3xl border border-white/5 shadow-2xl relative z-10" />;
 }

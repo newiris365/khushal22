@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   BrainCircuit, X, Send, ThumbsUp, ThumbsDown, 
   Sparkles, RefreshCw, MessageSquareCode, Clock, Check, Settings
@@ -298,17 +298,7 @@ export default function AIChatWidget() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [pathname]);
 
-  useEffect(() => {
-    if (sessionId && isAuthenticated) {
-      loadHistory(sessionId);
-    }
-  }, [role, isAuthenticated, sessionId, botConfig]); // Reload if role or botConfig updates
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
-
-  const loadHistory = async (sessId: string) => {
+  const loadHistory = useCallback(async (sessId: string) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
     const isMockToken = token && token.startsWith('mock-sandbox-jwt-token-value');
     
@@ -352,7 +342,13 @@ export default function AIChatWidget() {
         }
       ]);
     }
-  };
+  }, [role, getCustomOrWelcomeMessage]);
+
+  useEffect(() => {
+    if (sessionId && isAuthenticated) {
+      loadHistory(sessionId);
+    }
+  }, [role, isAuthenticated, sessionId, botConfig, loadHistory]);
 
   // Keyboard focus trap & Escape key listener (#4)
   useEffect(() => {

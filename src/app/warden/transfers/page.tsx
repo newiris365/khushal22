@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeftRight, CheckCircle2, XCircle, Clock, ChevronDown
 } from 'lucide-react';
@@ -36,7 +36,7 @@ export default function WardenTransfersPage() {
   const [remarks, setRemarks] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     setIsLoading(true);
     try {
       const params: any = {};
@@ -48,9 +48,9 @@ export default function WardenTransfersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { fetchRequests(); }, [statusFilter]);
+  useEffect(() => { fetchRequests(); }, [fetchRequests]);
 
   const handleApprove = async (id: string, approve: boolean) => {
     setActionLoading(true);

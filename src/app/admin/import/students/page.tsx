@@ -8,7 +8,7 @@ import {
 import Link from 'next/link';
 import { importStudentProfiles } from '@/lib/api';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ImportError {
   row: number;

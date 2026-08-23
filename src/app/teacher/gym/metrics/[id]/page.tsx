@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, ShieldAlert, Sparkles, ArrowLeft, Save } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import Link from 'next/link';
@@ -20,11 +20,7 @@ export default function TrainerEnterMetrics({ params }: { params: { id: string }
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadStudentDetails();
-  }, []);
-
-  const loadStudentDetails = async () => {
+  const loadStudentDetails = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet(`/students`);
@@ -32,7 +28,7 @@ export default function TrainerEnterMetrics({ params }: { params: { id: string }
         const found = res.students.find((s: any) => s.id === studentId);
         setStudent(found);
       }
-    } catch (err) {
+    } catch {
       console.log('Error loading student details, using mock fallback');
       setStudent({
         id: studentId,
@@ -43,7 +39,11 @@ export default function TrainerEnterMetrics({ params }: { params: { id: string }
     } finally {
       setLoading(false);
     }
-  };
+  }, [studentId]);
+
+  useEffect(() => {
+    loadStudentDetails();
+  }, [loadStudentDetails]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

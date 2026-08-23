@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Calendar, User, ExternalLink, Plus,
@@ -50,11 +50,7 @@ export default function TpoDriveRoundOperations() {
   const [saving, setSaving] = useState(false);
   const [activeDrives, setActiveDrives] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadRoundsAndApplicants();
-  }, [driveId]);
-
-  const loadRoundsAndApplicants = async () => {
+  const loadRoundsAndApplicants = useCallback(async () => {
     try {
       const res = await apiGet(`/placements/rounds/drive/${driveId}`);
       if (res.success && res.rounds) {
@@ -78,7 +74,11 @@ export default function TpoDriveRoundOperations() {
       setRounds([]);
     }
     setLoading(false);
-  };
+  }, [driveId]);
+
+  useEffect(() => {
+    loadRoundsAndApplicants();
+  }, [loadRoundsAndApplicants]);
 
   const [actionError, setActionError] = useState<string | null>(null);
 

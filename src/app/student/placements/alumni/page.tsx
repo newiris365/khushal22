@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Users, Calendar, Clock, MessageCircle, Globe,
   Linkedin, Award, CheckCircle, Search, Sparkles
@@ -34,11 +34,7 @@ export default function StudentAlumniMentors() {
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState(false);
 
-  useEffect(() => {
-    loadAlumni();
-  }, []);
-
-  const loadAlumni = async () => {
+  const loadAlumni = useCallback(async () => {
     try {
       const res = await apiGet('/placements/alumni');
       if (res.success && res.alumni?.length > 0) {
@@ -84,7 +80,11 @@ export default function StudentAlumniMentors() {
       ]);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAlumni();
+  }, [loadAlumni]);
 
   const handleBookSession = async (e: React.FormEvent) => {
     e.preventDefault();

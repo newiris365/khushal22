@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Briefcase, MapPin, Calendar, Clock, Lock,
@@ -44,11 +44,7 @@ export default function StudentDriveDetail() {
   const [applied, setApplied] = useState(false);
   const [coverLetter, setCoverLetter] = useState('');
 
-  useEffect(() => {
-    loadDriveAndProfile();
-  }, [driveId]);
-
-  const loadDriveAndProfile = async () => {
+  const loadDriveAndProfile = useCallback(async () => {
     try {
       // 1. Fetch drive
       const driveRes = await apiGet(`/placements/drives/${driveId}`);
@@ -64,11 +60,15 @@ export default function StudentDriveDetail() {
         batch: '2026',
         is_placed: false
       });
-    } catch (err) {
+    } catch {
       console.log('Error loading drive data');
     }
     setLoading(false);
-  };
+  }, [driveId]);
+
+  useEffect(() => {
+    loadDriveAndProfile();
+  }, [loadDriveAndProfile]);
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, CheckCircle, FileText, Download, XCircle,
   HelpCircle, ShieldCheck, Clock, RefreshCw
@@ -28,11 +28,7 @@ export default function StudentOffersLedger() {
   const [optedOut, setOptedOut] = useState(false);
   const [optOutReason, setOptOutReason] = useState('');
 
-  useEffect(() => {
-    loadOffersAndOptOut();
-  }, []);
-
-  const loadOffersAndOptOut = async () => {
+  const loadOffersAndOptOut = useCallback(async () => {
     try {
       const localProfile = localStorage.getItem('iris_user_profile');
       if (localProfile) {
@@ -42,7 +38,7 @@ export default function StudentOffersLedger() {
           setOffers(offersRes.offers);
         }
       }
-    } catch (err) {
+    } catch {
       console.log('Error fetching offers');
     }
     
@@ -64,7 +60,11 @@ export default function StudentOffersLedger() {
       ]);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadOffersAndOptOut();
+  }, [loadOffersAndOptOut]);
 
   const handleAccept = async (id: string) => {
     setProcessingId(id);

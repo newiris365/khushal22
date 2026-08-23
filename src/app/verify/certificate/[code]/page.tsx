@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ShieldCheck, ShieldAlert, Award, Calendar, ExternalLink, ArrowLeft, Bookmark } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import { useParams } from 'next/navigation';
@@ -14,11 +14,7 @@ export default function CertificateVerificationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    verifyCode();
-  }, [code]);
-
-  const verifyCode = async () => {
+  const verifyCode = useCallback(async () => {
     try {
       const res = await apiGet(`/events/certificates/verify/${code}`);
       if (res.success && res.valid) {
@@ -31,7 +27,11 @@ export default function CertificateVerificationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [code]);
+
+  useEffect(() => {
+    verifyCode();
+  }, [verifyCode]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });

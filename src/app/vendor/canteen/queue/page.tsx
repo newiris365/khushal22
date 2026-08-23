@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, CheckCircle2, Volume2, 
   ChefHat, AlertCircle, RefreshCw
@@ -51,15 +51,7 @@ export default function VendorQueuePage() {
     }
   };
 
-  useEffect(() => {
-    loadQueue();
-    const poll = setInterval(() => {
-      loadQueue();
-    }, 8000);
-    return () => clearInterval(poll);
-  }, []);
-
-  const loadQueue = async () => {
+  const loadQueue = useCallback(async () => {
     try {
       const res = await apiGet('canteen/orders/queue');
       if (res.success && res.queue) {
@@ -77,7 +69,15 @@ export default function VendorQueuePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadQueue();
+    const poll = setInterval(() => {
+      loadQueue();
+    }, 8000);
+    return () => clearInterval(poll);
+  }, [loadQueue]);
 
   const [actionError, setActionError] = useState<string | null>(null);
 

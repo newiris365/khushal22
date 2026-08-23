@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Users, CheckCircle, ShieldAlert, Sparkles,
@@ -74,11 +74,7 @@ export default function TpoDriveApplicationsReview() {
     exportToPDF(`Applicants Ledger: ${drive?.companies?.name || 'Recruiter'} - ${drive?.title || 'Position'}`, data, `Applicants_${drive?.companies?.name || 'Drive'}_${drive?.title || 'Role'}`, headers, ["name", "branch", "cgpa", "status", "resume"]);
   };
 
-  useEffect(() => {
-    loadDriveDetails();
-  }, [driveId]);
-
-  const loadDriveDetails = async () => {
+  const loadDriveDetails = useCallback(async () => {
     try {
       const res = await apiGet(`/placements/drives/${driveId}`);
       if (res && res.success && res.drive) {
@@ -90,7 +86,11 @@ export default function TpoDriveApplicationsReview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [driveId]);
+
+  useEffect(() => {
+    loadDriveDetails();
+  }, [loadDriveDetails]);
 
   const handleBulkShortlist = async () => {
     setShortlisting(true);

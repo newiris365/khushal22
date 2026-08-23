@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, MapPin, Users, Ticket, ArrowLeft, CreditCard, Star, Share2, Heart, Bell, CheckCircle2, AlertCircle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
@@ -17,9 +17,7 @@ export default function EventDetailPage() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('about');
 
-  useEffect(() => { loadEvent(); }, [eventId]);
-
-  const loadEvent = async () => {
+  const loadEvent = useCallback(async () => {
     try {
       const res = await apiGet(`/events/events/${eventId}`);
       if (res.success) {
@@ -52,7 +50,9 @@ export default function EventDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => { loadEvent(); }, [loadEvent]);
 
   const handleRegister = async () => {
     setRegistering(true);

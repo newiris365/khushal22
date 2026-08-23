@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Clock, CheckCircle2, AlertCircle, ChevronDown,
   ChevronUp, ExternalLink, Calendar, HelpCircle, Layers, XCircle
@@ -42,11 +42,7 @@ export default function StudentApplicationsTracker() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadApplications();
-  }, []);
-
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     try {
       const localProfile = localStorage.getItem('iris_user_profile');
       if (localProfile) {
@@ -56,7 +52,7 @@ export default function StudentApplicationsTracker() {
           setApplications(res.applications);
         }
       }
-    } catch (err) {
+    } catch {
       console.log('Error fetching applications');
     }
     
@@ -94,7 +90,11 @@ export default function StudentApplicationsTracker() {
       ]);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadApplications();
+  }, [loadApplications]);
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 lg:p-8">

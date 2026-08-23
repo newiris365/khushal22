@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Navigation, MapPin, ShieldAlert, Users, Compass } from 'lucide-react';
 import Link from 'next/link';
 import { getSocket } from '../../../../lib/socket';
@@ -92,7 +92,7 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
     return () => {};
   }, [params.busId]);
 
-  const loadRouteDetails = async () => {
+  const loadRouteDetails = useCallback(async () => {
     try {
       const busRes = await apiGet('/transit/buses');
       if (busRes.success && busRes.buses) {
@@ -105,7 +105,6 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
         }
       }
     } catch {
-      // Mock stops sequence
       setStops([
         { name: "Sardarpura 4th Road", latitude: 26.2912, longitude: 73.0156, stop_index: 0 },
         { name: "Shastri Nagar Circle", latitude: 26.2647, longitude: 73.0012, stop_index: 1 },
@@ -121,7 +120,11 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.busId]);
+
+  useEffect(() => {
+    loadRouteDetails();
+  }, [loadRouteDetails]);
 
   if (loading) {
     return (

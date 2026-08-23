@@ -8,7 +8,7 @@ import {
 import Link from 'next/link';
 import { importAttendanceRecords } from '@/lib/api';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ImportRow {
   student_roll: string;
@@ -24,6 +24,14 @@ interface ImportError {
   error: string;
 }
 
+interface ImportSuccess {
+  imported_count?: number;
+  imported?: number;
+  errors?: number;
+  error_details?: { row: number; error: string }[];
+  message?: string;
+}
+
 const REQUIRED_COLUMNS = ['student_roll', 'subject', 'date', 'status'];
 const VALID_STATUSES = ['present', 'absent', 'late', 'excused'];
 const SAMPLE_CSV = `student_roll,subject,date,status,method,time_slot
@@ -34,19 +42,22 @@ CS23B1025,Physics,2026-06-01,present,manual,10:00-11:00`;
 
 export default function AttendanceImportPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [data, setData] = useState<any[]>([]);
   const [rawData, setRawData] = useState<any[]>([]);
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [validatedRows, setValidatedRows] = useState<ImportRow[]>([]);
   const [errors, setErrors] = useState<ImportError[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportSuccess | null>(null);
-  const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'result'>('upload');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [step, setStep] = useState<'upload' | 'map' | 'preview' | 'result'>('upload');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const processFile = useCallback((file: File) => {
     setErrors([]);
     setImportResult(null);
+    setFileName(file.name);
 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel';
 

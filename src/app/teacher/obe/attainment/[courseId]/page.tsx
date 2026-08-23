@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, BarChart, CheckCircle2, XCircle, TrendingUp, HelpCircle, RefreshCw } from 'lucide-react';
 
@@ -24,7 +24,7 @@ export default function CoAttainmentDashboard({ params }: { params: { courseId: 
   const [stats, setStats] = useState<AttainmentStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet(`/obe/co-attainment/${courseId}`);
@@ -39,11 +39,11 @@ export default function CoAttainmentDashboard({ params }: { params: { courseId: 
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId]);
 
   useEffect(() => {
     loadData();
-  }, [courseId]);
+  }, [loadData]);
 
   // SVG parameters for the circular gauge
   const radius = 60;

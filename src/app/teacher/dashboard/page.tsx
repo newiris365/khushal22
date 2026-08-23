@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, BookOpen, Users, Clock, FileText, TrendingUp, 
   Calendar, CheckCircle, MessageSquare, AlertCircle, Award, 
@@ -45,11 +45,7 @@ export default function TeacherDashboard() {
   const [behaviorDesc, setBehaviorDesc] = useState('');
   const [submittingBehavior, setSubmittingBehavior] = useState(false);
 
-  useEffect(() => {
-    loadDashboard();
-  }, [scheduleType]);
-
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
       // 1. Fetch timetable based on toggle
@@ -95,7 +91,11 @@ export default function TeacherDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scheduleType]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
   const handlePostBehavior = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Lock, CreditCard, CheckCircle, Loader2, Home, Bus, Dumbbell } from 'lucide-react';
 import { apiGet, apiPost } from '../lib/api';
 
@@ -46,11 +46,7 @@ export default function SubscriptionGate({ serviceType, institutionId, studentId
   const Icon = SERVICE_ICONS[serviceType] || Home;
   const accentColor = SERVICE_COLORS[serviceType] || '#6C2BD9';
 
-  useEffect(() => {
-    checkSubscription();
-  }, [studentId, serviceType]);
-
-  const checkSubscription = async () => {
+  const checkSubscription = useCallback(async () => {
     if (!studentId) { setLoading(false); return; }
     try {
       const res = await apiGet(`/service-subscriptions/status/${studentId}`, { service_type: serviceType });
@@ -58,18 +54,20 @@ export default function SubscriptionGate({ serviceType, institutionId, studentId
         const hasSub = serviceType === 'hostel' ? res.has_hostel :
                        serviceType === 'transit' ? res.has_transit : res.has_gym;
         setHasSubscription(hasSub);
-        if (hasSub && res.subscriptions?.[serviceType]) {
-          setExpiryDate(res.subscriptions[serviceType].end_date);
+        if (res.expiry_dates?.[serviceType]) {
+          setExpiryDate(res.expiry_dates[serviceType]);
         }
-      } else {
-        setHasSubscription(false);
       }
     } catch {
       setHasSubscription(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [studentId, serviceType]);
+
+  useEffect(() => {
+    checkSubscription();
+  }, [checkSubscription]);
 
   const loadPlans = async () => {
     try {
