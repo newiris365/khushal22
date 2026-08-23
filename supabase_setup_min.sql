@@ -11307,3 +11307,5 @@ resolved_at TIMESTAMPTZ
 );
 ALTER TABLE public.dvv_queries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated full access to dvv_queries" ON public.dvv_queries FOR ALL USING (true);
+ALTER TABLE IF EXISTS public.companies
+ADD COLUMN IF NOT EXISTS access_key_hash text;

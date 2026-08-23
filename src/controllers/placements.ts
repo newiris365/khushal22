@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin, isSupabaseOffline } from '../config/supabase';
 import PDFDocument from 'pdfkit';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import logger from '../config/logger';
 
 // ============================================================
@@ -123,13 +124,18 @@ export async function createCompany(req: Request, res: Response) {
     }
 
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const insertPayload: any = {
+      institution_id: institutionId,
+      ...parse.data
+    };
+
+    if (req.body.access_key && typeof req.body.access_key === 'string' && req.body.access_key.trim()) {
+      insertPayload.access_key_hash = crypto.createHash('sha256').update(req.body.access_key.trim()).digest('hex');
+    }
 
     const { data, error } = await supabaseAdmin
       .from('companies')
-      .insert({
-        institution_id: institutionId,
-        ...parse.data
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -164,9 +170,14 @@ export async function updateCompany(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     }
 
+    const updatePayload: any = { ...parse.data };
+    if (req.body.access_key && typeof req.body.access_key === 'string' && req.body.access_key.trim()) {
+      updatePayload.access_key_hash = crypto.createHash('sha256').update(req.body.access_key.trim()).digest('hex');
+    }
+
     const { data, error } = await supabaseAdmin
       .from('companies')
-      .update(parse.data)
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
@@ -1246,47 +1257,33 @@ export async function companyLogin(req: Request, res: Response) {
     const cleanEmail = email.trim().toLowerCase();
 
     // Query companies table by hr_email
-    let company: any = null;
-    try {
-      const { data } = await supabaseAdmin
-        .from('companies')
-        .select('*')
-        .ilike('hr_email', cleanEmail)
-        .maybeSingle();
-      if (data) company = data;
-    } catch {
-      // ignore
+    const { data: company, error: companyErr } = await supabaseAdmin
+      .from('companies')
+      .select('*')
+      .ilike('hr_email', cleanEmail)
+      .maybeSingle();
+
+    if (companyErr || !company) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Demo fallback matching for partner recruiters if DB query yields no record
-    if (!company) {
-      if (cleanEmail === 'hr@google.com' || cleanEmail.includes('google')) {
-        company = {
-          id: 'c0000000-0000-0000-0000-000000000001',
-          name: 'Google India',
-          hr_name: 'Sundar Pichai (Recruitment Head)',
-          hr_email: cleanEmail,
-          institution_id: 'a0000000-0000-0000-0000-000000000001',
-          access_key: 'partner2026'
-        };
-      } else {
-        company = {
-          id: `c-${Date.now()}`,
-          name: 'Partner Enterprise Recruiters',
-          hr_name: 'Partner HR',
-          hr_email: cleanEmail,
-          institution_id: 'a0000000-0000-0000-0000-000000000001',
-          access_key: 'partner2026'
-        };
-      }
+    // Verify access key hash or legacy key
+    const inputHash = crypto.createHash('sha256').update(access_key.trim()).digest('hex');
+    const isValidKey = (company.access_key_hash && company.access_key_hash === inputHash) ||
+                       (company.access_key && (company.access_key === access_key.trim() || company.access_key === inputHash));
+
+    if (!isValidKey) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Verify access key if stored on company record
-    if (company.access_key && company.access_key !== access_key && access_key !== 'partner2026' && access_key !== 'admin123') {
-      return res.status(401).json({ success: false, error: 'Invalid TPO partner passkey' });
+    // Fail closed if JWT_SECRET is not set
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret && process.env.NODE_ENV !== 'test') {
+      logger.error('[companyLogin] CRITICAL SECURITY ERROR: JWT_SECRET is missing.');
+      return res.status(500).json({ success: false, error: 'Internal server security configuration error' });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'super-secret-jwt-key';
+    const secret = jwtSecret || 'test-secret-key-32-chars-minimum!!';
     const payload = {
       id: company.id,
       email: company.hr_email || cleanEmail,
@@ -1296,7 +1293,7 @@ export async function companyLogin(req: Request, res: Response) {
       institution_id: company.institution_id || 'a0000000-0000-0000-0000-000000000001'
     };
 
-    const token = jwt.sign(payload, jwtSecret, { expiresIn: '7d' });
+    const token = jwt.sign(payload, secret, { expiresIn: '15m' });
 
     return res.status(200).json({
       success: true,
@@ -1310,40 +1307,18 @@ export async function companyLogin(req: Request, res: Response) {
 
 export async function getMyCompanyDrives(req: Request, res: Response) {
   try {
-    let companyId = req.user?.company_id;
-    if (!companyId && req.query.company_id) {
-      companyId = req.query.company_id as string;
+    const companyId = req.user?.company_id;
+    if (!companyId) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Recruiter company scope required' });
     }
 
-    let query = supabaseAdmin.from('placement_drives').select('*, companies(*)');
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    } else if (req.user?.role === 'Company HR') {
-      query = query.eq('company_id', req.user.id);
-    }
+    const { data, error } = await supabaseAdmin
+      .from('placement_drives')
+      .select('*, companies(*)')
+      .eq('company_id', companyId);
 
-    const { data, error } = await query;
-    if (error || !data || data.length === 0) {
-      // Fallback demo drive for Google recruiter session if DB has no entries for this company yet
-      const demoDrives = [
-        {
-          id: 'd0000000-0000-0000-0000-000000000001',
-          company_id: companyId || 'c0000000-0000-0000-0000-000000000001',
-          title: 'Google SWE Summer Drive 2026',
-          role: 'Software Engineer (L3)',
-          job_type: 'full_time',
-          location: ['Bangalore', 'Hyderabad'],
-          ctc_display: '32 - 42 LPA',
-          min_cgpa: 8.0,
-          status: 'open',
-          application_deadline: new Date(Date.now() + 864000000).toISOString(),
-          companies: { name: 'Google India' }
-        }
-      ];
-      return res.status(200).json({ success: true, drives: demoDrives });
-    }
-
-    return res.status(200).json({ success: true, drives: data });
+    if (error) throw error;
+    return res.status(200).json({ success: true, drives: data || [] });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

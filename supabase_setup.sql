@@ -14538,3 +14538,12 @@ CREATE TABLE IF NOT EXISTS public.dvv_queries (
 
 ALTER TABLE public.dvv_queries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated full access to dvv_queries" ON public.dvv_queries FOR ALL USING (true);
+
+
+-- ==========================================================
+-- MIGRATION: 20260823000004_company_access_key.sql
+-- ==========================================================
+
+-- Migration: Add access_key_hash to companies table
+ALTER TABLE IF EXISTS public.companies 
+ADD COLUMN IF NOT EXISTS access_key_hash text;

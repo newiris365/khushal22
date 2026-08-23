@@ -33,7 +33,7 @@ const getRedirectPath = (role: string): string => {
     case 'Vice Principal': return '/vp/dashboard';
     case 'VP': return '/vp/dashboard';
     case 'HR Admin': return '/hr/my/dashboard';
-    case 'Company HR': return '/company';
+    case 'Company HR': return '/company/drives';
     case 'IQAC Coordinator': return '/iqac';
     case 'Admissions Officer': return '/officer/admissions';
     case 'TPO': return '/tpo';
