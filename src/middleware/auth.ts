@@ -35,8 +35,11 @@ import { tokenDenylist } from '../lib/tokenDenylist';
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   let authHeader = req.headers.authorization;
   
-  if (!authHeader && req.query && req.query.token) {
-    authHeader = `Bearer ${req.query.token}`;
+  if (!authHeader && req.query && typeof req.query.token === 'string' && req.method === 'GET') {
+    const isDownloadRoute = req.path.includes('/download') || req.path.includes('/export') || req.path.includes('/reports');
+    if (isDownloadRoute) {
+      authHeader = `Bearer ${req.query.token}`;
+    }
   }
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
