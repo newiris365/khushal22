@@ -33,19 +33,18 @@ CS23B1025,Mathematics,2026-06-01,late,manual,09:00-10:00
 CS23B1025,Physics,2026-06-01,present,manual,10:00-11:00`;
 
 export default function AttendanceImportPage() {
-  const [data, setData] = useState<ImportRow[]>([]);
-  const [errors, setErrors] = useState<{ row: number; error: string }[]>([]);
-  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [importResult, setImportResult] = useState<{ imported: number; errors: number; error_details: ImportError[] } | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [fileName, setFileName] = useState('');
-  const [rawHeaders, setRawHeaders] = useState<string[]>([]);
+  const [file, setFile] = useState<File | null>(null);
   const [rawData, setRawData] = useState<any[]>([]);
-  const [step, setStep] = useState<'upload' | 'map' | 'preview' | 'result'>('upload');
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [rawHeaders, setRawHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [validatedRows, setValidatedRows] = useState<ImportRow[]>([]);
+  const [errors, setErrors] = useState<ImportError[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [importResult, setImportResult] = useState<ImportSuccess | null>(null);
+  const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'result'>('upload');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = useCallback((file: File) => {
-    setFileName(file.name);
     setErrors([]);
     setImportResult(null);
 
@@ -53,18 +52,23 @@ export default function AttendanceImportPage() {
 
     if (isExcel) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          if (!firstSheetName) {
+          const buffer = e.target?.result as ArrayBuffer;
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(buffer);
+          const worksheet = workbook.worksheets[0];
+          if (!worksheet) {
             setErrors([{ row: 0, error: 'Excel file is empty (no sheets found)' }]);
             return;
           }
-          const worksheet = workbook.Sheets[firstSheetName];
-          const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
-          
+
+          const rawRows: any[][] = [];
+          worksheet.eachRow({ includeEmpty: true }, (row) => {
+            const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+            rawRows.push(values.map(v => (v !== null && v !== undefined ? (typeof v === 'object' && 'result' in v ? String((v as any).result) : (typeof v === 'object' && 'text' in v ? String((v as any).text) : String(v))) : '')));
+          });
+
           if (rawRows.length === 0) {
             setErrors([{ row: 0, error: 'Excel sheet is empty' }]);
             return;

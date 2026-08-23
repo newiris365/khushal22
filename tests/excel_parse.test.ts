@@ -1,28 +1,25 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
-describe('Excel Parsing Logic', () => {
-  it('should parse an Excel workbook in-memory and return headers and rawData', () => {
-    // 1. Create a dummy workbook in memory using XLSX
-    const sampleData = [
-      { student_roll: 'CS23B1024', subject: 'Mathematics', date: '2026-06-01', status: 'present', method: 'manual', time_slot: '09:00-10:00' },
-      { student_roll: 'CS23B1025', subject: 'Physics', date: '2026-06-01', status: 'absent', method: 'manual', time_slot: '10:00-11:00' }
-    ];
+describe('Excel Parsing Logic (ExcelJS)', () => {
+  it('should parse an Excel workbook in-memory and return headers and rawData', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Attendance');
+    worksheet.addRow(['student_roll', 'subject', 'date', 'status', 'method', 'time_slot']);
+    worksheet.addRow(['CS23B1024', 'Mathematics', '2026-06-01', 'present', 'manual', '09:00-10:00']);
+    worksheet.addRow(['CS23B1025', 'Physics', '2026-06-01', 'absent', 'manual', '10:00-11:00']);
 
-    const worksheet = XLSX.utils.json_to_sheet(sampleData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    // 2. Write the workbook as a binary buffer (representing what FileReader gets)
-    const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
-    const arrayBuffer = new Uint8Array(excelBuffer);
+    const readWorkbook = new ExcelJS.Workbook();
+    await readWorkbook.xlsx.load(buffer as ArrayBuffer);
+    const readWorksheet = readWorkbook.worksheets[0];
+    expect(readWorksheet.name).toBe('Attendance');
 
-    // 3. Simulating processFile Excel parsing logic
-    const readWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const firstSheetName = readWorkbook.SheetNames[0];
-    expect(firstSheetName).toBe('Attendance');
-
-    const readWorksheet = readWorkbook.Sheets[firstSheetName];
-    const rawRows = XLSX.utils.sheet_to_json<any[]>(readWorksheet, { header: 1, defval: '' });
+    const rawRows: any[][] = [];
+    readWorksheet.eachRow({ includeEmpty: true }, (row) => {
+      const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+      rawRows.push(values.map(v => (v !== null && v !== undefined ? String(v) : '')));
+    });
 
     expect(rawRows.length).toBe(3); // 1 header row + 2 data rows
 
@@ -45,24 +42,25 @@ describe('Excel Parsing Logic', () => {
     expect(dataRows[1].status).toBe('absent');
   });
 
-  it('should ignore empty rows and columns in the workbook', () => {
-    const rawRowsWithEmpties = [
-      ['student_roll', 'subject', 'date', 'status', ''],
-      ['CS23B1026', 'Chemistry', '2026-06-02', 'present', ''],
-      ['', '', '', '', ''], // empty row
-      ['CS23B1027', 'Biology', '2026-06-02', 'late', '']
-    ];
+  it('should ignore empty rows and columns in the workbook', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Sheet1');
+    worksheet.addRow(['student_roll', 'subject', 'date', 'status', '']);
+    worksheet.addRow(['CS23B1026', 'Chemistry', '2026-06-02', 'present', '']);
+    worksheet.addRow(['', '', '', '', '']);
+    worksheet.addRow(['CS23B1027', 'Biology', '2026-06-02', 'late', '']);
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rawRowsWithEmpties);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-    const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
-    const arrayBuffer = new Uint8Array(excelBuffer);
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    // Read and parse
-    const readWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const readWorksheet = readWorkbook.Sheets[readWorkbook.SheetNames[0]];
-    const rawRowsParsed = XLSX.utils.sheet_to_json<any[]>(readWorksheet, { header: 1, defval: '' });
+    const readWorkbook = new ExcelJS.Workbook();
+    await readWorkbook.xlsx.load(buffer as ArrayBuffer);
+    const readWorksheet = readWorkbook.worksheets[0];
+
+    const rawRowsParsed: any[][] = [];
+    readWorksheet.eachRow({ includeEmpty: true }, (row) => {
+      const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+      rawRowsParsed.push(values.map(v => (v !== null && v !== undefined ? String(v) : '')));
+    });
 
     const headers = (rawRowsParsed[0] || []).map(h => String(h).trim()).filter(h => h !== '');
     expect(headers).toEqual(['student_roll', 'subject', 'date', 'status']);

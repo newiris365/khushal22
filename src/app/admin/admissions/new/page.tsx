@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import Link from 'next/link';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface Admission {
   id: string;
@@ -129,17 +129,21 @@ export default function AdminAdmissionsPage() {
     if (isExcel) {
       const reader = new FileReader();
       const promise = new Promise<any[]>((resolve, reject) => {
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            if (!firstSheetName) {
+            const buffer = e.target?.result as ArrayBuffer;
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(buffer);
+            const worksheet = workbook.worksheets[0];
+            if (!worksheet) {
               reject(new Error('Excel file is empty'));
               return;
             }
-            const worksheet = workbook.Sheets[firstSheetName];
-            const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
+            const rawRows: any[][] = [];
+            worksheet.eachRow({ includeEmpty: true }, (row) => {
+              const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+              rawRows.push(values.map(v => (v !== null && v !== undefined ? (typeof v === 'object' && 'result' in v ? String((v as any).result) : (typeof v === 'object' && 'text' in v ? String((v as any).text) : String(v))) : '')));
+            });
             if (rawRows.length === 0) {
               reject(new Error('Excel sheet is empty'));
               return;

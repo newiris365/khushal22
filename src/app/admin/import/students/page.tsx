@@ -66,17 +66,22 @@ export default function StudentImportPage() {
 
     if (isExcel) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          if (!firstSheetName) {
+          const buffer = e.target?.result as ArrayBuffer;
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(buffer);
+          const worksheet = workbook.worksheets[0];
+          if (!worksheet) {
             setErrors([{ row: 0, error: 'Excel file is empty (no sheets found)' }]);
             return;
           }
-          const worksheet = workbook.Sheets[firstSheetName];
-          const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
+
+          const rawRows: any[][] = [];
+          worksheet.eachRow({ includeEmpty: true }, (row) => {
+            const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+            rawRows.push(values.map(v => (v !== null && v !== undefined ? (typeof v === 'object' && 'result' in v ? String((v as any).result) : (typeof v === 'object' && 'text' in v ? String((v as any).text) : String(v))) : '')));
+          });
           
           if (rawRows.length === 0) {
             setErrors([{ row: 0, error: 'Excel sheet is empty' }]);
