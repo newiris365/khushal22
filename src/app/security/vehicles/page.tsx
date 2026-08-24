@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Car, LogIn, LogOut, Search, Filter, Plus
 } from 'lucide-react';
@@ -29,7 +29,7 @@ export default function SecurityVehiclesPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     setFetchError(null);
     try {
@@ -49,9 +49,9 @@ export default function SecurityVehiclesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filter]);
 
-  useEffect(() => { fetchLogs(); }, [filter]);
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
   const handleEntry = async () => {
     if (!form.vehicle_number) return;

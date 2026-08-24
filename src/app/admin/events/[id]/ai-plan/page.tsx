@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, ArrowLeft, Calendar, DollarSign, Users, AlertTriangle, CheckCircle, Plus, Edit2, ListTodo, HelpCircle } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import Link from 'next/link';
@@ -23,11 +23,7 @@ export default function AdminAiPlannerPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    loadEvent();
-  }, [eventId]);
-
-  const loadEvent = async () => {
+  const loadEvent = useCallback(async () => {
     try {
       const res = await apiGet(`/events/events/${eventId}`);
       if (res.success) {
@@ -47,7 +43,11 @@ export default function AdminAiPlannerPage() {
     } catch (err) {
       setError('Offline mode: Using mock event information.');
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
 
   const handleGeneratePlan = async () => {
     setGenerating(true);

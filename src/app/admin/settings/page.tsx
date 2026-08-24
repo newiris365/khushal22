@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Settings, Save, CheckCircle2, Sliders, ToggleLeft, ToggleRight, Loader2, Database, AlertTriangle, ExternalLink } from 'lucide-react';
 import { 
   getFeatureToggles, setFeatureToggles,
@@ -129,11 +129,7 @@ export default function AdminSettingsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (institutionId) loadAll();
-  }, [institutionId]);
-
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     if (!institutionId) { setIsLoading(false); return; }
     setIsLoading(true);
     try {
@@ -159,7 +155,11 @@ export default function AdminSettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (institutionId) loadAll();
+  }, [institutionId, loadAll]);
 
   const handleToggleFeature = (featureKey: string) => {
     setFeatures(prev => prev.map(f =>

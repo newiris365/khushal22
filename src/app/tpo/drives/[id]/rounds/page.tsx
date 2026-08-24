@@ -68,11 +68,6 @@ export default function TpoDriveRoundOperations() {
     } catch (err) {
       console.log('Error loading rounds data');
     }
-
-    // fallback mock if empty
-    if (rounds.length === 0) {
-      setRounds([]);
-    }
     setLoading(false);
   }, [driveId]);
 

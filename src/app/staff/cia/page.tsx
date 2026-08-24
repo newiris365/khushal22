@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Plus, Search, Save, Download, ChevronDown
 } from 'lucide-react';
@@ -67,7 +67,7 @@ export default function FacultyCiaPage() {
   }, []);
 
   // Fetch assessments
-  const fetchAssessments = async () => {
+  const fetchAssessments = useCallback(async () => {
     setIsLoading(true);
     try {
       const params: any = {};
@@ -79,9 +79,9 @@ export default function FacultyCiaPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedDept]);
 
-  useEffect(() => { fetchAssessments(); }, [selectedDept]);
+  useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
 
   // Fetch marks for assessment
   const fetchMarks = async (assessment: Assessment) => {

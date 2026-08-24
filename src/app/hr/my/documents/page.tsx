@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, FileText, Upload, RefreshCw } from 'lucide-react';
 
@@ -21,7 +21,7 @@ export default function EmployeeDocuments() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/documents/me', {
@@ -36,11 +36,11 @@ export default function EmployeeDocuments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleUpload = (docType: string) => {
     const input = document.createElement('input');

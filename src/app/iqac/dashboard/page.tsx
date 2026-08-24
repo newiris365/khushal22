@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, CheckCircle2, AlertTriangle, RefreshCw, BarChart3,
   BookOpen, Users, Trophy
@@ -28,7 +28,7 @@ export default function IqacDashboard() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -53,11 +53,11 @@ export default function IqacDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleAutoSync = async () => {
     setSyncing(true);

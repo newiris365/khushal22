@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Download, RefreshCw, BarChart3, Users, IndianRupee, CalendarDays, TrendingDown, FileSpreadsheet } from 'lucide-react';
 
 interface HeadcountRow { department: string; count: number; }
@@ -21,7 +21,7 @@ export default function AdminHrReports() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [hcRes, salRes, llRes, atRes] = await Promise.all([
@@ -66,9 +66,9 @@ export default function AdminHrReports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const exportCSV = (filename: string, headers: string[], rows: string[][]) => {
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');

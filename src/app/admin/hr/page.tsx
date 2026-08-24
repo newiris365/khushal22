@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Users, FileText, CalendarDays, Briefcase, IndianRupee, RefreshCw, BarChart3 } from 'lucide-react';
 
@@ -14,18 +14,17 @@ export default function AdminHrDashboard() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [hcRes, salRes] = await Promise.all([
-        fetch('/api/v1/hr/reports/headcount', { headers: getAuthHeaders() }),
-        fetch('/api/v1/hr/reports/salary-summary', { headers: getAuthHeaders() })
-      ]);
-      const hcData = await hcRes.json();
-      const salData = await salRes.json();
-      
-      if (hcData.success) setHeadcount(hcData.report);
-      if (salData.success) setSalarySummary(salData.report);
+      const res = await fetch('/api/v1/hr/analytics/overview', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHeadcount(data.headcount || []);
+        setSalarySummary(data.salary_summary || null);
+      }
     } catch (err) {
       console.error(err);
       setHeadcount([{ department: 'Computer Science', count: 12 }, { department: 'Mechanical Eng.', count: 8 }]);
@@ -33,11 +32,11 @@ export default function AdminHrDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-8">

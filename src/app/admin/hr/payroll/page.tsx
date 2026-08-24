@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { IndianRupee, FileText, CheckCircle2, RefreshCw, BarChart3, Download } from 'lucide-react';
 
 interface PayrollRun {
@@ -27,7 +27,7 @@ export default function AdminPayrollConsole() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/payroll/runs', {
@@ -53,11 +53,11 @@ export default function AdminPayrollConsole() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleTriggerRun = async () => {
     setProcessing(true);

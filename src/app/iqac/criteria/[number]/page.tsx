@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Sparkles, Upload, FileText, Send, CheckCircle2, ChevronRight, HelpCircle, RefreshCw } from 'lucide-react';
 import { exportToCSV, exportToPDF } from '../../../../lib/exportUtils';
@@ -57,7 +57,7 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [savingNarrative, setSavingNarrative] = useState(false);
 
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -80,12 +80,12 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
     } finally {
       setLoading(false);
     }
-  };
+  }, [criterionNumber]);
 
   useEffect(() => {
     loadMetrics();
     setAiDraft('');
-  }, [criterionNumber]);
+  }, [loadMetrics]);
 
   const handleUpdateMetric = async (metricId: string, value: string, notes: string) => {
     setSavingId(metricId);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Award, Trophy, Star, Shield, Search, RefreshCw } from 'lucide-react';
 
 interface Achievement {
@@ -30,7 +30,7 @@ export default function AdminStudentAchievements() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const statsRes = await fetch('/api/v1/obe/student-achievements/stats', {
@@ -48,11 +48,11 @@ export default function AdminStudentAchievements() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">

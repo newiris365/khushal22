@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Calendar, CheckCircle, Clock, Plus, ShieldCheck, Trash2, Tag, Key, Info } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../../lib/api';
 import Link from 'next/link';
@@ -27,11 +27,7 @@ export default function StudyRoomsBookingPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadRoomsData();
-  }, [selectedDate]);
-
-  const loadRoomsData = async () => {
+  const loadRoomsData = useCallback(async () => {
     try {
       const res = await apiGet(`/library/study-rooms?date=${selectedDate}`);
       if (res.success) {
@@ -63,7 +59,11 @@ export default function StudyRoomsBookingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadRoomsData();
+  }, [loadRoomsData]);
 
   const handleAddMember = () => {
     if (!form.memberInput.trim()) return;

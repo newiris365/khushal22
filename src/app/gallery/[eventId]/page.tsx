@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Image as ImageIcon, ArrowLeft, Heart, MessageCircle, AlertCircle, Maximize2, X, Tag } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 import { useParams } from 'next/navigation';
@@ -18,11 +18,7 @@ export default function PublicEventGalleryPage() {
   
   const [activePhoto, setActivePhoto] = useState<any>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [eventId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [eventRes, photosRes] = await Promise.all([
         apiGet(`/events/events/${eventId}`),
@@ -43,7 +39,11 @@ export default function PublicEventGalleryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 relative overflow-hidden">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Heart, HelpCircle, AlertTriangle, TrendingDown, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from '../../../../lib/charts';
@@ -12,11 +12,7 @@ export default function AdminHostelWellness() {
   const [loading, setLoading] = useState(true);
   const [selectedBlock, setSelectedBlock] = useState('b1');
 
-  useEffect(() => {
-    loadWellnessData();
-  }, [selectedBlock]);
-
-  const loadWellnessData = async () => {
+  const loadWellnessData = useCallback(async () => {
     setLoading(true);
     try {
       const [trendsRes, alertsRes] = await Promise.all([
@@ -39,7 +35,11 @@ export default function AdminHostelWellness() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedBlock]);
+
+  useEffect(() => {
+    loadWellnessData();
+  }, [loadWellnessData]);
 
   const getMoodStatusLabel = (val: number) => {
     if (val >= 4.0) return { label: 'Excellent', color: 'text-emerald-400' };

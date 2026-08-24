@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, MapPin, Clock, HelpCircle, BarChart3, MessageSquare, AlertCircle } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import { useParams } from 'next/navigation';
@@ -21,16 +21,6 @@ export default function KioskLiveDisplayPage() {
   
   const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
   const [countdownStr, setCountdownStr] = useState('00:00:00');
-
-  useEffect(() => {
-    loadDisplayData();
-    const refreshTimer = setInterval(loadDisplayData, 8000); // Poll display data every 8s for updates
-    setupLiveSockets();
-
-    return () => {
-      clearInterval(refreshTimer);
-    };
-  }, [eventId]);
 
   useEffect(() => {
     if (!data || !data.start_datetime) return;
@@ -54,7 +44,7 @@ export default function KioskLiveDisplayPage() {
     return () => clearInterval(countTimer);
   }, [data]);
 
-  const loadDisplayData = async () => {
+  const loadDisplayData = useCallback(async () => {
     try {
       const res = await apiGet(`/events/events/${eventId}/live-display-data`);
       if (res.success) {
@@ -91,9 +81,19 @@ export default function KioskLiveDisplayPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
 
-  const setupLiveSockets = () => {
+  const triggerFloatingEmoji = useCallback((emoji: string) => {
+    const newId = Math.random().toString();
+    const randomLeft = 0; // 10% to 90%
+    setFloatingEmojis(prev => [...prev, { id: newId, emoji, left: randomLeft }]);
+
+    setTimeout(() => {
+      setFloatingEmojis(prev => prev.filter(e => e.id !== newId));
+    }, 2500);
+  }, []);
+
+  const setupLiveSockets = useCallback(() => {
     try {
       const io = require('socket.io-client');
       const socket = io('/events-live');
@@ -157,18 +157,20 @@ export default function KioskLiveDisplayPage() {
       }, 3000);
       return () => clearInterval(timer);
     }
-  };
+  }, [eventId, triggerFloatingEmoji]);
 
-  const triggerFloatingEmoji = (emoji: string) => {
-    const newId = Math.random().toString();
-    const randomLeft = 0; // 10% to 90%
-    setFloatingEmojis(prev => [...prev, { id: newId, emoji, left: randomLeft }]);
+  useEffect(() => {
+    loadDisplayData();
+    const refreshTimer = setInterval(loadDisplayData, 8000); // Poll display data every 8s for updates
+    const cleanupSockets = setupLiveSockets();
 
-    // Remove emoji from DOM after animation completes (3s)
-    setTimeout(() => {
-      setFloatingEmojis(prev => prev.filter(e => e.id !== newId));
-    }, 3000);
-  };
+    return () => {
+      clearInterval(refreshTimer);
+      if (cleanupSockets) cleanupSockets();
+    };
+  }, [loadDisplayData, setupLiveSockets]);
+
+
 
   if (loading) {
     return (

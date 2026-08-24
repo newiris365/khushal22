@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Users, GraduationCap, CheckCircle2, IndianRupee, Activity, CreditCard, Calendar, TrendingUp } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
@@ -43,9 +43,7 @@ export default function CampusDetailPanel({ institutionId, institutionName, onCl
   const [totalWalletBalance, setTotalWalletBalance] = useState(0);
   const [instDetails, setInstDetails] = useState<any>(institutionDetails || null);
 
-  useEffect(() => { loadDetail(); }, [institutionId]);
-
-  const loadDetail = async () => {
+  const loadDetail = useCallback(async () => {
     setLoading(true);
     try {
       const [studentsRes, staffRes, attendanceRes, feesRes, featuresRes, walletRes, instRes] = await Promise.all([
@@ -98,7 +96,11 @@ export default function CampusDetailPanel({ institutionId, institutionName, onCl
     } finally {
       setLoading(false);
     }
-  };
+  }, [institutionId, institutionDetails]);
+
+  useEffect(() => {
+    loadDetail();
+  }, [loadDetail]);
 
   const maxActivity = Math.max(...monthlyActivity.map(m => m.count), 1);
 

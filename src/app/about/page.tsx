@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 import styles from './about.module.css';
@@ -243,13 +243,14 @@ export default function AboutPage() {
       }
     }, { threshold: 0.25 });
 
-    if (statsSectionRef.current) {
-      observer.observe(statsSectionRef.current);
+    const node = statsSectionRef.current;
+    if (node) {
+      observer.observe(node);
     }
 
     return () => {
-      if (statsSectionRef.current) {
-        observer.unobserve(statsSectionRef.current);
+      if (node) {
+        observer.unobserve(node);
       }
     };
   }, [countersTriggered]);
@@ -285,7 +286,7 @@ export default function AboutPage() {
   };
 
   // 3. SVG Connection Paths Calculations
-  const updatePaths = () => {
+  const updatePaths = useCallback(() => {
     if (!containerRef.current || !hudRef.current) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
@@ -346,7 +347,7 @@ export default function AboutPage() {
     });
 
     setPaths(calculatedPaths);
-  };
+  }, [activeModule.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -370,7 +371,7 @@ export default function AboutPage() {
       observer.disconnect();
       window.removeEventListener('resize', updatePaths);
     };
-  }, [activeModule]);
+  }, [activeModule, updatePaths]);
 
   // CTA Glow Interval Loop
   useEffect(() => {
@@ -601,7 +602,7 @@ export default function AboutPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[#10b981] font-bold">SYS ACTIVE</span>
-                <span>//</span>
+                <span>{"//"}</span>
                 <span>ID: {activeModule.id.toUpperCase()}</span>
               </div>
             </div>

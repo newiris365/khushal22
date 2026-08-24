@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, BarChart2, IndianRupee, TrendingUp, AlertTriangle, CheckCircle, PieChart } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import Link from 'next/link';
@@ -16,11 +16,7 @@ export default function AdminAnalyticsPage() {
     collectionRate: '0%'
   });
 
-  useEffect(() => {
-    loadAnalyticsData();
-  }, []);
-
-  const loadAnalyticsData = async () => {
+  const loadAnalyticsData = useCallback(async () => {
     try {
       const res = await apiGet('/hostel/fees');
       if (res.success && res.fees) {
@@ -37,7 +33,11 @@ export default function AdminAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAnalyticsData();
+  }, [loadAnalyticsData]);
 
   const calculateStats = (records: any[]) => {
     let collected = 0;

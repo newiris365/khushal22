@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Calendar, BookOpen, Sparkles, MessageSquare, RefreshCw } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 
@@ -26,11 +26,7 @@ export default function AdminBookClubsPage() {
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    loadClubsData();
-  }, []);
-
-  const loadClubsData = async () => {
+  const loadClubsData = useCallback(async () => {
     try {
       const [clubsRes, booksRes] = await Promise.all([
         apiGet('/library/book-clubs'),
@@ -40,11 +36,13 @@ export default function AdminBookClubsPage() {
       if (clubsRes.success) {
         setClubs(clubsRes.book_clubs || []);
         if (clubsRes.book_clubs?.length > 0) {
-          const current = selectedClub ? clubsRes.book_clubs.find((c: any) => c.id === selectedClub.id) : clubsRes.book_clubs[0];
-          if (current) {
-            setSelectedClub(current);
-            loadDiscussions(current.id);
-          }
+          setSelectedClub((prev: any) => {
+            const current = prev ? clubsRes.book_clubs.find((c: any) => c.id === prev.id) : clubsRes.book_clubs[0];
+            if (current) {
+              loadDiscussions(current.id);
+            }
+            return current || clubsRes.book_clubs[0];
+          });
         }
       }
       if (booksRes.success) {
@@ -73,7 +71,11 @@ export default function AdminBookClubsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadClubsData();
+  }, [loadClubsData]);
 
   const loadDiscussions = async (clubId: string) => {
     setLoadingDiscussions(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Calendar, ChevronLeft, Plus, Clock, FileCheck2, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -41,7 +41,7 @@ export default function EmployeeLeavePortal() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [resHistory, resTypes] = await Promise.all([
@@ -66,11 +66,11 @@ export default function EmployeeLeavePortal() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();

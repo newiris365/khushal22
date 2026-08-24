@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Clock, Users, ArrowRight, Play, AlertTriangle, CheckCircle2, UserX, RefreshCw } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 
@@ -16,29 +16,22 @@ export default function AdminHostelRollCall() {
   const [selectedFloor, setSelectedFloor] = useState(2);
   const [timeLeft, setTimeLeft] = useState(60);
 
-  useEffect(() => {
-    loadActiveSession();
-  }, [selectedBlock, selectedFloor]);
+  const loadSessionStatus = useCallback(async (sessionId: string) => {
+    try {
+      const res = await apiGet(`/hostel/rollcall/status/${sessionId}`);
+      if (res.success) {
+        setPresent(res.present || []);
+        setAbsent(res.absent || []);
+        setStats(res.stats);
+      }
+    } catch (err) {
+      setPresent([]);
+      setAbsent([]);
+      setStats({ total: 0, present: 0, absent: 0 });
+    }
+  }, []);
 
-  useEffect(() => {
-    if (!activeSession || timeLeft <= 0) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          // Auto refresh status when countdown finishes
-          loadSessionStatus(activeSession.id);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeSession, timeLeft]);
-
-  const loadActiveSession = async () => {
+  const loadActiveSession = useCallback(async () => {
     setLoading(true);
     try {
       // Find if there is an active session for block/floor
@@ -65,22 +58,29 @@ export default function AdminHostelRollCall() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedBlock, selectedFloor, loadSessionStatus]);
 
-  const loadSessionStatus = async (sessionId: string) => {
-    try {
-      const res = await apiGet(`/hostel/rollcall/status/${sessionId}`);
-      if (res.success) {
-        setPresent(res.present || []);
-        setAbsent(res.absent || []);
-        setStats(res.stats);
-      }
-    } catch (err) {
-      setPresent([]);
-      setAbsent([]);
-      setStats({ total: 0, present: 0, absent: 0 });
-    }
-  };
+  useEffect(() => {
+    loadActiveSession();
+  }, [loadActiveSession]);
+
+  useEffect(() => {
+    if (!activeSession || timeLeft <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // Auto refresh status when countdown finishes
+          loadSessionStatus(activeSession.id);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSession, timeLeft, loadSessionStatus]);
 
   const handleStartRollCall = async () => {
     setStarting(true);

@@ -110,34 +110,7 @@ export default function AIChatWidget() {
     escalation_contact?: string;
   } | null>(null);
 
-  const fetchNudges = async () => {
-    try {
-      const res = await apiGet('/ai/nudges');
-      if (res.success && res.nudges) {
-        setNudges(res.nudges);
-        checkAndAutoOpenUrgentNudge(res.nudges);
-      }
-    } catch {}
-  };
-
-  const fetchNudgePrefs = async () => {
-    try {
-      const res = await apiGet('/ai/nudges/preferences');
-      if (res.success && res.preferences) {
-        setNudgePreferences({ enabled: res.preferences.enabled !== false });
-      }
-    } catch {}
-  };
-
-  const handleToggleNudgePrefs = async () => {
-    const nextVal = !nudgePreferences.enabled;
-    setNudgePreferences({ enabled: nextVal });
-    try {
-      await apiPut('/ai/nudges/preferences', { enabled: nextVal });
-    } catch {}
-  };
-
-  const checkAndAutoOpenUrgentNudge = async (nudgeList: any[]) => {
+  const checkAndAutoOpenUrgentNudge = useCallback(async (nudgeList: any[]) => {
     if (botConfig?.auto_open_on_urgent === false) return;
     if (typeof window === 'undefined') return;
 
@@ -167,6 +140,33 @@ export default function AIChatWidget() {
         ];
       });
     }
+  }, [botConfig?.auto_open_on_urgent]);
+
+  const fetchNudges = useCallback(async () => {
+    try {
+      const res = await apiGet('/ai/nudges');
+      if (res.success && res.nudges) {
+        setNudges(res.nudges);
+        checkAndAutoOpenUrgentNudge(res.nudges);
+      }
+    } catch {}
+  }, [checkAndAutoOpenUrgentNudge]);
+
+  const fetchNudgePrefs = useCallback(async () => {
+    try {
+      const res = await apiGet('/ai/nudges/preferences');
+      if (res.success && res.preferences) {
+        setNudgePreferences({ enabled: res.preferences.enabled !== false });
+      }
+    } catch {}
+  }, []);
+
+  const handleToggleNudgePrefs = async () => {
+    const nextVal = !nudgePreferences.enabled;
+    setNudgePreferences({ enabled: nextVal });
+    try {
+      await apiPut('/ai/nudges/preferences', { enabled: nextVal });
+    } catch {}
   };
 
   useEffect(() => {
@@ -176,7 +176,7 @@ export default function AIChatWidget() {
       const interval = setInterval(fetchNudges, 5 * 60 * 1000);
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated, botConfig]);
+  }, [isAuthenticated, fetchNudges, fetchNudgePrefs]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -237,7 +237,7 @@ export default function AIChatWidget() {
     loadBotConfig();
   }, [pathname, isAuthenticated]);
 
-  const getCustomOrWelcomeMessage = (r: string) => {
+  const getCustomOrWelcomeMessage = useCallback((r: string) => {
     if (botConfig?.role_greetings) {
       const matchedKey = Object.keys(botConfig.role_greetings).find(
         k => k.toLowerCase() === r.toLowerCase()
@@ -250,7 +250,7 @@ export default function AIChatWidget() {
       return botConfig.welcome_message.trim();
     }
     return getWelcomeMessage(r);
-  };
+  }, [botConfig]);
 
   // Check auth & session reset on route or storage changes (#1)
   const syncAuthStateAndSession = () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Check, X, FileText, BarChart2, ShieldAlert, Settings, Upload, AlertTriangle } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../../../lib/api';
 import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
@@ -42,12 +42,6 @@ export default function AdminAttendancePage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchHolidays();
-    // Auto-start attendance sessions based on timetable
-    triggerAutoStart();
-  }, []);
-
   const triggerAutoStart = async () => {
     try {
       await apiPost('/core/attendance/auto-start', {});
@@ -56,17 +50,7 @@ export default function AdminAttendancePage() {
     }
   };
 
-  useEffect(() => {
-    if (isSchool) {
-      fetchClassSections();
-    }
-  }, [isSchool]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [selectedDept, selectedClassSection]);
-
-  const fetchHolidays = async () => {
+  const fetchHolidays = useCallback(async () => {
     try {
       const res = await apiGet('/core/calendar/holidays');
       if (res.success) {
@@ -81,9 +65,9 @@ export default function AdminAttendancePage() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
-  const fetchClassSections = async () => {
+  const fetchClassSections = useCallback(async () => {
     try {
       const res = await apiGet('school/classes');
       if (res.success) {
@@ -92,9 +76,9 @@ export default function AdminAttendancePage() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
       if (isSchool) {
@@ -122,7 +106,23 @@ export default function AdminAttendancePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isSchool, classSections, selectedClassSection, selectedDept]);
+
+  useEffect(() => {
+    fetchHolidays();
+    // Auto-start attendance sessions based on timetable
+    triggerAutoStart();
+  }, [fetchHolidays]);
+
+  useEffect(() => {
+    if (isSchool) {
+      fetchClassSections();
+    }
+  }, [isSchool, fetchClassSections]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
 
   const handleApproveRegularization = async (id: string, approve: boolean) => {
     try {

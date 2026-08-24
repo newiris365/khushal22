@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, CheckSquare, RefreshCw } from 'lucide-react';
 
 interface TeamAppraisal {
@@ -27,7 +27,7 @@ export default function HodAppraisalReviews() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/appraisal/department-pending', {
@@ -42,11 +42,11 @@ export default function HodAppraisalReviews() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleHodReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

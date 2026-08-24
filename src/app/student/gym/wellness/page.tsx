@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Heart, Brain, Sun, AlertTriangle, Moon, Sparkles, CheckCircle2, RefreshCw, Award
 } from 'lucide-react';
@@ -33,39 +33,7 @@ export default function StudentWellnessPage() {
   const [streakCount, setStreakCount] = useState<number>(0);
   const [successMessage, setSuccessMessage] = useState<string>('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const userStr = localStorage.getItem('iris_user_profile');
-      const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || user?.id || '';
-
-      const res = await apiGet(`/fitzone/gym/wellness/${studentId}`);
-      if (res.success && res.checkins) {
-        setHistory(res.checkins);
-        calculateStreak(res.checkins);
-      }
-    } catch (err) {
-      console.log('Error loading wellness history, using mocks');
-      // Mock history
-      const mockHistory: WellnessCheckin[] = [
-        { id: '1', date: '2026-06-09', mood: 4, stress_level: 2, sleep_hours: 7.5, energy_level: 4, notes: 'Feeling productive.', created_at: '2026-06-09T08:00:00Z' },
-        { id: '2', date: '2026-06-08', mood: 3, stress_level: 4, sleep_hours: 6.0, energy_level: 3, notes: 'Stressed about exams.', created_at: '2026-06-08T08:00:00Z' },
-        { id: '3', date: '2026-06-07', mood: 5, stress_level: 1, sleep_hours: 8.5, energy_level: 5, notes: 'Great weekend workout!', created_at: '2026-06-07T08:00:00Z' },
-        { id: '4', date: '2026-06-06', mood: 2, stress_level: 5, sleep_hours: 5.0, energy_level: 2, notes: 'Poor sleep.', created_at: '2026-06-06T08:00:00Z' },
-        { id: '5', date: '2026-06-05', mood: 2, stress_level: 4, sleep_hours: 5.5, energy_level: 2, notes: 'Tired and sore.', created_at: '2026-06-05T08:00:00Z' }
-      ];
-      setHistory(mockHistory);
-      setStreakCount(3);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateStreak = (logs: WellnessCheckin[]) => {
+  const calculateStreak = useCallback((logs: WellnessCheckin[]) => {
     if (!logs || logs.length === 0) {
       setStreakCount(0);
       return;
@@ -91,7 +59,35 @@ export default function StudentWellnessPage() {
       }
     }
     setStreakCount(streak);
-  };
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiGet('/fitzone/gym/wellness/history');
+      if (res.success && res.history) {
+        setHistory(res.history);
+        calculateStreak(res.history);
+      }
+    } catch {
+      // Mock history fallback
+      const mockHistory: WellnessCheckin[] = [
+        { id: '1', date: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0], mood: 4, stress_level: 2, sleep_hours: 7.5, energy_level: 4, created_at: new Date().toISOString() },
+        { id: '2', date: new Date(Date.now() - 86400000).toISOString().split('T')[0], mood: 3, stress_level: 3, sleep_hours: 6.0, energy_level: 3, created_at: new Date().toISOString() },
+        { id: '3', date: new Date().toISOString().split('T')[0], mood: 4, stress_level: 2, sleep_hours: 8.0, energy_level: 5, created_at: new Date().toISOString() }
+      ];
+      setHistory(mockHistory);
+      calculateStreak(mockHistory);
+    } finally {
+      setLoading(false);
+    }
+  }, [calculateStreak]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

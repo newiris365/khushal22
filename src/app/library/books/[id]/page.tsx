@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Book, Sparkles, CheckCircle, Clock, Send, AlertTriangle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
@@ -14,11 +14,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  useEffect(() => {
-    loadBookDetails();
-  }, []);
-
-  const loadBookDetails = async () => {
+  const loadBookDetails = useCallback(async () => {
     try {
       const res = await apiGet(`/library/books/${params.id}`);
       if (res.success) {
@@ -48,7 +44,11 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
+
+  useEffect(() => {
+    loadBookDetails();
+  }, [loadBookDetails]);
 
   const handleReserve = async () => {
     setReserving(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Check, X, RefreshCw } from 'lucide-react';
 
 interface PendingLeave {
@@ -27,7 +27,7 @@ export default function HodLeaveApprovals() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/leave/department-pending', {
@@ -42,11 +42,11 @@ export default function HodLeaveApprovals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleApprove = async (id: string) => {
     try {

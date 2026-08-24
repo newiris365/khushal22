@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { 
   UtensilsCrossed, Sparkles, Leaf, Flame, ShieldAlert, 
@@ -45,12 +45,7 @@ export default function DigitalMenuBoard() {
   const [promoIndex, setPromoIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Load backend menu
-  useEffect(() => {
-    loadMenu();
-  }, [institutionId]);
-
-  const loadMenu = async () => {
+  const loadMenu = useCallback(async () => {
     try {
       const res = await apiGet(`/canteen/menu?institution_id=${institutionId}`);
       if (res.success && res.menu) {
@@ -59,7 +54,12 @@ export default function DigitalMenuBoard() {
     } catch (err) {
       console.log('Failed to load menu board data from server');
     }
-  };
+  }, [institutionId]);
+
+  // Load backend menu
+  useEffect(() => {
+    loadMenu();
+  }, [loadMenu]);
 
   // Rotate Promotions every 7 seconds
   useEffect(() => {

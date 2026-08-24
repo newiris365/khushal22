@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, Users, GraduationCap, TrendingUp, AlertTriangle, 
   Calendar, CheckCircle2, XCircle, Clock, Send, Plus, Trash2, 
@@ -59,17 +59,7 @@ export default function PrincipalDashboard() {
   const [formRoomNumber, setFormRoomNumber] = useState('');
   const [formCapacity, setFormCapacity] = useState('40');
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'overview') {
-      loadTabData();
-    }
-  }, [activeTab]);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet('/school/principal/metrics');
@@ -90,9 +80,9 @@ export default function PrincipalDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadTabData = async () => {
+  const loadTabData = useCallback(async () => {
     try {
       if (activeTab === 'grades') {
         const res = await apiGet('/school/analytics/grades');
@@ -130,7 +120,17 @@ export default function PrincipalDashboard() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    if (activeTab !== 'overview') {
+      loadTabData();
+    }
+  }, [activeTab, loadTabData]);
 
   const handleSelectDefaulter = (id: string) => {
     setSelectedDefaulters(prev => 

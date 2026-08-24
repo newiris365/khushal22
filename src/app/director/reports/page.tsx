@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FileText, Calendar, Plus, RefreshCw, ArrowLeft, 
   Download, Clock, CheckCircle2, ChevronRight, Activity, AlertCircle
@@ -35,11 +35,7 @@ export default function DirectorReportsPage() {
   const [reportType, setReportType] = useState<'weekly' | 'monthly'>('weekly');
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
-  useEffect(() => {
-    loadReportsData();
-  }, []);
-
-  const loadReportsData = async () => {
+  const loadReportsData = useCallback(async () => {
     setLoading(true);
     try {
       const [reportsRes, scheduleRes] = await Promise.all([
@@ -54,7 +50,11 @@ export default function DirectorReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [schedules]);
+
+  useEffect(() => {
+    loadReportsData();
+  }, [loadReportsData]);
 
   const handleCompile = async (e: React.FormEvent) => {
     e.preventDefault();

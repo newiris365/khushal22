@@ -18,27 +18,7 @@ export default function DriverTripPage() {
   const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [assignRes, tripRes] = await Promise.all([
-          apiGet('campusCore/driver/assignments'),
-          apiGet('campusCore/driver/today-trip'),
-        ]);
-        if (assignRes && assignRes.success) setAssignments(assignRes.assignments?.[0] || null);
-        if (tripRes && tripRes.success) {
-          const trip = tripRes.trip || null;
-          setTodayTrip(trip);
-          if (trip?.status === 'active') startGpsEmission();
-        }
-      } catch (err: any) {
-        console.error(err);
-        setActionError('Failed to load initial trip assignment from server.');
-      }
-    };
-    load();
-    return () => { stopGpsEmission(); stopTimer(); };
-  }, []);
+
 
   const emitGps = useCallback(async () => {
     if (!navigator.geolocation) {
@@ -83,7 +63,7 @@ export default function DriverTripPage() {
 
   const gpsWatchRef = useRef<number | null>(null);
 
-  const startGpsEmission = () => {
+  const startGpsEmission = useCallback(() => {
     setGpsStatus('active');
     emitGps(); // immediate first fix
 
@@ -98,7 +78,7 @@ export default function DriverTripPage() {
 
           try {
             const res = await apiPost('transit/location', {
-              bus_id: assignments?.bus_id,
+              bus_route_id: assignments.find((a: any) => a.today_trip)?.bus_route_id || '',
               latitude,
               longitude,
               speed: speed || 0,
@@ -110,16 +90,16 @@ export default function DriverTripPage() {
               setServerSyncStatus('server_error');
             }
           } catch (err) {
-            console.error('GPS emit failed:', err);
+            console.error('GPS watch emit failed:', err);
             setServerSyncStatus('server_error');
           }
         },
         (err) => {
-          console.error('Geolocation watch error:', err);
+          console.error('Watch position error:', err);
           setGpsStatus('error');
           setServerSyncStatus('device_error');
         },
-        { enableHighAccuracy: true, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
       );
     }
 
@@ -128,7 +108,7 @@ export default function DriverTripPage() {
     timerRef.current = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
-  };
+  }, [emitGps, assignments]);
 
   const stopGpsEmission = () => {
     if (gpsWatchRef.current !== null && navigator.geolocation) {
@@ -149,6 +129,30 @@ export default function DriverTripPage() {
       timerRef.current = null;
     }
   };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await apiGet('transit/driver/today');
+        if (res.success && res.assignments) {
+          setAssignments(res.assignments);
+          const trip = res.assignments.find((a: any) => a.today_trip)?.today_trip || null;
+          setTodayTrip(trip);
+          if (trip?.status === 'active') startGpsEmission();
+        } else {
+          // Fallback check legacy endpoint
+          const tripRes = await apiGet('transit/today-trip');
+          const trip = tripRes.trip || null;
+          setTodayTrip(trip);
+          if (trip?.status === 'active') startGpsEmission();
+        }
+      } catch (err: any) {
+        console.error(err);
+        setActionError('Failed to load initial trip assignment from server.');
+      }
+    };
+    load();
+  }, [startGpsEmission]);
 
   const handleStartTrip = async () => {
     if (!assignments) return;

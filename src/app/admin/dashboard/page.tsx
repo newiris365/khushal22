@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Users, GraduationCap, Building2, CheckCircle, IndianRupee, AlertTriangle,
@@ -89,7 +89,6 @@ export default function AdminDashboard() {
       setProfile(p);
       setInstituteType(p.institute_type || 'college');
     }
-    loadDashboardData();
   }, []);
 
   const getAuthHeaders = () => ({
@@ -97,7 +96,7 @@ export default function AdminDashboard() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
     setIsFallbackData(false);
     let fetchedOverview = null;
@@ -211,9 +210,12 @@ export default function AdminDashboard() {
           transit: { active_subscriptions: 0 },
         });
       }
-      setLoading(false);
     }
-  };
+  }, [isSchool]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const handleDownloadReport = async () => {
     setDateRangeError('');

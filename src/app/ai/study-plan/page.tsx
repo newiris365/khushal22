@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface StudyBlock {
   time: string;
@@ -65,11 +65,9 @@ export default function StudyPlanPage() {
 
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
   const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') || 'demo' : 'demo';
-  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  const headers = React.useMemo(() => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }), [token]);
 
-  useEffect(() => { fetchPlan(); }, []);
-
-  const fetchPlan = async () => {
+  const fetchPlan = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/ai/study-plan/b0000000-0000-0000-0000-000000000001`, { headers });
@@ -78,7 +76,9 @@ export default function StudyPlanPage() {
         setPlan(data.study_plan);
       }
     } catch {} finally { setLoading(false); }
-  };
+  }, [API, headers]);
+
+  useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
   const generatePlan = async () => {
     setGenerating(true);

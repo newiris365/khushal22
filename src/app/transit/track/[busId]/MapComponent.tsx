@@ -93,7 +93,7 @@ export default function MapComponent({ latitude, longitude, busLocation, stops =
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [hasCoords, lat, lng, stops]);
 
   useEffect(() => {
     if (busMarkerRef.current && hasCoords) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ShieldCheck, User, Calendar, Clock, RefreshCw, ArrowLeft, MoveDownLeft, MoveUpRight, Info } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 import Link from 'next/link';
@@ -15,22 +15,19 @@ export default function StudentMovementHistoryPage() {
     lateArrivals: 0
   });
 
-  useEffect(() => {
-    const userStr = typeof window !== 'undefined' ? localStorage.getItem('iris_user_profile') : null;
-    if (userStr) {
-      try {
-        const parsed = JSON.parse(userStr);
-        setProfile(parsed);
-        fetchHistory(parsed.id);
-      } catch {}
-    } else {
-      const fallback = { id: '', name: 'Student', role: 'Student' };
-      setProfile(fallback);
-      fetchHistory(fallback.id);
-    }
-  }, []);
+  const calculateStats = (logs: any[]) => {
+    const entries = logs.filter(l => l.direction === 'in');
+    const lates = logs.filter(l => l.reason?.toLowerCase().includes('late')).length;
+    
+    // Estimate some random mock hours based on logins
+    setStats({
+      totalEntries: entries.length,
+      totalHours: entries.length * 7 + 4,
+      lateArrivals: lates
+    });
+  };
 
-  const fetchHistory = async (personId: string) => {
+  const fetchHistory = useCallback(async (personId: string) => {
     setLoading(true);
     try {
       const res = await apiGet(`/gate/person/${personId}/history`);
@@ -45,19 +42,22 @@ export default function StudentMovementHistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const calculateStats = (logs: any[]) => {
-    const entries = logs.filter(l => l.direction === 'in');
-    const lates = logs.filter(l => l.reason?.toLowerCase().includes('late')).length;
-    
-    // Estimate some random mock hours based on logins
-    setStats({
-      totalEntries: entries.length,
-      totalHours: entries.length * 7 + 4,
-      lateArrivals: lates
-    });
-  };
+  useEffect(() => {
+    const userStr = typeof window !== 'undefined' ? localStorage.getItem('iris_user_profile') : null;
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr);
+        setProfile(parsed);
+        fetchHistory(parsed.id);
+      } catch {}
+    } else {
+      const fallback = { id: '', name: 'Student', role: 'Student' };
+      setProfile(fallback);
+      fetchHistory(fallback.id);
+    }
+  }, [fetchHistory]);
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24">

@@ -56,8 +56,8 @@ export default function PublicMeritListsPage() {
             code: p.code || p.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
           }));
           setPrograms(progs);
-          if (progs.length > 0 && !selectedProgramId) {
-            setSelectedProgramId(progs[0].id);
+          if (progs.length > 0) {
+            setSelectedProgramId(prev => prev || progs[0].id);
           }
         }
       } catch (err) {

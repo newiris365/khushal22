@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Users, PlusCircle, Search, Trash2, Edit3, ArrowUpRight, Upload } from 'lucide-react';
 import { apiGet, apiPost, apiDelete, apiPut } from '../../../lib/api';
 import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
@@ -52,26 +52,7 @@ export default function AdminStudentsPage() {
     fingerprint_id: ''
   });
 
-  useEffect(() => {
-    fetchStudents();
-  }, [selectedDept, selectedBatch]);
-
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    if (!formData.name.trim()) errors.name = 'Full name is required';
-    if (!formData.roll_number.trim()) errors.roll_number = 'Roll number is required';
-    if (instituteType !== 'school' && (!formData.email.trim() || !formData.email.includes('@'))) {
-      errors.email = 'Valid institutional email is required';
-    }
-    if (!formData.guardian_name.trim()) errors.guardian_name = 'Guardian name is required';
-    if (!formData.guardian_phone.trim() || formData.guardian_phone.replace(/\D/g, '').length < 10) {
-      errors.guardian_phone = 'Valid 10-digit guardian phone number is required';
-    }
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await apiGet('/core/students', {
@@ -86,6 +67,25 @@ export default function AdminStudentsPage() {
     } finally {
       setIsLoading(false);
     }
+  }, [selectedDept, selectedBatch]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Full name is required';
+    if (!formData.roll_number.trim()) errors.roll_number = 'Roll number is required';
+    if (instituteType !== 'school' && (!formData.email.trim() || !formData.email.includes('@'))) {
+      errors.email = 'Valid institutional email is required';
+    }
+    if (!formData.guardian_name.trim()) errors.guardian_name = 'Guardian name is required';
+    if (!formData.guardian_phone.trim() || formData.guardian_phone.replace(/\D/g, '').length < 10) {
+      errors.guardian_phone = 'Valid 10-digit guardian phone number is required';
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleAddStudent = async (e: React.FormEvent) => {

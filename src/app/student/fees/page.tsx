@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { IndianRupee, CreditCard, CheckCircle2, FileDown, Clock, AlertTriangle, Wallet, Building, Smartphone, Banknote } from 'lucide-react';
 import { useAcademic } from '../AcademicContext';
 import { apiGet, apiPost } from '../../../lib/api';
@@ -34,11 +34,8 @@ export default function StudentFeesPage() {
     }
   }, [studentProfile]);
 
-  useEffect(() => {
-    if (studentId) loadData();
-  }, [studentId, institutionType]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!studentId) return;
     try {
       const [feesRes, walletRes] = await Promise.all([
         apiGet(`/core/fees/student/${studentId}`),
@@ -89,7 +86,11 @@ export default function StudentFeesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [studentId, institutionType, studentProfile?.institution_id]);
+
+  useEffect(() => {
+    if (studentId) loadData();
+  }, [studentId, loadData]);
 
   const calculateLateFee = (structure: any) => {
     if (!structure.due_date) return { daysOverdue: 0, lateFee: 0, daysAfterGrace: 0 };

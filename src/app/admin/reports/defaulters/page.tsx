@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   AlertTriangle, Download, Filter, TrendingDown, Users, Search,
   ArrowLeft, BarChart3
@@ -38,7 +38,7 @@ export default function DefaulterReportPage() {
   const [riskFilter, setRiskFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchDefaulters = async () => {
+  const fetchDefaulters = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await apiGet('campusCore/reports/defaulters', {
@@ -51,9 +51,9 @@ export default function DefaulterReportPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [attThreshold, feeDays]);
 
-  useEffect(() => { fetchDefaulters(); }, [attThreshold, feeDays]);
+  useEffect(() => { fetchDefaulters(); }, [fetchDefaulters]);
 
   const filtered = defaulters.filter(d =>
     (riskFilter === 'all' || d.risk_level === riskFilter) &&

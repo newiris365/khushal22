@@ -39,46 +39,46 @@ export default function StudentAlumniMentors() {
       const res = await apiGet('/placements/alumni');
       if (res.success && res.alumni?.length > 0) {
         setAlumni(res.alumni);
+        setLoading(false);
+        return;
       }
     } catch (err) {
       console.log('Error loading alumni');
     }
     
     // Seed mock if empty
-    if (alumni.length === 0) {
-      setAlumni([
-        {
-          id: 'alum-1',
-          graduation_year: 2023,
-          current_company: 'Microsoft',
-          current_role: 'Software Engineer II',
-          location: 'Hyderabad',
-          linkedin_url: 'https://linkedin.com',
-          is_mentor: true,
-          mentoring_slots: 3,
-          students: {
-            first_name: 'Aditya',
-            last_name: 'Vyas',
-            branch: 'CSE'
-          }
-        },
-        {
-          id: 'alum-2',
-          graduation_year: 2022,
-          current_company: 'Zomato',
-          current_role: 'Product Manager',
-          location: 'Gurgaon',
-          linkedin_url: 'https://linkedin.com',
-          is_mentor: true,
-          mentoring_slots: 2,
-          students: {
-            first_name: 'Shreya',
-            last_name: 'Choudhary',
-            branch: 'ECE'
-          }
+    setAlumni(prev => prev.length > 0 ? prev : [
+      {
+        id: 'alum-1',
+        graduation_year: 2023,
+        current_company: 'Microsoft',
+        current_role: 'Software Engineer II',
+        location: 'Hyderabad',
+        linkedin_url: 'https://linkedin.com',
+        is_mentor: true,
+        mentoring_slots: 3,
+        students: {
+          first_name: 'Aditya',
+          last_name: 'Vyas',
+          branch: 'CSE'
         }
-      ]);
-    }
+      },
+      {
+        id: 'alum-2',
+        graduation_year: 2022,
+        current_company: 'Zomato',
+        current_role: 'Product Manager',
+        location: 'Gurgaon',
+        linkedin_url: 'https://linkedin.com',
+        is_mentor: true,
+        mentoring_slots: 2,
+        students: {
+          first_name: 'Shreya',
+          last_name: 'Choudhary',
+          branch: 'ECE'
+        }
+      }
+    ]);
     setLoading(false);
   }, []);
 

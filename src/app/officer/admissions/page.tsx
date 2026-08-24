@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiGet, apiPost } from '../../../lib/api';
 import { 
   Users, Search, Filter, RefreshCw, ChevronRight, UserCheck, 
@@ -33,7 +33,7 @@ export default function OfficerQueuePage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [programFilter, setProgramFilter] = useState('');
 
-  async function fetchQueue(silent = false) {
+  const fetchQueue = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
 
@@ -57,11 +57,11 @@ export default function OfficerQueuePage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [statusFilter, searchTerm, programFilter]);
 
   useEffect(() => {
     fetchQueue();
-  }, [statusFilter, programFilter]);
+  }, [fetchQueue]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

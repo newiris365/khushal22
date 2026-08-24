@@ -33,6 +33,8 @@ declare global {
 import { tokenDenylist } from '../lib/tokenDenylist';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  // SECURITY ENFORCEMENT: Query-string JWT fallback (req.query.token) is strictly eliminated globally
+  // to prevent credential exposure in access logs and HTTP Referer headers.
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

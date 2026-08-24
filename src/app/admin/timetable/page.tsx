@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarDays, Plus, Trash2, Cpu, Settings, GripVertical, X } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../../lib/api';
 import { Toast, ConfirmModal, type ToastMessage } from '../../../components/ToastModal';
@@ -99,21 +99,17 @@ export default function AdminTimetablePage() {
     }
   }, []);
 
-  useEffect(() => { if (isSchool) { fetchClassSections(); fetchTeachers(); } }, [isSchool]);
-  useEffect(() => { fetchTimetable(); }, [selectedDept, selectedClassSection, viewMode, selectedTeacher]);
-
-  const saveConfig = () => {
-    localStorage.setItem('iris_timetable_config', JSON.stringify({ periodCount, startHour, startMin, durationMin, breakMin, lunchAfterPeriod, lunchDuration }));
-    setShowSettings(false);
-  };
-
-  const fetchClassSections = async () => {
+  const fetchClassSections = useCallback(async () => {
     try { const res = await apiGet('school/classes'); if (res.success) { setClassSections(res.classes || []); if (res.classes?.length > 0 && !selectedClassSection) setSelectedClassSection(res.classes[0].id); } } catch (err) { console.error(err); }
-  };
-  const fetchTeachers = async () => {
+  }, [selectedClassSection]);
+  
+  const fetchTeachers = useCallback(async () => {
     try { const res = await apiGet('school/teachers'); if (res.success) setTeachers(res.teachers || []); } catch (err) { console.error(err); }
-  };
-  const fetchTimetable = async () => {
+  }, []);
+
+  useEffect(() => { if (isSchool) { fetchClassSections(); fetchTeachers(); } }, [isSchool, fetchClassSections, fetchTeachers]);
+  
+  const fetchTimetable = useCallback(async () => {
     setIsLoading(true);
     try {
       let res;
@@ -133,6 +129,13 @@ export default function AdminTimetablePage() {
         setTimetable(data);
       }
     } catch (err) { console.error(err); } finally { setIsLoading(false); }
+  }, [viewMode, selectedTeacher, isSchool, selectedClassSection, selectedDept]);
+
+  useEffect(() => { fetchTimetable(); }, [fetchTimetable]);
+
+  const saveConfig = () => {
+    localStorage.setItem('iris_timetable_config', JSON.stringify({ periodCount, startHour, startMin, durationMin, breakMin, lunchAfterPeriod, lunchDuration }));
+    setShowSettings(false);
   };
 
   const handleAddBlock = async (e: React.FormEvent) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, MessageSquarePlus, Activity, CheckCircle2, Plus, RefreshCw } from 'lucide-react';
 
 interface Survey {
@@ -34,7 +34,7 @@ export default function IqacSurveyDesk() {
 
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const loadSurveys = async () => {
+  const loadSurveys = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -44,8 +44,8 @@ export default function IqacSurveyDesk() {
       const data = await res.json();
       if (res.ok && data.success && data.surveys) {
         setSurveys(data.surveys);
-        if (data.surveys.length > 0 && !selectedSurvey) {
-          setSelectedSurvey(data.surveys[0].id);
+        if (data.surveys.length > 0) {
+          setSelectedSurvey(prev => prev || data.surveys[0].id);
         }
       } else {
         setFetchError(data.error || 'Unable to load surveys list.');
@@ -58,9 +58,9 @@ export default function IqacSurveyDesk() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadAnalytics = async (surveyId: string) => {
+  const loadAnalytics = useCallback(async (surveyId: string) => {
     if (!surveyId) return;
     try {
       const res = await fetch(`/api/obe/surveys/${surveyId}/analytics`, {
@@ -75,17 +75,17 @@ export default function IqacSurveyDesk() {
     } catch (err) {
       setAnalytics(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadSurveys();
-  }, []);
+  }, [loadSurveys]);
 
   useEffect(() => {
     if (selectedSurvey) {
       loadAnalytics(selectedSurvey);
     }
-  }, [selectedSurvey]);
+  }, [selectedSurvey, loadAnalytics]);
 
   const handleToggleSurvey = async (id: string, active: boolean) => {
     try {

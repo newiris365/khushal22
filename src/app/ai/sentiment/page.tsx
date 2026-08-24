@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface SentimentAnalysis {
   date: string;
@@ -16,21 +16,25 @@ interface SentimentAnalysis {
 }
 
 interface DeptRanking {
-  department: string;
-  avg_sentiment: number;
-  total_messages: number;
-  total_complaints: number;
-  mood: string;
-  top_keywords: string[];
+  dept?: string;
+  department?: string;
+  score?: number;
+  avg_sentiment?: number;
+  status?: string;
+  total_feedback?: number;
+  total_messages?: number;
+  total_complaints?: number;
+  mood?: string;
+  top_keywords?: string[];
 }
 
 interface DailyTrend {
   date: string;
-  message_count: number;
   positive: number;
   negative: number;
   neutral: number;
   avg_sentiment: number;
+  message_count?: number;
 }
 
 export default function SentimentPage() {
@@ -44,21 +48,22 @@ export default function SentimentPage() {
 
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
   const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') || 'demo' : 'demo';
-  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  const headers = React.useMemo(() => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }), [token]);
 
-  useEffect(() => { fetchTrends(); }, [period]);
-
-  const fetchTrends = async () => {
+  const fetchTrends = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/ai/sentiment/trends?days=${period}`, { headers });
       const data = await res.json();
       if (data.success) {
-        setTrends(data.daily_trends || []);
-        setDeptRankings(data.department_rankings || []);
+        setTrends(data.trends || []);
+        setDeptRankings(data.dept_rankings || []);
+        if (data.latest_analysis) setAnalysis(data.latest_analysis);
       }
     } catch {} finally { setLoading(false); }
-  };
+  }, [API, headers, period]);
+
+  useEffect(() => { fetchTrends(); }, [fetchTrends]);
 
   const runAnalysis = async () => {
     setAnalyzing(true);

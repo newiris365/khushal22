@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
@@ -36,12 +36,9 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
   const [noChildLinked, setNoChildLinked] = useState(false);
   const authorizedRef = React.useRef<boolean | null>(null);
 
-  useEffect(() => {
-    setHasMounted(true);
-    fetchChildren();
-  }, []);
 
-  const fetchChildren = async () => {
+
+  const fetchChildren = useCallback(async () => {
     try {
       const token = localStorage.getItem('iris_jwt_token') || '';
       if (!token) {
@@ -88,7 +85,12 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Failed to fetch linked children:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    setHasMounted(true);
+    fetchChildren();
+  }, [fetchChildren]);
 
   const applyLinks = (type: string) => {
     // Both school and college parents maintain full feature parity across campus & academic modules

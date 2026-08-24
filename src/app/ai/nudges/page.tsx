@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface Nudge {
   id: string;
@@ -56,11 +56,9 @@ export default function NudgesPage() {
 
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
   const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') || 'demo' : 'demo';
-  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  const headers = React.useMemo(() => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }), [token]);
 
-  useEffect(() => { fetchNudges(); fetchPrefs(); }, []);
-
-  const fetchNudges = async () => {
+  const fetchNudges = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/ai/nudges`, { headers });
@@ -70,15 +68,17 @@ export default function NudgesPage() {
         setStats(data.stats || { total: 0, unread: 0, actioned: 0, action_rate: 0 });
       }
     } catch {} finally { setLoading(false); }
-  };
+  }, [API, headers]);
 
-  const fetchPrefs = async () => {
+  const fetchPrefs = useCallback(async () => {
     try {
       const res = await fetch(`${API}/ai/nudges/preferences`, { headers });
       const data = await res.json();
       if (data.success) setPrefs(data.preferences);
     } catch {}
-  };
+  }, [API, headers]);
+
+  useEffect(() => { fetchNudges(); fetchPrefs(); }, [fetchNudges, fetchPrefs]);
 
   const markRead = async (id: string) => {
     try {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Plus, Search, RefreshCw, Edit2, Trash2, X, Check, AlertTriangle, CheckCircle
 } from 'lucide-react';
@@ -44,11 +44,7 @@ export default function AdminDepartmentsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (institutionId) fetchDepartments();
-  }, [institutionId]);
-
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet('campusCore/departments', { institution_id: institutionId });
@@ -62,7 +58,11 @@ export default function AdminDepartmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (institutionId) fetchDepartments();
+  }, [institutionId, fetchDepartments]);
 
   const handleAdd = async () => {
     if (!addForm.name.trim()) {

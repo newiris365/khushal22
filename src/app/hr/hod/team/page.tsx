@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Calendar, Mail, Phone, Briefcase, RefreshCw } from 'lucide-react';
 
 interface TeamMember {
@@ -22,10 +22,10 @@ export default function HodTeamOverview() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/hr/employees', {
+      const res = await fetch('/api/v1/hr/team/my-department', {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -46,11 +46,11 @@ export default function HodTeamOverview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">

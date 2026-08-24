@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Mail, Shield, Building2, Crown, ArrowLeft, KeyRound, Bell, Palette, Loader2, X, CheckCircle, AlertCircle, Monitor, Smartphone, Globe, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,6 +33,49 @@ export default function ProfilePage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [showThemeModal, setShowThemeModal] = useState(false);
 
+  const getDeviceName = () => {
+    if (typeof window === 'undefined') return 'Desktop';
+    const ua = navigator.userAgent;
+    if (/mobile/i.test(ua)) return 'Mobile Device';
+    if (/iPad|Tablet/i.test(ua)) return 'Tablet';
+    return 'Desktop PC';
+  };
+
+  const getBrowserName = () => {
+    if (typeof window === 'undefined') return 'Chrome';
+    const ua = navigator.userAgent;
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Edg')) return 'Edge';
+    if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
+    return 'Chrome';
+  };
+
+  const initSessions = useCallback(() => {
+    const currentSession = {
+      id: `session_${Date.now()}`,
+      device: getDeviceName(),
+      browser: getBrowserName(),
+      ip: 'Current Session',
+      lastActive: new Date().toISOString(),
+      isCurrent: true
+    };
+    setSessions([currentSession]);
+    localStorage.setItem('iris_active_sessions', JSON.stringify([currentSession]));
+  }, []);
+
+  const loadSessions = useCallback(() => {
+    const stored = localStorage.getItem('iris_active_sessions');
+    if (stored) {
+      try {
+        setSessions(JSON.parse(stored));
+      } catch {
+        initSessions();
+      }
+    } else {
+      initSessions();
+    }
+  }, [initSessions]);
+
   useEffect(() => {
     const saved = localStorage.getItem('iris_user_profile');
     if (saved) {
@@ -59,52 +102,9 @@ export default function ProfilePage() {
 
     // Load sessions
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
-  const loadSessions = () => {
-    const stored = localStorage.getItem('iris_active_sessions');
-    if (stored) {
-      try {
-        setSessions(JSON.parse(stored));
-      } catch {
-        initSessions();
-      }
-    } else {
-      initSessions();
-    }
-  };
 
-  const initSessions = () => {
-    const currentSession = {
-      id: `session_${Date.now()}`,
-      device: getDeviceName(),
-      browser: getBrowserName(),
-      ip: 'Current Session',
-      lastActive: new Date().toISOString(),
-      isCurrent: true
-    };
-    setSessions([currentSession]);
-    localStorage.setItem('iris_active_sessions', JSON.stringify([currentSession]));
-  };
-
-  const getDeviceName = () => {
-    const ua = navigator.userAgent;
-    if (/Windows/.test(ua)) return 'Windows PC';
-    if (/Mac/.test(ua)) return 'Mac';
-    if (/Linux/.test(ua)) return 'Linux PC';
-    if (/Android/.test(ua)) return 'Android Device';
-    if (/iPhone|iPad/.test(ua)) return 'iOS Device';
-    return 'Unknown Device';
-  };
-
-  const getBrowserName = () => {
-    const ua = navigator.userAgent;
-    if (/Edg/.test(ua)) return 'Edge';
-    if (/Chrome/.test(ua)) return 'Chrome';
-    if (/Firefox/.test(ua)) return 'Firefox';
-    if (/Safari/.test(ua)) return 'Safari';
-    return 'Unknown Browser';
-  };
 
   const handlePasswordChange = async () => {
     setPasswordMsg(null);

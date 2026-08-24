@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Save, RefreshCw, Check, X, Sliders, Database, AlertTriangle, CheckCircle
 } from 'lucide-react';
@@ -201,11 +201,25 @@ export default function AdminPermissionsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (institutionId) fetchPermissions();
-  }, [institutionId]);
+  const loadDefaults = useCallback(() => {
+    const perms: ModulePermission[] = [];
+    for (const role of ALL_ROLES) {
+      for (const mod of ALL_MODULES) {
+        const def = DEFAULT_PERMISSIONS[role]?.[mod.key] || { read: false, write: false, delete: false };
+        perms.push({
+          role,
+          module: mod.key,
+          can_read: def.read,
+          can_write: def.write,
+          can_delete: def.delete,
+        });
+      }
+    }
+    setPermissions(perms);
+    setHasExisting(false);
+  }, []);
 
-  const fetchPermissions = async () => {
+  const fetchPermissions = useCallback(async () => {
     setLoading(true);
     setSaveMsg(null);
     try {
@@ -234,25 +248,11 @@ export default function AdminPermissionsPage() {
       console.error(err);
       loadDefaults();
     } finally { setLoading(false); }
-  };
+  }, [institutionId, loadDefaults]);
 
-  const loadDefaults = () => {
-    const perms: ModulePermission[] = [];
-    for (const role of ALL_ROLES) {
-      for (const mod of ALL_MODULES) {
-        const def = DEFAULT_PERMISSIONS[role]?.[mod.key] || { read: false, write: false, delete: false };
-        perms.push({
-          role,
-          module: mod.key,
-          can_read: def.read,
-          can_write: def.write,
-          can_delete: def.delete,
-        });
-      }
-    }
-    setPermissions(perms);
-    setHasExisting(false);
-  };
+  useEffect(() => {
+    if (institutionId) fetchPermissions();
+  }, [institutionId, fetchPermissions]);
 
   const updatePerm = (role: string, module: string, field: 'can_read' | 'can_write' | 'can_delete', value: boolean) => {
     setPermissions(prev => {

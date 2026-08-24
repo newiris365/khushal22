@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle, XCircle, Eye, BarChart3, Star, User, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 interface Appraisal {
@@ -33,7 +33,7 @@ export default function PrincipalAppraisals() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/appraisal/cycles', { headers: getAuthHeaders() });
@@ -49,9 +49,9 @@ export default function PrincipalAppraisals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleFinalize = async (e: React.FormEvent) => {
     e.preventDefault();

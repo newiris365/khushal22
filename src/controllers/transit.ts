@@ -5,6 +5,22 @@ import { sendTextMessage } from '../services/whatsapp';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
+export interface TransitStop {
+  name: string;
+  latitude: number;
+  longitude: number;
+  stop_index?: number;
+  scheduled_time_morning?: string;
+  scheduled_time_evening?: string;
+}
+
+export interface TransitEta {
+  name: string;
+  stop_index?: number;
+  distance_km: number;
+  eta_minutes: number;
+}
+
 // ========== ZOD VALIDATION SCHEMAS ==========
 
 export const createRouteSchema = z.object({
@@ -497,7 +513,7 @@ export async function updateBusLocation(req: Request, res: Response) {
     }
 
     // Calculate remaining ETAs for upcoming stops if active route exists
-    let etas: any[] = [];
+    let etas: TransitEta[] = [];
     if (bus.route_id) {
       const { data: route } = await supabaseAdmin
         .from('bus_routes')
@@ -506,8 +522,8 @@ export async function updateBusLocation(req: Request, res: Response) {
         .single();
 
       if (route && Array.isArray(route.stops)) {
-        const stopsList: any[] = route.stops;
-        etas = stopsList.map((stop: any) => {
+        const stopsList: TransitStop[] = route.stops as TransitStop[];
+        etas = stopsList.map((stop: TransitStop) => {
           const distance = calculateHaversineDistance(latitude, longitude, stop.latitude, stop.longitude);
           // Use current speed if moving, else fallback to average speed 25 km/h
           const velocity = speed > 5 ? speed : 25;

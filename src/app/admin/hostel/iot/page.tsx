@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Cpu, RefreshCw, AlertTriangle, TrendingUp, Download, Zap, Droplet } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from '../../../../lib/charts';
@@ -13,11 +13,7 @@ export default function AdminHostelIot() {
   const [selectedBlock, setSelectedBlock] = useState('b1');
   const [selectedMeter, setSelectedMeter] = useState<'electricity' | 'water'>('electricity');
 
-  useEffect(() => {
-    loadIotData();
-  }, [selectedBlock, selectedMeter]);
-
-  const loadIotData = async () => {
+  const loadIotData = useCallback(async () => {
     setLoading(true);
     try {
       const [trendsRes, reportRes] = await Promise.all([
@@ -61,7 +57,11 @@ export default function AdminHostelIot() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedBlock, selectedMeter]);
+
+  useEffect(() => {
+    loadIotData();
+  }, [loadIotData]);
 
   const getMetricLabel = () => selectedMeter === 'electricity' ? 'Average Power Load (kWh)' : 'Average Water Consumption (L)';
 

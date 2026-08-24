@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ArrowLeft, Search, MessageSquare, Clock, RefreshCw, 
   Smartphone, Monitor, Radio, Compass, User
@@ -32,36 +32,7 @@ export default function AdminConversationsPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  const loadSessions = async () => {
-    setLoadingList(true);
-    try {
-      const res = await apiGet('/ai/sessions');
-      if (res.success) {
-        setSessions(res.sessions || []);
-        setFilteredSessions(res.sessions || []);
-
-        if (res.sessions && res.sessions.length > 0) {
-          setSelectedSessionId(res.sessions[0].session_id);
-          loadHistory(res.sessions[0].session_id);
-        }
-      }
-    } catch {
-      // Sandbox Fallbacks
-      const fallbackList: SessionItem[]  = [];
-      setSessions(fallbackList);
-      setFilteredSessions(fallbackList);
-      setSelectedSessionId('sess_1');
-      loadHistory('sess_1');
-    } finally {
-      setLoadingList(false);
-    }
-  };
-
-  const loadHistory = async (sessId: string) => {
+  const loadHistory = useCallback(async (sessId: string) => {
     setLoadingHistory(true);
     try {
       const res = await apiGet(`/ai/chat/history/${sessId}`);
@@ -88,7 +59,36 @@ export default function AdminConversationsPage() {
     } finally {
       setLoadingHistory(false);
     }
-  };
+  }, []);
+
+  const loadSessions = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await apiGet('/ai/sessions');
+      if (res.success) {
+        setSessions(res.sessions || []);
+        setFilteredSessions(res.sessions || []);
+
+        if (res.sessions && res.sessions.length > 0) {
+          setSelectedSessionId(res.sessions[0].session_id);
+          loadHistory(res.sessions[0].session_id);
+        }
+      }
+    } catch {
+      // Sandbox Fallbacks
+      const fallbackList: SessionItem[]  = [];
+      setSessions(fallbackList);
+      setFilteredSessions(fallbackList);
+      setSelectedSessionId('sess_1');
+      loadHistory('sess_1');
+    } finally {
+      setLoadingList(false);
+    }
+  }, [loadHistory]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

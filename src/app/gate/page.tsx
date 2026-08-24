@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ShieldCheck, User, QrCode, Cpu, UserCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { apiGet, apiPost } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -34,6 +34,33 @@ export default function SecurityGuardDashboard() {
   // Feedback notifications
   const [alertMsg, setAlertMsg] = useState({ text: '', type: '' });
 
+  const loadOccupancyData = useCallback(async () => {
+    try {
+      const occRes = await apiGet('/gate/occupancy/live');
+      if (occRes.success && occRes.occupancy) {
+        setOccupancy(occRes.occupancy);
+      }
+    } catch {}
+  }, []);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [logsRes] = await Promise.all([
+        apiGet('/gate/logs'),
+        loadOccupancyData(),
+      ]);
+      if (logsRes.success) {
+        setLogs(logsRes.logs || []);
+      }
+    } catch {
+      // Clean Fallback
+      setLogs([]);
+      setOccupancy({ students_inside: 0, staff_inside: 0, visitors_inside: 0, total_occupancy: 0 });
+    } finally {
+      setLoading(false);
+    }
+  }, [loadOccupancyData]);
+
   useEffect(() => {
     loadDashboardData();
 
@@ -64,34 +91,7 @@ export default function SecurityGuardDashboard() {
 
     return () => {
     };
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      const [logsRes] = await Promise.all([
-        apiGet('/gate/logs'),
-        loadOccupancyData(),
-      ]);
-      if (logsRes.success) {
-        setLogs(logsRes.logs || []);
-      }
-    } catch {
-      // Clean Fallback
-      setLogs([]);
-      setOccupancy({ students_inside: 0, staff_inside: 0, visitors_inside: 0, total_occupancy: 0 });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadOccupancyData = async () => {
-    try {
-      const occRes = await apiGet('/gate/occupancy/live');
-      if (occRes.success && occRes.occupancy) {
-        setOccupancy(occRes.occupancy);
-      }
-    } catch {}
-  };
+  }, [loadDashboardData, loadOccupancyData]);
 
   const triggerAlert = (text: string, type: 'success' | 'danger') => {
     setAlertMsg({ text, type });

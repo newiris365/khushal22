@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Camera, Search, ArrowLeft, Ticket, CheckCircle2, XCircle, AlertCircle, RefreshCw, Users } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import Link from 'next/link';
@@ -19,11 +19,7 @@ export default function AdminCheckinScannerPage() {
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; registration?: any } | null>(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, [eventId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -45,7 +41,11 @@ export default function AdminCheckinScannerPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleCheckin = async (code: string) => {
     if (!code) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, User, Search, RefreshCw, Layers } from 'lucide-react';
 
 interface Employee {
@@ -33,7 +33,7 @@ export default function AdminEmployeeDirectory() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/employees', {
@@ -53,11 +53,11 @@ export default function AdminEmployeeDirectory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Award, FileText, Bookmark, Calendar, ArrowUpRight, RefreshCw } from 'lucide-react';
 
 interface Publication {
@@ -43,7 +43,7 @@ export default function AdminFacultyDevelopment() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Load stats
@@ -65,11 +65,11 @@ export default function AdminFacultyDevelopment() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">

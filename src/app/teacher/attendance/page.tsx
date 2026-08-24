@@ -82,7 +82,7 @@ export default function TeacherAttendancePage() {
         setMarkedRecords(initialMark);
       });
     }
-  }, [instituteType]);
+  }, [instituteType, formData.department_id]);
 
   // Fetch students for School Mode
   useEffect(() => {

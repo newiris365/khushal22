@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, Clock, User, ShieldAlert, Sparkles, ChevronRight, Check } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 
@@ -21,26 +21,23 @@ export default function StudentGymBooking() {
   const [success, setSuccess] = useState(false);
 
   // Generate next 7 days list
-  const daysList = Array.from({ length: 7 }).map((_, i) => {
+  const daysList = useMemo(() => Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
     const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
     const dayNum = d.getDate();
     return { dateStr, dayName, dayNum };
-  });
+  }), []);
 
   useEffect(() => {
-    setSelectedDate(daysList[0].dateStr);
-  }, []);
-
-  useEffect(() => {
-    if (selectedDate) {
-      loadSlotsAndBookings();
+    if (daysList.length > 0) {
+      setSelectedDate(daysList[0].dateStr);
     }
-  }, [selectedDate]);
+  }, [daysList]);
 
-  const loadSlotsAndBookings = async () => {
+  const loadSlotsAndBookings = useCallback(async () => {
+    if (!selectedDate) return;
     setLoading(true);
     setError('');
     setMessage('');
@@ -64,7 +61,13 @@ export default function StudentGymBooking() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (selectedDate) {
+      loadSlotsAndBookings();
+    }
+  }, [selectedDate, loadSlotsAndBookings]);
 
   const handleBook = async (slotId: string) => {
     setError('');

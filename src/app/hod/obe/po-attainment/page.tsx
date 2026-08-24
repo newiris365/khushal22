@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, HelpCircle, BarChart3, ShieldCheck, Sparkles, RefreshCw } from 'lucide-react';
 
@@ -21,7 +21,7 @@ export default function HodPoAttainment() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       let programId = '';
@@ -49,11 +49,11 @@ export default function HodPoAttainment() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   // SVG Radar generator parameters
   const size = 300;

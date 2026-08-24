@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MessageSquare, Send, Clock, User, AlertCircle, RefreshCw, ChevronRight, Check
 } from 'lucide-react';
@@ -85,13 +85,7 @@ export default function ParentMessagesPage() {
     };
   }, [selectedTeacherId]);
 
-  useEffect(() => {
-    if (selectedTeacherId) {
-      fetchMessages();
-    }
-  }, [selectedTeacherId]);
-
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('iris_jwt_token') || '';
@@ -109,7 +103,13 @@ export default function ParentMessagesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTeacherId]);
+
+  useEffect(() => {
+    if (selectedTeacherId) {
+      fetchMessages();
+    }
+  }, [selectedTeacherId, fetchMessages]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BrainCircuit, MessageSquare, Sliders, AlertTriangle, 
   HelpCircle, BarChart2, Radio, Activity, RefreshCw, 
@@ -66,7 +66,7 @@ export default function AdminAIDashboard() {
     }
   }, []);
 
-  const loadAiKeys = async () => {
+  const loadAiKeys = useCallback(async () => {
     if (!institutionId) return;
     setConfigLoading(true);
     try {
@@ -89,7 +89,7 @@ export default function AdminAIDashboard() {
     } finally {
       setConfigLoading(false);
     }
-  };
+  }, [institutionId]);
 
   const [modalTab, setModalTab] = useState<'keys' | 'branding'>('keys');
   const [selectedGreetingRole, setSelectedGreetingRole] = useState('Student');
@@ -111,7 +111,7 @@ export default function AdminAIDashboard() {
     force_llm_always: false
   });
 
-  const loadBotConfig = async () => {
+  const loadBotConfig = useCallback(async () => {
     if (!institutionId) return;
     try {
       const token = localStorage.getItem('iris_jwt_token') || 'mock-sandbox-jwt-token-value';
@@ -137,7 +137,7 @@ export default function AdminAIDashboard() {
     } catch (err) {
       console.error('Failed to load bot branding config:', err);
     }
-  };
+  }, [institutionId]);
 
   const handleSaveBotConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,7 +187,7 @@ export default function AdminAIDashboard() {
       loadAiKeys();
       loadBotConfig();
     }
-  }, [showConfigModal, institutionId]);
+  }, [showConfigModal, institutionId, loadAiKeys, loadBotConfig]);
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();

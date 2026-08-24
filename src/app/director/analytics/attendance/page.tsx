@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar 
@@ -19,12 +19,7 @@ export default function AttendanceAnalyticsPage() {
   const [defaulters, setDefaulters] = useState<any[]>([]);
   const [heatmap, setHeatmap] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    setMounted(true);
-    loadAttendanceData();
-  }, [days]);
-
-  const loadAttendanceData = async () => {
+  const loadAttendanceData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet('/director/analytics/attendance', { days: days.toString() });
@@ -53,7 +48,12 @@ export default function AttendanceAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days]);
+
+  useEffect(() => {
+    setMounted(true);
+    loadAttendanceData();
+  }, [loadAttendanceData]);
 
   // Mock department comparison lists
   const departmentData = [

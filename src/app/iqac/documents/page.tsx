@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Download, Trash, RefreshCw } from 'lucide-react';
 
 interface SsrDocument {
@@ -24,7 +24,7 @@ export default function IqacDocumentsVault() {
 
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -45,11 +45,11 @@ export default function IqacDocumentsVault() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadDocuments();
-  }, []);
+  }, [loadDocuments]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to remove this evidence file from the SSR document catalog?')) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { 
   ArrowLeft, Calendar, MapPin, Clock, Users, Ticket, DollarSign, 
@@ -38,11 +38,56 @@ export default function ManageEventPage() {
   const [newPhoto, setNewPhoto] = useState({ photo_url: '', caption: '', is_featured: false });
   const [searchReg, setSearchReg] = useState('');
 
-  useEffect(() => {
-    loadAllData();
+
+
+  const setupMockData = useCallback(() => {
+    setEvent({
+      id: eventId,
+      title: 'TechFest 2026 — AI & Robotics Summit',
+      description: 'The flagship technology summit featuring hackathons, workshops, and keynote speakers from leading tech companies.',
+      category: 'Tech',
+      venue: 'Main Auditorium',
+      start_datetime: '2026-06-20T10:00:00Z',
+      end_datetime: '2026-06-21T18:00:00Z',
+      max_participants: 500,
+      registration_count: 347,
+      volunteer_count: 12,
+      budget_allocated: 150000,
+      budget_spent: 98500,
+      banner_image_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200',
+      status: 'Scheduled',
+      organizer_id: 'org-1'
+    });
+    setRegistrations([
+      { id: 'r1', event_id: eventId, student_id: 's1', qr_code: 'EVT-QR-1001', checked_in: true, checked_in_at: '2026-06-20T10:15:00Z', registered_at: '2026-06-01T12:00:00Z', students: { first_name: 'Aditya', last_name: 'Sharma', roll_number: '2024-CSE-001' } },
+      { id: 'r2', event_id: eventId, student_id: 's2', qr_code: 'EVT-QR-1002', checked_in: false, registered_at: '2026-06-02T14:30:00Z', students: { first_name: 'Priya', last_name: 'Verma', roll_number: '2024-ECE-042' } }
+    ]);
+
+    setVolunteers([]);
+
+    setBudgetItems([
+      { id: 'b1', category: 'Venue', description: 'Auditorium Booking Charge', estimated_amount: 15000, actual_amount: 15000, status: 'approved' },
+      { id: 'b2', category: 'Catering', description: 'Lunch & Snacks for attendees', estimated_amount: 45000, actual_amount: 42300, status: 'approved' },
+      { id: 'b3', category: 'Prizes', description: 'Cash prize for Hackathon winner', estimated_amount: 50000, actual_amount: 50000, status: 'approved' },
+      { id: 'b4', category: 'Marketing', description: 'Banners, brochures & posters', estimated_amount: 10000, actual_amount: 12500, status: 'pending' }
+    ]);
+    setBudgetSummary({ total_estimated: 120000, total_actual: 119800, variance: 200 });
+
+    setPhotos([
+      { id: 'p1', photo_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=500', caption: 'Inauguration Ceremony Kickoff', is_featured: true },
+      { id: 'p2', photo_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=500', caption: 'Students coding in Hackathon', is_featured: false }
+    ]);
+
+    setAnnouncements([
+      { id: 'a1', title: 'Schedule Update', message: 'The keynote speaker speaker session will now begin at 11:00 AM instead of 10:30 AM.', priority: 'high', sent_via: ['push', 'email'], created_at: '2026-06-09T09:00:00Z' },
+      { id: 'a2', title: 'Free Wi-Fi access details', message: 'Connect to campus guest network using credential techfest2026', priority: 'normal', sent_via: ['push'], created_at: '2026-06-08T15:30:00Z' }
+    ]);
+
+    setFeedback([]);
+    setFeedbackStats({ total_responses: 2, avg_overall_rating: 4.5 });
   }, [eventId]);
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
       const [
@@ -79,54 +124,11 @@ export default function ManageEventPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, setupMockData]);
 
-  const setupMockData = () => {
-    setEvent({
-      id: eventId,
-      title: 'TechFest 2026 — AI & Robotics Summit',
-      description: 'The flagship technology summit featuring hackathons, workshops, and keynote speakers from leading tech companies.',
-      category: 'Tech',
-      venue: 'Main Auditorium',
-      start_datetime: '2026-06-20T10:00:00Z',
-      end_datetime: '2026-06-21T18:00:00Z',
-      max_participants: 500,
-      registration_count: 347,
-      volunteer_count: 12,
-      avg_rating: '4.7',
-      feedback_count: 4,
-      is_paid: true,
-      ticket_price: 299,
-      status: 'Scheduled',
-      tags: ['AI', 'Robotics', 'Innovation'],
-      registration_deadline: '2026-06-19T23:59:59Z'
-    });
-
-    setRegistrations([]);
-
-    setVolunteers([]);
-
-    setBudgetItems([
-      { id: 'b1', category: 'Venue', description: 'Auditorium Booking Charge', estimated_amount: 15000, actual_amount: 15000, status: 'approved' },
-      { id: 'b2', category: 'Catering', description: 'Lunch & Snacks for attendees', estimated_amount: 45000, actual_amount: 42300, status: 'approved' },
-      { id: 'b3', category: 'Prizes', description: 'Cash prize for Hackathon winner', estimated_amount: 50000, actual_amount: 50000, status: 'approved' },
-      { id: 'b4', category: 'Marketing', description: 'Banners, brochures & posters', estimated_amount: 10000, actual_amount: 12500, status: 'pending' }
-    ]);
-    setBudgetSummary({ total_estimated: 120000, total_actual: 119800, variance: 200 });
-
-    setPhotos([
-      { id: 'p1', photo_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=500', caption: 'Inauguration Ceremony Kickoff', is_featured: true },
-      { id: 'p2', photo_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=500', caption: 'Students coding in Hackathon', is_featured: false }
-    ]);
-
-    setAnnouncements([
-      { id: 'a1', title: 'Schedule Update', message: 'The keynote speaker session will now begin at 11:00 AM instead of 10:30 AM.', priority: 'high', sent_via: ['push', 'email'], created_at: '2026-06-09T09:00:00Z' },
-      { id: 'a2', title: 'Free Wi-Fi access details', message: 'Connect to campus guest network using credential techfest2026', priority: 'normal', sent_via: ['push'], created_at: '2026-06-08T15:30:00Z' }
-    ]);
-
-    setFeedback([]);
-    setFeedbackStats({ total_responses: 2, avg_overall_rating: 4.5 });
-  };
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
 
   const handleUpdateStatus = async (status: string) => {
     try {

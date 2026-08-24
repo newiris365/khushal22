@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Calendar, Clock, Video, User, CheckCircle, RefreshCw, AlertCircle,
   Link as LinkIcon, XCircle, History, ChevronDown
@@ -50,7 +50,43 @@ export default function ParentPTMPage() {
 
   const token = typeof window !== 'undefined' ? (localStorage.getItem('iris_jwt_token') || '') : '';
 
-  const authHeaders: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const authHeaders: Record<string, string> = useMemo(() => token ? { 'Authorization': `Bearer ${token}` } : {}, [token]);
+
+  const fetchTeachers = useCallback(async () => {
+    try {
+      setTeachersLoading(true);
+      setError(null);
+      const res = await fetch('/api/v1/parent/ptm/teachers', { headers: authHeaders });
+      const data = await res.json();
+      if (data.success && data.teachers?.length > 0) {
+        setTeachers(data.teachers);
+        setSelectedTeacherId(prev => prev || data.teachers[0].id);
+      } else {
+        setTeachers([]);
+        setError('No teachers available for PTM scheduling.');
+      }
+    } catch (err) {
+      console.error('Failed to fetch teachers:', err);
+      setError('Failed to load teachers. Please try again.');
+    } finally {
+      setTeachersLoading(false);
+    }
+  }, [authHeaders]);
+
+  const fetchBookings = useCallback(async () => {
+    try {
+      setBookingsLoading(true);
+      const res = await fetch('/api/v1/parent/ptm/bookings', { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) {
+        setBookings(data.bookings || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bookings:', err);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, [authHeaders]);
 
   // Fetch teachers on mount and setup polling
   useEffect(() => {
@@ -62,38 +98,10 @@ export default function ParentPTMPage() {
     }, 15000); // Poll bookings status every 15 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchTeachers, fetchBookings]);
 
-
-  // Fetch slots when teacher or date changes
-  useEffect(() => {
-    if (selectedTeacherId) {
-      fetchSlots();
-    }
-  }, [selectedTeacherId, selectedDate]);
-
-  const fetchTeachers = async () => {
-    try {
-      setTeachersLoading(true);
-      setError(null);
-      const res = await fetch('/api/v1/parent/ptm/teachers', { headers: authHeaders });
-      const data = await res.json();
-      if (data.success && data.teachers?.length > 0) {
-        setTeachers(data.teachers);
-        setSelectedTeacherId(data.teachers[0].id);
-      } else {
-        setTeachers([]);
-        setError('No teachers available for PTM scheduling.');
-      }
-    } catch (err) {
-      console.error('Failed to fetch teachers:', err);
-      setError('Failed to load teachers. Please try again.');
-    } finally {
-      setTeachersLoading(false);
-    }
-  };
-
-  const fetchSlots = async () => {
+  const fetchSlots = useCallback(async () => {
+    if (!selectedTeacherId) return;
     try {
       setLoading(true);
       setError(null);
@@ -114,22 +122,14 @@ export default function ParentPTMPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTeacherId, selectedDate, authHeaders]);
 
-  const fetchBookings = async () => {
-    try {
-      setBookingsLoading(true);
-      const res = await fetch('/api/v1/parent/ptm/bookings', { headers: authHeaders });
-      const data = await res.json();
-      if (data.success) {
-        setBookings(data.bookings || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch bookings:', err);
-    } finally {
-      setBookingsLoading(false);
+  // Fetch slots when teacher or date changes
+  useEffect(() => {
+    if (selectedTeacherId) {
+      fetchSlots();
     }
-  };
+  }, [selectedTeacherId, selectedDate, fetchSlots]);
 
   const handleBookSlot = async () => {
     const slot = slots.find(s => s.id === selectedSlotId);

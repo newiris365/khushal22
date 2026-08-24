@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CreditCard, TrendingUp, TrendingDown, IndianRupee, Users, Download, Filter
 } from 'lucide-react';
@@ -11,7 +11,7 @@ export default function DirectorFeeRecoveryPage() {
   const [loading, setLoading] = useState(true);
   const [semester, setSemester] = useState<string>('');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = {};
@@ -20,9 +20,9 @@ export default function DirectorFeeRecoveryPage() {
       if (res.success) setData(res);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
+  }, [semester]);
 
-  useEffect(() => { fetchData(); }, [semester]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="text-purple-400 animate-pulse">Loading fee recovery data...</div></div>;
   if (!data) return <div className="text-center py-12 text-slate-400">No data available.</div>;

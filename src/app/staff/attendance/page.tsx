@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   CalendarDays, AlertTriangle, Users, Search, CheckCircle2,
@@ -67,7 +67,7 @@ export default function FacultyAttendancePage() {
   }, []);
 
   // Fetch shortage report
-  const fetchShortageReport = async () => {
+  const fetchShortageReport = useCallback(async () => {
     if (!selectedDept) return;
     setIsLoading(true);
     try {
@@ -81,11 +81,11 @@ export default function FacultyAttendancePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedDept, selectedSubject]);
 
   useEffect(() => {
     if (selectedDept) fetchShortageReport();
-  }, [selectedDept, selectedSubject]);
+  }, [selectedDept, fetchShortageReport]);
 
   const [sessionMsg, setSessionMsg] = useState('');
 

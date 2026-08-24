@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Clock, CheckCircle, ArrowLeft, Plus, Star, MapPin } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
@@ -11,11 +11,7 @@ export default function StudentComplaintsPage() {
   const [filter, setFilter] = useState('all');
   const [successMsg, setSuccessMsg] = useState('');
 
-  useEffect(() => {
-    loadComplaints();
-  }, []);
-
-  const loadComplaints = async () => {
+  const loadComplaints = useCallback(async () => {
     try {
       let studentId = '';
       if (typeof window !== 'undefined') {
@@ -42,7 +38,11 @@ export default function StudentComplaintsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadComplaints();
+  }, [loadComplaints]);
 
   const handleRateResolution = async (complaintId: string, rating: number) => {
     try {

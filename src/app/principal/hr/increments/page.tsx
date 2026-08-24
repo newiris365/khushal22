@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle, XCircle, IndianRupee, TrendingUp, User, FileText, Download } from 'lucide-react';
 
 interface IncrementRequest {
@@ -27,7 +27,7 @@ export default function PrincipalIncrements() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/reports/headcount', { headers: getAuthHeaders() });
@@ -39,9 +39,9 @@ export default function PrincipalIncrements() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleApproval = async (id: string, action: 'approve' | 'reject') => {
     setProcessing(id);

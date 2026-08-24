@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar, RefreshCw, ArrowLeft, ShieldAlert, Check, Clock, UserCheck, AlertTriangle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
@@ -12,16 +12,12 @@ export default function AdminVisitorManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [alertMsg, setAlertMsg] = useState({ text: '', type: '' });
 
-  useEffect(() => {
-    loadVisitorPasses();
-  }, [selectedDate]);
-
   const triggerAlert = (text: string, type: 'success' | 'danger') => {
     setAlertMsg({ text, type });
     setTimeout(() => setAlertMsg({ text: '', type: '' }), 5000);
   };
 
-  const loadVisitorPasses = async () => {
+  const loadVisitorPasses = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet('/gate/visitors', { date: selectedDate });
@@ -34,7 +30,11 @@ export default function AdminVisitorManagementPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadVisitorPasses();
+  }, [loadVisitorPasses]);
 
   const handleForceCheckout = async (id: string) => {
     try {

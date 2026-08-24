@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Trophy, Users, Target, Activity, Award, RefreshCw, ChevronRight, Flame, Plus, CheckCircle2, TrendingUp
 } from 'lucide-react';
@@ -56,11 +56,19 @@ export default function StudentChallengesPage() {
   const [logValue, setLogValue] = useState<string>('');
   const [activeLogChallengeId, setActiveLogChallengeId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAllData();
+  const fetchChallengeLeaderboard = useCallback(async (challengeId: string) => {
+    try {
+      const res = await apiGet(`/fitzone/gym/challenges/${challengeId}/leaderboard`);
+      if (res.success && res.leaderboard) {
+        setChallengeLeaderboards(prev => ({
+          ...prev,
+          [challengeId]: res.leaderboard
+        }));
+      }
+    } catch {}
   }, []);
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
       const userStr = localStorage.getItem('iris_user_profile');
@@ -86,12 +94,11 @@ export default function StudentChallengesPage() {
       }
 
       // 3. Fetch Campus Leaderboard
-      const ldRes = await apiGet('/fitzone/gym/leaderboard');
-      if (ldRes.success && ldRes.leaderboard) {
-        setCampusLeaderboard(ldRes.leaderboard);
+      const lbRes = await apiGet('/fitzone/gym/fitpoints/leaderboard');
+      if (lbRes.success) {
+        setCampusLeaderboard(lbRes.leaderboard || []);
       }
-    } catch (err) {
-      console.log('Error loading challenges or points data');
+    } catch {
       setChallenges([]);
       setFitPointsTotal(0);
       setFitPointsLogs([]);
@@ -99,19 +106,11 @@ export default function StudentChallengesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchChallengeLeaderboard]);
 
-  const fetchChallengeLeaderboard = async (challengeId: string) => {
-    try {
-      const res = await apiGet(`/fitzone/gym/challenges/${challengeId}/leaderboard`);
-      if (res.success && res.leaderboard) {
-        setChallengeLeaderboards(prev => ({
-          ...prev,
-          [challengeId]: res.leaderboard
-        }));
-      }
-    } catch {}
-  };
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
 
   const handleJoinChallenge = async (challengeId: string) => {
     setSubmittingId(challengeId);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, HelpCircle, Save, CheckCircle2, RefreshCw } from 'lucide-react';
 
@@ -19,10 +19,10 @@ export default function EmployeeTdsDeclaration() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/hr/tds/me', {
+      const res = await fetch('/api/v1/hr/tds/declaration/2026-2027', {
         headers: getAuthHeaders()
       });
       const data = await res.json();
@@ -40,11 +40,11 @@ export default function EmployeeTdsDeclaration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

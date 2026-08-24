@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Users, BookOpen, CreditCard, ShieldCheck, MapPin, 
   Phone, Mail, ArrowLeft, RefreshCw, Activity, ArrowRight, 
@@ -51,11 +51,7 @@ export default function StudentLookupPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  useEffect(() => {
-    loadStudents();
-  }, []);
-
-  const loadStudents = async () => {
+  const loadStudents = useCallback(async () => {
     setLoadingList(true);
     try {
       const res = await apiGet('/students');
@@ -81,7 +77,11 @@ export default function StudentLookupPage() {
     } finally {
       setLoadingList(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadStudents();
+  }, [loadStudents]);
 
   const loadStudentProfile = async (id: string) => {
     setLoadingProfile(true);

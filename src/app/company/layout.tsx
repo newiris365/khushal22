@@ -13,13 +13,12 @@ const companyLinks: SidebarLink[] = [
 
 function CompanyLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { authorized } = usePortalAuth(['Company HR', 'SuperAdmin']);
 
   // If on HR login portal page, do not display navigation sidebar wrapper or trigger auth check
   if (pathname === '/company/portal') {
     return <>{children}</>;
   }
-
-  const { authorized } = usePortalAuth(['Company HR', 'SuperAdmin']);
 
   if (!authorized) {
     return (

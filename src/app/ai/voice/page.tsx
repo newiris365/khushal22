@@ -37,21 +37,7 @@ export default function VoiceChatPage() {
 
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      synthRef.current = window.speechSynthesis;
-    }
-    fetchVoiceHistory();
-    return () => {
-      if (amplitudeInterval.current) clearInterval(amplitudeInterval.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const fetchVoiceHistory = async () => {
+  const fetchVoiceHistory = useCallback(async () => {
     try {
       const token = localStorage.getItem('iris_jwt_token') || 'demo';
       const res = await fetch(`${API}/ai/voice/history`, {
@@ -60,7 +46,21 @@ export default function VoiceChatPage() {
       const data = await res.json();
       if (data.success) setVoiceHistory(data.transcripts || []);
     } catch {}
-  };
+  }, [API]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      synthRef.current = window.speechSynthesis;
+    }
+    fetchVoiceHistory();
+    return () => {
+      if (amplitudeInterval.current) clearInterval(amplitudeInterval.current);
+    };
+  }, [fetchVoiceHistory]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const startListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

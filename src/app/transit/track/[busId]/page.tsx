@@ -24,7 +24,6 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'offline'>('connecting');
 
   useEffect(() => {
-    loadRouteDetails();
     let socketRef: any = null;
 
     (async () => {

@@ -34,8 +34,10 @@ export default function StudentOffersLedger() {
       if (localProfile) {
         const user = JSON.parse(localProfile);
         const offersRes = await apiGet(`/placements/offers/student/${user.id}`);
-        if (offersRes.success && offersRes.offers) {
+        if (offersRes.success && offersRes.offers && offersRes.offers.length > 0) {
           setOffers(offersRes.offers);
+          setLoading(false);
+          return;
         }
       }
     } catch {
@@ -43,22 +45,20 @@ export default function StudentOffersLedger() {
     }
     
     // Seed mock if empty
-    if (offers.length === 0) {
-      setOffers([
-        {
-          id: 'offer-1',
-          offer_number: 'OFFER-GOOG-39182',
-          role: 'Software Engineer (L3)',
-          ctc: 32.5,
-          joining_date: '2026-07-15',
-          location: 'Bangalore',
-          status: 'received',
-          companies: {
-            name: 'Google India'
-          }
+    setOffers(prev => prev.length > 0 ? prev : [
+      {
+        id: 'offer-1',
+        offer_number: 'OFFER-GOOG-39182',
+        role: 'Software Engineer (L3)',
+        ctc: 32.5,
+        joining_date: '2026-07-15',
+        location: 'Bangalore',
+        status: 'received',
+        companies: {
+          name: 'Google India'
         }
-      ]);
-    }
+      }
+    ]);
     setLoading(false);
   }, []);
 

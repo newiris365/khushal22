@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   UserPlus, Upload, FileText, CheckCircle2, XCircle, Clock,
   ChevronDown, Search, Filter, Download, ArrowLeft
@@ -82,7 +82,7 @@ export default function AdminAdmissionsPage() {
     load();
   }, []);
 
-  const fetchAdmissions = async () => {
+  const fetchAdmissions = useCallback(async () => {
     setIsLoading(true);
     try {
       const params: any = {};
@@ -94,9 +94,9 @@ export default function AdminAdmissionsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { fetchAdmissions(); }, [statusFilter]);
+  useEffect(() => { fetchAdmissions(); }, [fetchAdmissions]);
 
   const handleCreateAdmission = async () => {
     if (!form.applicant_name) return;

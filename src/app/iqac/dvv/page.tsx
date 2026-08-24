@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, MessageSquare, AlertCircle, FileCheck2, Plus, RefreshCw } from 'lucide-react';
 
 interface DvvQuery {
@@ -33,7 +33,7 @@ export default function IqacDvvDesk() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadQueries = async () => {
+  const loadQueries = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -54,11 +54,11 @@ export default function IqacDvvDesk() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadQueries();
-  }, []);
+  }, [loadQueries]);
 
   const triggerAiDraft = async (query: DvvQuery) => {
     setSelectedQuery(query);

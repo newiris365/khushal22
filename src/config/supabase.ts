@@ -17,17 +17,21 @@ if (!supabaseUrl || !supabaseServiceKey) {
   logger.warn('Supabase URL or Service Key is missing. Operating with fallback client configuration.');
 }
 
-// Internal admin client to bypass RLS for administrative updates
-const _supabaseAdminInternal = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co',
-  supabaseServiceKey || 'placeholder-service-key-for-test-environments',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
+// Internal admin client lazily initialized on first use to prevent synchronous throws when env credentials are missing at import time
+let _supabaseAdminInternalClient: SupabaseClient | null = null;
+export function getSupabaseAdminInternal(): SupabaseClient {
+  if (!_supabaseAdminInternalClient) {
+    const url = process.env.SUPABASE_URL || 'https://placeholder-url.supabase.co';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key-for-test-environments';
+    _supabaseAdminInternalClient = createClient(url, key, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
   }
-);
+  return _supabaseAdminInternalClient;
+}
 
 export let isSupabaseOffline = false;
 
@@ -138,7 +142,7 @@ export function getDynamicSupabaseClient(): SupabaseClient {
           }
         });
       }
-      return _supabaseAdminInternal;
+      return getSupabaseAdminInternal();
     }
 
     const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseServiceKey;
@@ -154,7 +158,7 @@ export function getDynamicSupabaseClient(): SupabaseClient {
       }
     });
   }
-  return _supabaseAdminInternal;
+  return getSupabaseAdminInternal();
 }
 
 // Define Mock course registrations in-memory store for student courses view
@@ -1219,7 +1223,7 @@ const mockSupabaseClient = {
 } as any;
 
 // Export supabaseAdmin as a Proxy that dynamically routes to getDynamicSupabaseClient()
-export const supabaseAdmin = new Proxy(_supabaseAdminInternal, {
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
   get(target, prop, receiver) {
     if (isSupabaseOffline && process.env.NODE_ENV !== 'production') {
       const value = Reflect.get(mockSupabaseClient, prop, mockSupabaseClient);
@@ -1238,7 +1242,7 @@ export const supabaseAdmin = new Proxy(_supabaseAdminInternal, {
 });
 
 // Export a raw, un-proxied client for explicit administrative actions
-export const supabaseServiceRole = new Proxy(_supabaseAdminInternal, {
+export const supabaseServiceRole = new Proxy({} as SupabaseClient, {
   get(target, prop, receiver) {
     if (isSupabaseOffline && process.env.NODE_ENV !== 'production') {
       const value = Reflect.get(mockSupabaseClient, prop, mockSupabaseClient);
@@ -1247,9 +1251,10 @@ export const supabaseServiceRole = new Proxy(_supabaseAdminInternal, {
       }
       return value;
     }
-    const value = Reflect.get(_supabaseAdminInternal, prop, _supabaseAdminInternal);
+    const adminClient = getSupabaseAdminInternal();
+    const value = Reflect.get(adminClient, prop, adminClient);
     if (typeof value === 'function') {
-      return value.bind(_supabaseAdminInternal);
+      return value.bind(adminClient);
     }
     return value;
   }
@@ -1276,7 +1281,7 @@ export function getSupabaseClient(req?: Request) {
       }
     });
   }
-  return _supabaseAdminInternal;
+  return getSupabaseAdminInternal();
 }
 
 // Middleware: block requests when Supabase is offline (returns 503)

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, Clock, FileText, Send, User, ShieldAlert, CheckCircle2,
   RefreshCw, MessageSquare, Sparkles
@@ -29,7 +29,7 @@ export default function EmployeeHrDashboard() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/leave/balance/me', {
@@ -47,7 +47,7 @@ export default function EmployeeHrDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const getDefaultBalances = (): LeaveBalance[] => [
     { id: 'b-1', type_name: 'Casual Leave (CL)', code: 'CL', entitled_days: 12, used_days: 3, remaining_days: 9 },
@@ -61,7 +61,7 @@ export default function EmployeeHrDashboard() {
     setChatHistory([
       { sender: 'bot', text: 'Hello! I am your IRIS AI HR Advisor. Ask me anything about CL/EL leave policies, tax regimes, or payslips!' }
     ]);
-  }, []);
+  }, [loadData]);
 
   const handleSendChat = async () => {
     if (!chatPrompt.trim()) return;

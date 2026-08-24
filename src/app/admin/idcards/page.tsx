@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CreditCard, Save, RefreshCw, Layers, ShieldCheck, Download } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import { Toast, type ToastMessage } from '../../../components/ToastModal';
@@ -23,11 +23,7 @@ export default function AdminIdCardsPage() {
   const [zipUrl, setZipUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  useEffect(() => {
-    fetchTemplate();
-  }, []);
-
-  const fetchTemplate = async () => {
+  const fetchTemplate = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await apiGet('/core/idcards/template');
@@ -39,7 +35,11 @@ export default function AdminIdCardsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [template]);
+
+  useEffect(() => {
+    fetchTemplate();
+  }, [fetchTemplate]);
 
   const handleSaveTemplate = async () => {
     try {

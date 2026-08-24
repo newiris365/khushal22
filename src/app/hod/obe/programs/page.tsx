@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { BookOpen, ShieldAlert, Sparkles, CheckCircle2, ChevronRight, AlertCircle, RefreshCw, Plus } from 'lucide-react';
 
@@ -33,12 +33,12 @@ export default function HodCoursesOverview() {
     program_id: ''
   });
 
-  const getAuthHeaders = () => ({
+  const getAuthHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
-  });
+  }), []);
 
-  const loadCourses = async (programIdParam?: string) => {
+  const loadCourses = useCallback(async (programIdParam?: string) => {
     setLoading(true);
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
@@ -77,9 +77,9 @@ export default function HodCoursesOverview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAuthHeaders]);
 
-  const loadPrograms = async () => {
+  const loadPrograms = useCallback(async () => {
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
       const res = await fetch(`${API_BASE}/obe/programs`, {
@@ -95,12 +95,12 @@ export default function HodCoursesOverview() {
     } catch (err) {
       setPrograms([]);
     }
-  };
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     loadCourses();
     loadPrograms();
-  }, []);
+  }, [loadCourses, loadPrograms]);
 
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -48,8 +48,10 @@ export default function StudentApplicationsTracker() {
       if (localProfile) {
         const user = JSON.parse(localProfile);
         const res = await apiGet(`/placements/applications/student/${user.id}`);
-        if (res.success && res.applications) {
+        if (res.success && res.applications && res.applications.length > 0) {
           setApplications(res.applications);
+          setLoading(false);
+          return;
         }
       }
     } catch {
@@ -57,38 +59,36 @@ export default function StudentApplicationsTracker() {
     }
     
     // Seed mock if empty
-    if (applications.length === 0) {
-      setApplications([
-        {
-          id: 'app-1',
-          drive_id: 'drive-1',
-          applied_at: new Date(Date.now() - 86400000).toISOString(),
-          status: 'interview_scheduled',
-          current_round: 2,
-          placement_drives: {
-            title: 'Google SWE Summer Drive 2026',
-            role: 'Software Engineer (L3)',
-            companies: {
-              name: 'Google India'
-            }
-          }
-        },
-        {
-          id: 'app-2',
-          drive_id: 'drive-2',
-          applied_at: new Date(Date.now() - 172800000).toISOString(),
-          status: 'applied',
-          current_round: 0,
-          placement_drives: {
-            title: 'ZS Consulting Campus Hiring',
-            role: 'Business Technology Analyst',
-            companies: {
-              name: 'ZS Associates'
-            }
+    setApplications(prev => prev.length > 0 ? prev : [
+      {
+        id: 'app-1',
+        drive_id: 'drive-1',
+        applied_at: new Date(Date.now() - 86400000).toISOString(),
+        status: 'interview_scheduled',
+        current_round: 2,
+        placement_drives: {
+          title: 'Google SWE Summer Drive 2026',
+          role: 'Software Engineer (L3)',
+          companies: {
+            name: 'Google India'
           }
         }
-      ]);
-    }
+      },
+      {
+        id: 'app-2',
+        drive_id: 'drive-2',
+        applied_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+        status: 'test_scheduled',
+        current_round: 1,
+        placement_drives: {
+          title: 'ZS Consulting Campus Hiring',
+          role: 'Business Technology Analyst',
+          companies: {
+            name: 'ZS Associates'
+          }
+        }
+      }
+    ]);
     setLoading(false);
   }, []);
 

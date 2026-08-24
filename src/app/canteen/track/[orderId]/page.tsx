@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Clock, CheckCircle2, ShieldCheck, 
@@ -66,41 +66,7 @@ export default function OrderTrackingPage() {
     }
   };
 
-  useEffect(() => {
-    fetchOrder();
-    
-    // Set up polling interval for order progress updates
-    const timer = setInterval(() => {
-      fetchOrder();
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, [orderId]);
-
-  const fetchOrder = async () => {
-    try {
-      const token = localStorage.getItem('iris_jwt_token') || '';
-      const res = await fetch(`/api/canteen/orders/track/${orderId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      
-      if (data.success && data.order) {
-        updateOrderState(data.order);
-      } else {
-        // Fallback mock logic for sandbox & local runs
-        mockFetchFallback();
-      }
-    } catch (err) {
-      mockFetchFallback();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateOrderState = (newOrder: OrderState) => {
+  const updateOrderState = useCallback((newOrder: OrderState) => {
     setOrder(newOrder);
     
     // Sound Trigger when transitioning to "Ready"
@@ -108,9 +74,9 @@ export default function OrderTrackingPage() {
       playReadySound();
     }
     prevStatusRef.current = newOrder.status;
-  };
+  }, []);
 
-  const mockFetchFallback = () => {
+  const mockFetchFallback = useCallback(() => {
     // Generate simulated progress based on time elapsed since creation
     setOrder(prev => {
       if (prev) {
@@ -139,11 +105,47 @@ export default function OrderTrackingPage() {
           special_instructions: 'Extra coconut chutney and less sweet coffee please.',
           estimated_ready_minutes: 12
         };
-        prevStatusRef.current = 'Received';
+        updateOrderState(initialMock);
         return initialMock;
       }
     });
-  };
+  }, [orderId, updateOrderState]);
+
+  const fetchOrder = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('iris_jwt_token') || '';
+      const res = await fetch(`/api/canteen/orders/track/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      
+      if (data.success && data.order) {
+        updateOrderState(data.order);
+      } else {
+        // Fallback mock logic for sandbox & local runs
+        mockFetchFallback();
+      }
+    } catch (err) {
+      mockFetchFallback();
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, updateOrderState, mockFetchFallback]);
+
+  useEffect(() => {
+    fetchOrder();
+    
+    // Set up polling interval for order progress updates
+    const timer = setInterval(() => {
+      fetchOrder();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [fetchOrder]);
+
+
 
   if (loading && !order) {
     return (

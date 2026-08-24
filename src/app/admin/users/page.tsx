@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, UserPlus, Search, RefreshCw,
   Key, X, Eye, EyeOff
@@ -82,9 +82,7 @@ export default function AdminUsersPage() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); fetchStats(); }, [roleFilter, activeFilter, page]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -101,14 +99,16 @@ export default function AdminUsersPage() {
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
+  }, [roleFilter, activeFilter, search, page]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await apiGet('campusCore/users/stats');
       if (res.success) setStats(res.stats || {});
     } catch {}
-  };
+  }, []);
+
+  useEffect(() => { fetchUsers(); fetchStats(); }, [fetchUsers, fetchStats]);
 
   const handleSearch = () => { setPage(1); fetchUsers(); };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Home, Settings, BarChart2, Layers, Users, ShieldAlert, IndianRupee, ArrowRight, Grid, X, User, Phone, Mail, Calendar, MapPin, Wifi, Droplets, Zap, BedDouble } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 import Link from 'next/link';
@@ -20,11 +20,7 @@ export default function AdminHostelOverview() {
   const [roomStudents, setRoomStudents] = useState<any[]>([]);
   const [roomDetailLoading, setRoomDetailLoading] = useState(false);
 
-  useEffect(() => {
-    loadAdminData();
-  }, []);
-
-  const loadAdminData = async () => {
+  const loadAdminData = useCallback(async () => {
     try {
       const [overviewRes, blocksRes] = await Promise.all([
         apiGet('/hostel/overview'),
@@ -47,7 +43,11 @@ export default function AdminHostelOverview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAdminData();
+  }, [loadAdminData]);
 
   const loadRoomsForBlock = async (blockId: string) => {
     setRoomsLoading(true);

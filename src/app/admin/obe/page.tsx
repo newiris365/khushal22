@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Award, CheckCircle2, ChevronRight, BarChart3, RefreshCw, Plus } from 'lucide-react';
 import { Toast, type ToastMessage } from '../../../components/ToastModal';
 
@@ -36,7 +36,7 @@ export default function AdminObeOverview() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Mock stats matching institutional parameters
@@ -50,9 +50,9 @@ export default function AdminObeOverview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadPrograms = async () => {
+  const loadPrograms = useCallback(async () => {
     try {
       const res = await fetch('/api/obe/programs', {
         headers: getAuthHeaders()
@@ -80,12 +80,12 @@ export default function AdminObeOverview() {
       setPrograms(fallback);
       setNewCourse(prev => ({ ...prev, program_id: fallback[0].id }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
     loadPrograms();
-  }, []);
+  }, [loadData, loadPrograms]);
 
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();

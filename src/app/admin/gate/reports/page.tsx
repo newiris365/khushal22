@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, FileText, ArrowLeft, RefreshCw, Download, CheckCircle, Info } from 'lucide-react';
 import { apiGet, apiFetchBlob } from '../../../../lib/api';
 import Link from 'next/link';
@@ -13,17 +13,9 @@ export default function AdminGateReportsPage() {
   const [previewData, setPreviewData] = useState<any>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [alertMsg, setAlertMsg] = useState({ text: '', type: '' });
+  const triggerAlert = (text: string, type: string) => setAlertMsg({ text, type });
 
-  useEffect(() => {
-    loadPreviewStats();
-  }, [selectedDate]);
-
-  const triggerAlert = (text: string, type: 'success' | 'danger') => {
-    setAlertMsg({ text, type });
-    setTimeout(() => setAlertMsg({ text: '', type: '' }), 5000);
-  };
-
-  const loadPreviewStats = async () => {
+  const loadPreviewStats = useCallback(async () => {
     setLoadingPreview(true);
     try {
       // Hit the logs endpoint for the date to get a quick count preview
@@ -56,7 +48,11 @@ export default function AdminGateReportsPage() {
     } finally {
       setLoadingPreview(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadPreviewStats();
+  }, [loadPreviewStats]);
 
   const handleDownloadPDF = async () => {
     setDownloading(true);

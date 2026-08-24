@@ -74,7 +74,7 @@ export function usePortalAuth(allowedRoles: string[]): PortalAuthResult {
       return;
     }
 
-    const roleSet = new Set(allowedRoles);
+    const roleSet = new Set(allowedRolesKey ? allowedRolesKey.split(',') : []);
     if (!roleSet.has(role)) {
       const redirect = ROLE_DASHBOARD_MAP[role] || '/dashboard';
       window.location.href = redirect;

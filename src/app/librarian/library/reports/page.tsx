@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, FileSpreadsheet, Download, IndianRupee, Clock, CheckCircle } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import Link from 'next/link';
@@ -11,11 +11,7 @@ export default function LibrarianReportsPage() {
   const [activeTab, setActiveTab] = useState<'borrowings' | 'fines' | 'utilization'>('borrowings');
   const [successMsg, setSuccessMsg] = useState('');
 
-  useEffect(() => {
-    loadReport();
-  }, [activeTab]);
-
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet(`/library/analytics/reports?type=${activeTab}`);
@@ -23,20 +19,20 @@ export default function LibrarianReportsPage() {
         setReportData(res.report || []);
       }
     } catch {
-      // Mock Fallbacks
-      if (activeTab === 'borrowings') {
-        setReportData([]);
-      } else if (activeTab === 'fines') {
-        setReportData([]);
-      } else {
-        setReportData([
-          { id: '1', date: '2026-06-09', start_time: '10:00', end_time: '12:00', status: 'confirmed', study_rooms: { name: 'Albert Einstein Room' } }
-        ]);
-      }
+      // Mock Fallback
+      setReportData([
+        { id: '1', title: 'Introduction to Algorithms (4th Ed)', category: 'Computer Science', total_borrows: 142, active_loans: 12 },
+        { id: '2', title: 'Clean Code: Handbook of Agile Craftsmanship', category: 'Software Eng', total_borrows: 98, active_loans: 5 }
+      ]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadReport();
+  }, [loadReport]);
+
 
   const handleExportPDF = () => {
     setSuccessMsg(`Generating PDF compilation sheet for ${activeTab} report...`);

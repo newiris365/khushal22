@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, MessageSquare, Plus, Save, Trash2, ArrowLeft,
   Calendar, Clock, CheckCircle2, Star, Award
@@ -18,11 +18,7 @@ export default function AdminAlumniSettings() {
 
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadAlumniRoster();
-  }, []);
-
-  const loadAlumniRoster = async () => {
+  const loadAlumniRoster = useCallback(async () => {
     try {
       const res = await apiGet('/placements/alumni');
       if (res.success && res.alumni) {
@@ -60,7 +56,11 @@ export default function AdminAlumniSettings() {
       ]);
     }
     setLoading(false);
-  };
+  }, [alumniList.length]);
+
+  useEffect(() => {
+    loadAlumniRoster();
+  }, [loadAlumniRoster]);
 
   const handleAddTestimonial = () => {
     if (newStudent && newQuote) {

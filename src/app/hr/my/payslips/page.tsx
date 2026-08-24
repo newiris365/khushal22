@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Download, FileText, RefreshCw } from 'lucide-react';
 import { exportToCSV, exportToPDF } from '../../../../lib/exportUtils';
@@ -25,7 +25,7 @@ export default function EmployeePayslipHistory() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/payslips/me', {
@@ -40,11 +40,11 @@ export default function EmployeePayslipHistory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleDownload = async (slip: PayslipRow) => {
     try {

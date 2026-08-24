@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Award, CheckCircle2, ChevronRight, BarChart3, RefreshCw } from 'lucide-react';
 
 interface ProgramStats {
@@ -23,24 +23,16 @@ export default function IqacObeOverview() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch('/api/obe/programs', {
+      const res = await fetch('/api/naac/obe-summary', {
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (res.ok && data.success && data.programs) {
-        const mapped = data.programs.map((p: any) => ({
-          id: p.id,
-          name: p.name || p.program_name || 'Academic Program',
-          code: p.code || p.program_code || 'DEGREE',
-          courses_count: p.courses_count || p.total_courses || 24,
-          average_attainment: p.average_attainment || p.avg_attainment || 72.5,
-          target_met_percentage: p.target_met_percentage || p.targets_met || 85
-        }));
-        setStats(mapped);
+      if (res.ok && data.success && Array.isArray(data.programs)) {
+        setStats(data.programs);
       } else {
         setFetchError(data.error || 'Unable to load OBE program attainment statistics.');
         setStats([]);
@@ -52,11 +44,11 @@ export default function IqacObeOverview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">

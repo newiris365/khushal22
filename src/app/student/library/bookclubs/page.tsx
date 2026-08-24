@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Users, Award, Book, Calendar, MessageSquare, Send, Sparkles, CheckCircle, RefreshCw } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
@@ -25,26 +25,38 @@ export default function BookClubsPage() {
   const [showCertModal, setShowCertModal] = useState(false);
   const [certMessage, setCertMessage] = useState('');
 
-  useEffect(() => {
-    const userStr = localStorage.getItem('iris_user_profile');
-    const user = userStr ? JSON.parse(userStr) : null;
-    const stdId = user?.student_id || user?.id || '';
-    setStudentId(stdId);
-    loadClubs();
+  const loadDiscussions = useCallback(async (clubId: string) => {
+    setLoadingDiscussions(true);
+    try {
+      const res = await apiGet(`/library/book-clubs/${clubId}/discussions`);
+      if (res.success) {
+        setDiscussions(res.discussions || []);
+        if (res.discussions?.length > 0) {
+          setActiveDiscussionId(res.discussions[0].id);
+        } else {
+          setActiveDiscussionId('');
+        }
+      }
+    } catch {
+      // offline fallback handled by loadClubs error
+    } finally {
+      setLoadingDiscussions(false);
+    }
   }, []);
 
-  const loadClubs = async () => {
+  const loadClubs = useCallback(async () => {
     try {
       const res = await apiGet('/library/book-clubs');
       if (res.success) {
         setClubs(res.book_clubs || []);
         if (res.book_clubs?.length > 0) {
-          // Keep active selected club or select first
-          const current = selectedClub ? res.book_clubs.find((c: any) => c.id === selectedClub.id) : res.book_clubs[0];
-          if (current) {
-            setSelectedClub(current);
-            loadDiscussions(current.id);
-          }
+          setSelectedClub((prev: any) => {
+            const current = prev ? res.book_clubs.find((c: any) => c.id === prev.id) : res.book_clubs[0];
+            if (current) {
+              loadDiscussions(current.id);
+            }
+            return current || res.book_clubs[0];
+          });
         }
       }
     } catch (err) {
@@ -75,26 +87,18 @@ export default function BookClubsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [studentId, loadDiscussions]);
 
-  const loadDiscussions = async (clubId: string) => {
-    setLoadingDiscussions(true);
-    try {
-      const res = await apiGet(`/library/book-clubs/${clubId}/discussions`);
-      if (res.success) {
-        setDiscussions(res.discussions || []);
-        if (res.discussions?.length > 0) {
-          setActiveDiscussionId(res.discussions[0].id);
-        } else {
-          setActiveDiscussionId('');
-        }
-      }
-    } catch {
-      // offline fallback handled by loadClubs error
-    } finally {
-      setLoadingDiscussions(false);
-    }
-  };
+  useEffect(() => {
+    const userStr = localStorage.getItem('iris_user_profile');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const stdId = user?.student_id || user?.id || '';
+    setStudentId(stdId);
+  }, []);
+
+  useEffect(() => {
+    loadClubs();
+  }, [loadClubs]);
 
   const handleSelectClub = (club: any) => {
     setSelectedClub(club);

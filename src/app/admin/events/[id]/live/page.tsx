@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Play, Megaphone, HelpCircle, ArrowLeft, Star, BarChart3, Plus, Check, MessageSquare, AlertCircle, Heart, Monitor } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { io } from 'socket.io-client';
 
 export default function AdminLiveControlPanel() {
   const params = useParams();
@@ -23,12 +24,22 @@ export default function AdminLiveControlPanel() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    loadData();
-    setupSockets();
+  const setupMockLivePanel = useCallback(() => {
+    setEvent({ id: eventId, title: 'TechFest 2026 — AI & Robotics Summit' });
+    setPolls([
+      { id: 'p1', question: 'Which AI model are you most excited to build with today?', options: ['Claude 3.5 Sonnet', 'GPT-4o', 'Gemini 1.5 Pro'], is_active: true },
+      { id: 'p2', question: 'Rate the speed of the campus hackathon internet connection.', options: ['Blazing Fast', 'Usable', 'Slow', 'Dead'], is_active: false }
+    ]);
+    setActivePoll({ id: 'p1', question: 'Which AI model are you most excited to build with today?', options: ['Claude 3.5 Sonnet', 'GPT-4o', 'Gemini 1.5 Pro'] });
+    setPollResults([
+      { option: 'Claude 3.5 Sonnet', votes: 142 },
+      { option: 'GPT-4o', votes: 78 },
+      { option: 'Gemini 1.5 Pro', votes: 94 }
+    ]);
+    setQuestions([]);
   }, [eventId]);
 
-  const loadData = async () => {
+  const loadLivePanel = useCallback(async () => {
     setLoading(true);
     try {
       const eventRes = await apiGet(`/events/events/${eventId}`);
@@ -58,24 +69,9 @@ export default function AdminLiveControlPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, setupMockLivePanel]);
 
-  const setupMockLivePanel = () => {
-    setEvent({ id: eventId, title: 'TechFest 2026 — AI & Robotics Summit' });
-    setPolls([
-      { id: 'p1', question: 'Which AI model are you most excited to build with today?', options: ['Claude 3.5 Sonnet', 'GPT-4o', 'Gemini 1.5 Pro'], is_active: true },
-      { id: 'p2', question: 'Rate the speed of the campus hackathon internet connection.', options: ['Blazing Fast', 'Usable', 'Slow', 'Dead'], is_active: false }
-    ]);
-    setActivePoll({ id: 'p1', question: 'Which AI model are you most excited to build with today?', options: ['Claude 3.5 Sonnet', 'GPT-4o', 'Gemini 1.5 Pro'] });
-    setPollResults([
-      { option: 'Claude 3.5 Sonnet', votes: 142 },
-      { option: 'GPT-4o', votes: 78 },
-      { option: 'Gemini 1.5 Pro', votes: 94 }
-    ]);
-    setQuestions([]);
-  };
-
-  const setupSockets = () => {
+  const setupSockets = useCallback(() => {
     // Dynamically connect to the namespace to listen to floating comments/polls/votes
     try {
       const io = require('socket.io-client');
@@ -103,7 +99,12 @@ export default function AdminLiveControlPanel() {
     } catch {
       // socket client missing or failed during Next.js SSR
     }
-  };
+  }, [eventId, activePoll?.id]);
+
+  useEffect(() => {
+    loadLivePanel();
+    setupSockets();
+  }, [loadLivePanel, setupSockets]);
 
   const handleCreatePoll = async (e: React.FormEvent) => {
     e.preventDefault();

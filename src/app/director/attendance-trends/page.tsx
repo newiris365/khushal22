@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, TrendingDown, AlertTriangle, Calendar, Filter } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
@@ -9,16 +9,16 @@ export default function DirectorAttendanceTrendsPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('weekly');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiGet('director/attendance-trends', { period });
       if (res.success) setData(res);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
+  }, [period]);
 
-  useEffect(() => { fetchData(); }, [period]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="text-purple-400 animate-pulse">Loading attendance trends...</div></div>;
 

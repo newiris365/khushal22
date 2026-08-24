@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Ticket, ArrowLeft, Calendar, MapPin, QrCode, Download, Clock, Printer, ShieldAlert } from 'lucide-react';
 import { apiGet } from '../../../../../lib/api';
 import Link from 'next/link';
@@ -12,11 +12,7 @@ export default function StudentTicketPage() {
   const [registration, setRegistration] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadTicket();
-  }, [eventId]);
-
-  const loadTicket = async () => {
+  const loadTicket = useCallback(async () => {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
@@ -56,7 +52,11 @@ export default function StudentTicketPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    loadTicket();
+  }, [loadTicket]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });

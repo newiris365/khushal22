@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Calendar, RefreshCw, ArrowLeft, ArrowDownLeft, ArrowUpRight, Filter } from 'lucide-react';
 import { apiGet } from '../../../../lib/api';
 import Link from 'next/link';
@@ -15,11 +15,7 @@ export default function AdminMovementLogsPage() {
   const [selectedGate, setSelectedGate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadMovementLogs();
-  }, [selectedDate, selectedType, selectedGate]);
-
-  const loadMovementLogs = async () => {
+  const loadMovementLogs = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = { date: selectedDate };
@@ -36,7 +32,11 @@ export default function AdminMovementLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate, selectedType, selectedGate]);
+
+  useEffect(() => {
+    loadMovementLogs();
+  }, [loadMovementLogs]);
 
   const filteredLogs = logs.filter(l => 
     l.person_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||

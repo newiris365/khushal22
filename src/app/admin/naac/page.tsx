@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, CheckCircle2, TrendingUp, RefreshCw } from 'lucide-react';
 
 interface CriteriaScore {
@@ -20,7 +20,15 @@ export default function AdminNaacDashboard() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const getDefaultScores = (): CriteriaScore[] => [
+    { name: 'Curricular Aspects', score: 3.8, max: 4.0 },
+    { name: 'Teaching-Learning & Evaluation', score: 3.75, max: 4.0 },
+    { name: 'Research, Innovations & Extensions', score: 3.5, max: 4.0 },
+    { name: 'Infrastructure & Learning Resources', score: 3.85, max: 4.0 },
+    { name: 'Student Support & Progression', score: 3.9, max: 4.0 }
+  ];
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/naac/score/estimate', {
@@ -40,19 +48,11 @@ export default function AdminNaacDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getDefaultScores = (): CriteriaScore[] => [
-    { name: 'Curricular Aspects', score: 3.8, max: 4.0 },
-    { name: 'Teaching-Learning & Evaluation', score: 3.75, max: 4.0 },
-    { name: 'Research, Innovations & Extensions', score: 3.5, max: 4.0 },
-    { name: 'Infrastructure & Learning Resources', score: 3.85, max: 4.0 },
-    { name: 'Student Support & Progression', score: 3.9, max: 4.0 }
-  ];
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">

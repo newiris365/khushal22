@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Info, HelpCircle, Calendar, Plus, RefreshCw } from 'lucide-react';
 
@@ -29,7 +29,7 @@ export default function EmployeeAttendance() {
     'Authorization': `Bearer ${localStorage.getItem('iris_jwt_token')}`
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/v1/hr/attendance/d0000000-0000-0000-0000-000000000003/06/2026', {
@@ -44,11 +44,11 @@ export default function EmployeeAttendance() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleRegSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

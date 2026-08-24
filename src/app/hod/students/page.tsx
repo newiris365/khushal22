@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Users, Download, Mail, Phone, GraduationCap, AlertTriangle, Filter, ChevronDown, Eye } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
@@ -28,15 +28,7 @@ const HODStudentsPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [students, searchQuery, semesterFilter, batchFilter, statusFilter]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const data = await apiGet('/campusCore/faculty/students');
       // Guard: API may return {data: [...]} or a non-array on error
@@ -50,9 +42,9 @@ const HODStudentsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let result = Array.isArray(students) ? [...students] : [];
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -72,7 +64,15 @@ const HODStudentsPage = () => {
       result = result.filter(s => s.status === statusFilter);
     }
     setFilteredStudents(result);
-  };
+  }, [students, searchQuery, semesterFilter, batchFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const stats = {
     total: filteredStudents.length,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -46,7 +46,7 @@ export default function SlotRosterPage() {
   // Manual QR input state
   const [qrCodeInput, setQrCodeInput] = useState('');
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     if (!slotId) return;
     setLoading(true);
     setError(null);
@@ -65,11 +65,11 @@ export default function SlotRosterPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [slotId]);
 
   useEffect(() => {
     fetchBookings();
-  }, [slotId]);
+  }, [fetchBookings]);
 
   const handleCheckin = async (bookingId: string, qrCode?: string) => {
     setCheckinLoading(bookingId);
