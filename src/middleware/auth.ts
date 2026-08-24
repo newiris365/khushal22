@@ -33,15 +33,17 @@ declare global {
 import { tokenDenylist } from '../lib/tokenDenylist';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  // SECURITY ENFORCEMENT: Query-string JWT fallback (req.query.token) is strictly eliminated globally
-  // to prevent credential exposure in access logs and HTTP Referer headers.
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, error: 'Authorization token required. Access Denied.', requestId: req.id });
+  let token = req.cookies?.iris_jwt_token;
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
   }
 
-  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Authorization token required. Access Denied.', requestId: req.id });
+  }
 
   authLocalStorage.run(token, () => {
     // Check if token has been revoked via logout denylist (#9)

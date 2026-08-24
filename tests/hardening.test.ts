@@ -148,3 +148,26 @@ describe('Hardening - Razorpay Webhook Multi-Module Reconciliation', () => {
     );
   });
 });
+
+describe('Hardening - httpOnly Cookie Authentication', () => {
+  it('should authenticate user via req.cookies.iris_jwt_token end to end', () => {
+    const validToken = jwt.sign(
+      { id: 'user-cookie-1', institution_id: 'inst-1', role: 'Student', email: 'student@example.com' },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const req = makeReq({
+      cookies: { iris_jwt_token: validToken },
+      headers: {}
+    });
+    const res = makeRes();
+    const next = jest.fn();
+
+    authMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.user).toBeDefined();
+    expect(req.user.id).toBe('user-cookie-1');
+  });
+});

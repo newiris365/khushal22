@@ -100,6 +100,19 @@ export async function login(req: Request, res: Response) {
     // Generate stateless JWT valid for 15 minutes
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });
 
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/'
+    };
+
+    res.cookie('iris_jwt_token', token, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+    if (authData.session.refresh_token) {
+      res.cookie('iris_refresh_token', authData.session.refresh_token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    }
+
     return res.status(200).json({
       success: true,
       token,
@@ -228,6 +241,19 @@ export async function refresh(req: Request, res: Response) {
 
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });
 
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/'
+    };
+
+    res.cookie('iris_jwt_token', token, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+    if (authData.session.refresh_token) {
+      res.cookie('iris_refresh_token', authData.session.refresh_token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    }
+
     return res.status(200).json({
       success: true,
       token,
@@ -285,13 +311,29 @@ export async function forgotPassword(req: Request, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   try {
+    const cookieToken = req.cookies?.iris_jwt_token;
+    if (cookieToken) {
+      tokenDenylist.add(cookieToken, 15 * 60);
+    }
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (token) {
-        tokenDenylist.add(token, 15 * 60); // Revoke token for remainder of its 15m lifetime (#9)
+        tokenDenylist.add(token, 15 * 60);
       }
     }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/'
+    };
+
+    res.clearCookie('iris_jwt_token', cookieOptions);
+    res.clearCookie('iris_refresh_token', cookieOptions);
+
     // SignOut from Supabase Auth to invalidate tokens globally
     await supabaseAdmin.auth.signOut();
     return res.status(200).json({

@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
@@ -388,11 +389,12 @@ app.set('trust proxy', 1);
 
 // Security and CORS middleware configuration
 app.use(helmet());
+app.use(cookieParser());
 
 app.use(cors({
   origin: checkCorsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Device-ID'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Device-ID', 'Cookie'],
   credentials: true
 }));
 

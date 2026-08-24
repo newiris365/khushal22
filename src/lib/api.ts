@@ -88,20 +88,21 @@ async function request(url: string, options: RequestInit): Promise<Response> {
     }
   }
   options.headers = headers;
+  options.credentials = options.credentials || 'include';
 
   const response = await fetch(url, options);
 
   if (response.status === 401) {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('iris_refresh_token') : null;
-    if (refreshToken) {
-      if (!isRefreshing) {
-        isRefreshing = true;
-        try {
-          const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken })
-          });
+    if (!isRefreshing) {
+      isRefreshing = true;
+      try {
+        const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {})
+        });
 
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();
