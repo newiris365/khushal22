@@ -1,84 +1,59 @@
 # Contributing to IRIS 365
 
-Thank you for your interest in contributing to IRIS 365! This document provides guidelines and instructions for contributing.
+Thank you for contributing to the IRIS 365 AI-Powered Campus Operating System. This document outlines the engineering practices, repository rules, and verification standards required for all developers.
 
-## Development Setup
+---
 
-1. Fork and clone the repository
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env` and fill in your Supabase credentials
-4. Run the development server: `npm run dev`
+## 1. Local Setup & Prerequisites
 
-This boots both Next.js (port 3000) and Express (port 4000) concurrently.
-
-## Branching Strategy
-
-- `main` — stable, production-ready code
-- `dev` — integration branch for features
-- `feature/*` — new features (e.g., `feature/transit-realtime`)
-- `fix/*` — bug fixes (e.g., `fix/gate-auth-timeout`)
+- **Node.js**: `v20.x` LTS
+- **Package Manager**: `npm`
 
 ```bash
-git checkout -b feature/your-feature-name dev
+# Clone the repository
+git clone https://github.com/newiris365/khushal22.git
+cd "2 july iris"
+
+# Install dependencies
+npm install
+
+# Run local development server (Express + Next.js concurrently)
+npm run dev
 ```
 
-## Commit Convention
+---
 
-Use [Conventional Commits](https://www.conventionalcommits.org/):
+## 2. Mandatory Verification Before Submitting PRs
 
-- `feat:` new feature
-- `fix:` bug fix
-- `docs:` documentation changes
-- `refactor:` code refactoring
-- `test:` adding tests
-- `chore:` maintenance tasks
+Before creating a Pull Request or pushing commits to `main`, every developer MUST run and pass the following 4 automated checks locally:
 
-Examples:
-```
-feat(canteen): add order tracking via WebSocket
-fix(transit): resolve bus location polling delay
-docs(readme): update architecture diagram
-```
+```bash
+# 1. Client Type Check
+npx tsc --noEmit -p tsconfig.json
 
-## Pull Request Process
+# 2. Server Type Check
+npx tsc --noEmit -p tsconfig.server.json
 
-1. Create your feature branch from `dev`
-2. Make your changes following the code conventions below
-3. Run `npx tsc --noEmit` to verify no type errors
-4. Run `npm run build:frontend && npm run build:backend` to verify builds pass
-5. Open a PR against `dev` with a clear title and description
-6. Request review from a maintainer
+# 3. ESLint Verification
+npm run lint
 
-## Code Conventions
-
-- **Frontend**: Next.js App Router, React 18, Tailwind CSS, `"use client"` for client components
-- **Backend**: Express with routes → controllers → lib layering
-- **Database**: Supabase (PostgreSQL), RPCs for complex operations, RLS for multi-tenancy
-- **Styling**: Dark theme with `#0D0A1A` background, `#6C2BD9` / `#8B5CF6` accents, `#C4B5FD` text
-- **Naming**: Files use camelCase for utils, PascalCase for React components
-- **Dynamic imports**: Use `next/dynamic` with `{ ssr: false }` for Leaflet, Recharts, and any `window`-dependent code
-
-## Project Structure
-
-```
-src/
-├── app/            # Next.js App Router pages
-├── components/     # Shared React components
-├── lib/            # Shared utilities (api.ts, socket.ts, charts.tsx)
-├── config/         # Server config (supabase, logger, cron)
-├── controllers/    # Express route handlers
-├── routes/         # Express route definitions
-├── middleware/     # Express middleware (auth, rate limit)
-├── services/       # Server-side services
-└── server.ts       # Express + Socket.io server entry
+# 4. Jest Unit & Security Test Suite
+npm test
 ```
 
-## Reporting Issues
+---
 
-Use the GitHub issue templates for:
-- **Bug reports**: Include steps to reproduce, expected vs actual behavior
-- **Feature requests**: Include use case and expected behavior
+## 3. Branch Protection & PR Requirements
 
-## License
+1. **Direct Pushes Blocked**: Direct commits to `main` are restricted. All changes must be submitted via feature branches (`feat/feature-name`, `fix/bug-name`).
+2. **Mandatory CI Pipeline**: Every Pull Request must pass the automated GitHub Actions CI workflow (`.github/workflows/ci.yml`).
+3. **Review Approval**: At least 1 peer review approval from a senior engineer is required before merging.
 
-By contributing, you agree that your contributions will be licensed under the project license.
+---
+
+## 4. Coding & Security Standards
+
+- **Strict Type Safety**: Avoid explicit `: any` types. Use proper interfaces or `unknown` with type guards.
+- **Structured Logging**: Do not use `console.log` for production logging. Use the Winston logger (`import logger from './config/logger'`).
+- **Fail-Closed Security**: Webhooks and payment integrations must fail closed (return 500/503 on missing secrets) and use timing-safe buffer comparisons (`crypto.timingSafeEqual`).
+- **File Metadata Validation**: Always validate `file_url`, `file_type`, and `file_size_kb` server-side using `validateFileMetadata`.

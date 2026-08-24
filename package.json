@@ -82,6 +82,8 @@
     "ts-node-dev": "^2.0.0"
   },
   "overrides": {
-    "postcss": "$postcss"
+    "postcss": "^8.5.23",
+    "glob": "^10.4.5",
+    "uuid": "^11.1.1"
   }
 }
