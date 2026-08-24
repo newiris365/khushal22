@@ -210,3 +210,12 @@ describe('Hardening - Supabase Auth Password Hashing Audit', () => {
     expect(authControllerContent).not.toContain('crypto.createHash');
   });
 });
+
+describe('Hardening - Zod Input Validation on Mutating Routes Audit', () => {
+  it('should verify serviceSubscriptions mutating routes validate input with Zod', () => {
+    const routeContent = require('fs').readFileSync('src/routes/serviceSubscriptions.ts', 'utf-8');
+    expect(routeContent).toContain('pricingPlanSchema.safeParse');
+    expect(routeContent).toContain('initiateSubscriptionSchema.safeParse');
+    expect(routeContent).toContain('verifySubscriptionSchema.safeParse');
+  });
+});

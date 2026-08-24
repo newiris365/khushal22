@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import { authMiddleware, requireRole } from '../middleware/auth';
 import { getRazorpayClient } from '../lib/razorpay';
@@ -6,6 +7,29 @@ import crypto from 'crypto';
 
 const router = Router();
 router.use(authMiddleware);
+
+const pricingPlanSchema = z.object({
+  institution_id: z.string().uuid('Invalid institution_id'),
+  service_type: z.enum(['hostel', 'transit', 'gym']),
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  price: z.number().nonnegative('Price must be non-negative'),
+  duration_days: z.number().int().positive().optional().default(30),
+  features: z.array(z.string()).optional().default([])
+});
+
+const initiateSubscriptionSchema = z.object({
+  student_id: z.string().uuid('Invalid student_id'),
+  pricing_id: z.string().uuid('Invalid pricing_id')
+});
+
+const verifySubscriptionSchema = z.object({
+  student_id: z.string().uuid('Invalid student_id'),
+  pricing_id: z.string().uuid('Invalid pricing_id'),
+  razorpay_order_id: z.string().optional(),
+  razorpay_payment_id: z.string().optional(),
+  razorpay_signature: z.string().optional()
+});
 
 // ========== PRICING MANAGEMENT (Institute Admin) ==========
 
@@ -39,15 +63,11 @@ router.get('/pricing/:institutionId', async (req: Request, res: Response) => {
 // POST /pricing — Create or update a pricing plan (Admin only)
 router.post('/pricing', requireRole(['Admin', 'SuperAdmin']), async (req: Request, res: Response) => {
   try {
-    const { institution_id, service_type, name, description, price, duration_days, features } = req.body;
-
-    if (!institution_id || !service_type || !name || price === undefined) {
-      return res.status(400).json({ success: false, error: 'institution_id, service_type, name, and price are required.' });
+    const parse = pricingPlanSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     }
-
-    if (!['hostel', 'transit', 'gym'].includes(service_type)) {
-      return res.status(400).json({ success: false, error: 'service_type must be hostel, transit, or gym.' });
-    }
+    const { institution_id, service_type, name, description, price, duration_days, features } = parse.data;
 
     const { data, error } = await supabaseAdmin
       .from('service_pricing')
@@ -141,11 +161,11 @@ router.get('/status/:studentId', async (req: Request, res: Response) => {
 // POST /initiate — Create Razorpay order for a service subscription
 router.post('/initiate', async (req: Request, res: Response) => {
   try {
-    const { student_id, pricing_id } = req.body;
-
-    if (!student_id || !pricing_id) {
-      return res.status(400).json({ success: false, error: 'student_id and pricing_id are required.' });
+    const parse = initiateSubscriptionSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     }
+    const { student_id, pricing_id } = parse.data;
 
     // Fetch pricing plan
     const { data: plan, error: planError } = await supabaseAdmin
@@ -207,11 +227,11 @@ router.post('/initiate', async (req: Request, res: Response) => {
 // POST /verify — Verify Razorpay payment and activate subscription
 router.post('/verify', async (req: Request, res: Response) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, pricing_id } = req.body;
-
-    if (!student_id || !pricing_id) {
-      return res.status(400).json({ success: false, error: 'student_id and pricing_id are required.' });
+    const parse = verifySubscriptionSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     }
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, pricing_id } = parse.data;
 
     // Fetch pricing plan
     const { data: plan } = await supabaseAdmin
