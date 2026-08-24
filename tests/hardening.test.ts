@@ -201,3 +201,12 @@ describe('Hardening - Server-Side File Upload Metadata Validation', () => {
     expect(res.error).toContain('bucket pattern');
   });
 });
+
+describe('Hardening - Supabase Auth Password Hashing Audit', () => {
+  it('should confirm authentication delegates purely to Supabase Auth without custom password storage', () => {
+    const authControllerContent = require('fs').readFileSync('src/controllers/auth.ts', 'utf-8');
+    expect(authControllerContent).toContain('supabaseAdmin.auth.signInWithPassword');
+    expect(authControllerContent).not.toContain('bcrypt');
+    expect(authControllerContent).not.toContain('crypto.createHash');
+  });
+});
