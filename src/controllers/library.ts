@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import logger from '../config/logger';
+import { validateFileMetadata } from '../lib/file-validation';
 
 // ============================================================
 // ZOD VALIDATION SCHEMAS
@@ -1003,6 +1004,15 @@ export async function createEbook(req: Request, res: Response) {
   try {
     const parse = createEbookSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+
+    const fileCheck = validateFileMetadata({
+      file_url: parse.data.file_url,
+      file_size_kb: (req.body.file_size_kb !== undefined ? req.body.file_size_kb : (parse.data.file_size_mb ? parse.data.file_size_mb * 1024 : undefined)),
+      file_type: req.body.file_type
+    });
+    if (!fileCheck.valid) {
+      return res.status(400).json({ success: false, error: fileCheck.error });
+    }
 
     const { data, error } = await supabaseAdmin
       .from('ebooks')

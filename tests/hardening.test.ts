@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { authMiddleware } from '../src/middleware/auth';
 import { razorpayWebhook } from '../src/controllers/campusCore';
 import { supabaseAdmin } from '../src/config/supabase';
+import { validateFileMetadata } from '../src/lib/file-validation';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -169,5 +170,34 @@ describe('Hardening - httpOnly Cookie Authentication', () => {
     expect(next).toHaveBeenCalled();
     expect(req.user).toBeDefined();
     expect(req.user.id).toBe('user-cookie-1');
+  });
+});
+
+describe('Hardening - Server-Side File Upload Metadata Validation', () => {
+  it('should reject disallowed file types server-side', () => {
+    const res = validateFileMetadata({
+      file_url: 'https://supabase.co/storage/v1/object/public/kyc/malicious.exe',
+      file_type: 'application/x-msdownload'
+    });
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('Invalid file_type');
+  });
+
+  it('should reject oversized files exceeding server max size limit', () => {
+    const res = validateFileMetadata({
+      file_url: 'https://supabase.co/storage/v1/object/public/docs/large.pdf',
+      file_size_kb: 50000 // 50MB, exceeds 10MB limit
+    });
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('Maximum permitted file size');
+  });
+
+  it('should reject file_url from invalid storage bucket pattern', () => {
+    const res = validateFileMetadata({
+      file_url: 'https://evil-attacker.com/malicious.pdf',
+      file_type: 'application/pdf'
+    });
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('bucket pattern');
   });
 });

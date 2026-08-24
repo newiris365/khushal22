@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import PDFDocument from 'pdfkit';
 import logger from '../config/logger';
+import { validateFileMetadata } from '../lib/file-validation';
 
 // ============================================================
 // ZOD VALIDATION SCHEMAS
@@ -240,7 +241,17 @@ export async function updateEmployee(req: Request, res: Response) {
 export async function uploadEmployeeDocument(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const { doc_type, doc_name, doc_url } = req.body;
+    const { doc_type, doc_name, doc_url, file_size_kb, file_type } = req.body;
+
+    const fileCheck = validateFileMetadata({
+      file_url: doc_url,
+      file_size_kb: file_size_kb,
+      file_type: file_type || doc_type,
+      file_name: doc_name
+    });
+    if (!fileCheck.valid) {
+      return res.status(400).json({ success: false, error: fileCheck.error });
+    }
     
     const { data: doc, error } = await supabaseAdmin
       .from('employee_documents')
