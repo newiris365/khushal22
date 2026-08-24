@@ -43,11 +43,16 @@ npm test
 
 ---
 
-## 3. Branch Protection & PR Requirements
+## 3. Branch Protection & GitHub Settings
 
-1. **Direct Pushes Blocked**: Direct commits to `main` are restricted. All changes must be submitted via feature branches (`feat/feature-name`, `fix/bug-name`).
-2. **Mandatory CI Pipeline**: Every Pull Request must pass the automated GitHub Actions CI workflow (`.github/workflows/ci.yml`).
-3. **Review Approval**: At least 1 peer review approval from a senior engineer is required before merging.
+1. **GitHub Branch Protection Rules**:
+   Navigate to **Settings -> Branches -> Add branch protection rule** for `main`:
+   - Check **Require a pull request before merging** (Require at least **1 review approval**).
+   - Check **Require status checks to pass before merging** (Select status check `verify` from `.github/workflows/ci.yml`).
+   - Check **Do not allow bypassing the above settings**.
+
+2. **Pre-Commit Hooks**:
+   Husky is configured via `.husky/pre-commit` to execute `npx lint-staged` on every commit.
 
 ---
 
@@ -57,3 +62,9 @@ npm test
 - **Structured Logging**: Do not use `console.log` for production logging. Use the Winston logger (`import logger from './config/logger'`).
 - **Fail-Closed Security**: Webhooks and payment integrations must fail closed (return 500/503 on missing secrets) and use timing-safe buffer comparisons (`crypto.timingSafeEqual`).
 - **File Metadata Validation**: Always validate `file_url`, `file_type`, and `file_size_kb` server-side using `validateFileMetadata`.
+
+---
+
+## 5. Security & Upstream Upgrade Roadmap
+
+- **Next.js 15 Upgrade Tracking**: Upstream Next.js 14.x framework advisories are tracked for upgrade to Next.js 15. Standardize on feature branch `feat/nextjs-15-upgrade` with full regression testing prior to production release.

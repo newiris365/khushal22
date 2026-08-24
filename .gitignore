@@ -40,3 +40,4 @@ next-env.d.ts
 
 # scratch & internal ad-hoc scripts
 scratch/
+.github/
