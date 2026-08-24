@@ -3,6 +3,7 @@ process.env.SUPABASE_URL = 'http://localhost:54321';
 process.env.SUPABASE_ANON_KEY = 'test-anon-key';
 
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { authMiddleware } from '../src/middleware/auth';
 import { razorpayWebhook } from '../src/controllers/campusCore';
 import { supabaseAdmin } from '../src/config/supabase';
@@ -86,9 +87,12 @@ describe('Hardening - Razorpay Webhook Multi-Module Reconciliation', () => {
     });
     const res = makeRes();
 
-    // Disable signature validation in test by setting secret to empty or matching sig
-    process.env.RAZORPAY_WEBHOOK_SECRET = '';
-    process.env.RAZORPAY_KEY_SECRET = '';
+    const secret = 'test_webhook_secret';
+    process.env.RAZORPAY_WEBHOOK_SECRET = secret;
+    const bodyStr = JSON.stringify(req.body);
+    const signature = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');
+    req.headers['x-razorpay-signature'] = signature;
+    req.rawBody = bodyStr;
 
     await razorpayWebhook(req, res);
 
@@ -97,6 +101,49 @@ describe('Hardening - Razorpay Webhook Multi-Module Reconciliation', () => {
       expect.objectContaining({
         success: true,
         message: expect.stringContaining('Ignored')
+      })
+    );
+  });
+
+  it('should reject webhook with 503 when RAZORPAY_WEBHOOK_SECRET is missing', async () => {
+    delete process.env.RAZORPAY_WEBHOOK_SECRET;
+    delete process.env.RAZORPAY_KEY_SECRET;
+
+    const req = makeReq({
+      headers: { 'x-razorpay-signature': 'any_sig' },
+      body: { event: 'payment.captured' }
+    });
+    const res = makeRes();
+
+    await razorpayWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining('secret is not configured')
+      })
+    );
+  });
+
+  it('should reject webhook with 400 on invalid signature or timing-safe mismatch', async () => {
+    const secret = 'test_webhook_secret';
+    process.env.RAZORPAY_WEBHOOK_SECRET = secret;
+
+    const req = makeReq({
+      headers: { 'x-razorpay-signature': 'invalid_signature_hex_digest_mismatch' },
+      body: { event: 'payment.captured' },
+      rawBody: JSON.stringify({ event: 'payment.captured' })
+    });
+    const res = makeRes();
+
+    await razorpayWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: 'Invalid webhook signature.'
       })
     );
   });

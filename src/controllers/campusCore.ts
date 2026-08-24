@@ -7400,17 +7400,25 @@ export async function razorpayWebhook(req: Request, res: Response) {
     const signature = req.headers['x-razorpay-signature'] as string;
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
 
+    if (!secret) {
+      logger.error('[CRITICAL SECURITY ALERT] Razorpay webhook secret is not configured on server (RAZORPAY_WEBHOOK_SECRET missing). Failing closed.');
+      return res.status(503).json({ success: false, error: 'Webhook signature verification secret is not configured on server.' });
+    }
+
     if (!signature) {
       return res.status(400).json({ success: false, error: 'Signature header missing.' });
     }
 
-    if (secret) {
-      const shasum = crypto.createHmac('sha256', secret);
-      shasum.update(req.rawBody);
-      const digest = shasum.digest('hex');
-      if (digest !== signature) {
-        return res.status(400).json({ success: false, error: 'Invalid webhook signature.' });
-      }
+    const shasum = crypto.createHmac('sha256', secret);
+    const payload = req.rawBody || JSON.stringify(req.body);
+    shasum.update(payload);
+    const digest = shasum.digest('hex');
+
+    const digestBuf = Buffer.from(digest, 'utf8');
+    const sigBuf = Buffer.from(signature, 'utf8');
+
+    if (digestBuf.length !== sigBuf.length || !crypto.timingSafeEqual(digestBuf, sigBuf)) {
+      return res.status(400).json({ success: false, error: 'Invalid webhook signature.' });
     }
 
     const event = req.body.event;
