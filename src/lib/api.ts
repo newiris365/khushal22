@@ -104,37 +104,35 @@ async function request(url: string, options: RequestInit): Promise<Response> {
           body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {})
         });
 
-          if (refreshResponse.ok) {
-            const data = await refreshResponse.json();
-            if (data.success && data.token) {
-              localStorage.setItem('iris_jwt_token', data.token);
-              if (data.refreshToken) {
-                localStorage.setItem('iris_refresh_token', data.refreshToken);
-              }
-              onRefreshed(data.token);
-              isRefreshing = false;
-
-              // Re-run the request with the new token
-              const headers = { ...options.headers } as Record<string, string>;
-              headers['Authorization'] = `Bearer ${data.token}`;
-              return await fetch(url, { ...options, headers });
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json();
+          if (data.success && data.token) {
+            localStorage.setItem('iris_jwt_token', data.token);
+            if (data.refreshToken) {
+              localStorage.setItem('iris_refresh_token', data.refreshToken);
             }
-          }
-        } catch (err) {
-          console.error('Failed to auto-refresh token:', err);
-        } finally {
-          isRefreshing = false;
-        }
-      } else {
-        // Wait for current refresh to complete
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((newToken) => {
+            onRefreshed(data.token);
+
+            // Re-run the request with the new token
             const headers = { ...options.headers } as Record<string, string>;
-            headers['Authorization'] = `Bearer ${newToken}`;
-            resolve(fetch(url, { ...options, headers }));
-          });
-        });
+            headers['Authorization'] = `Bearer ${data.token}`;
+            return await fetch(url, { ...options, headers });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to auto-refresh token:', err);
+      } finally {
+        isRefreshing = false;
       }
+    } else {
+      // Wait for current refresh to complete
+      return new Promise((resolve) => {
+        subscribeTokenRefresh((newToken) => {
+          const headers = { ...options.headers } as Record<string, string>;
+          headers['Authorization'] = `Bearer ${newToken}`;
+          resolve(fetch(url, { ...options, headers }));
+        });
+      });
     }
 
     // Refresh failed or no refresh token
