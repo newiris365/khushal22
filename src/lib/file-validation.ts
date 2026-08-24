@@ -37,7 +37,10 @@ export function validateFileMetadata(
     return { valid: false, error: `Invalid file_type '${input.file_type}'. Allowed types: ${allowedTypes.join(', ')}` };
   }
 
-  if (input.file_size_kb !== undefined && (typeof input.file_size_kb !== 'number' || input.file_size_kb > maxSizeKb || input.file_size_kb <= 0)) {
+  if (
+    input.file_size_kb !== undefined &&
+    (typeof input.file_size_kb !== 'number' || input.file_size_kb > maxSizeKb || input.file_size_kb <= 0)
+  ) {
     return { valid: false, error: `Invalid file_size_kb. Maximum permitted file size is ${maxSizeKb} KB.` };
   }
 
@@ -49,7 +52,10 @@ export function validateFileMetadata(
       }
       if (typeof bucketPattern === 'string') {
         if (!input.file_url.includes(bucketPattern)) {
-          return { valid: false, error: `file_url does not belong to expected storage bucket path '${bucketPattern}'.` };
+          return {
+            valid: false,
+            error: `file_url does not belong to expected storage bucket path '${bucketPattern}'.`
+          };
         }
       } else if (!bucketPattern.test(input.file_url)) {
         return { valid: false, error: 'file_url does not match expected storage bucket pattern.' };
