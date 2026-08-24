@@ -420,7 +420,7 @@ export async function parentLinkChild(req: Request, res: Response) {
       .eq('id', result.student_id)
       .maybeSingle();
 
-    const studentName = (studentUser as any)?.users?.full_name || roll_number;
+    const studentName = (studentUser as Record<string, any>)?.users?.full_name || roll_number;
 
     return res.status(200).json({ 
       success: true, 

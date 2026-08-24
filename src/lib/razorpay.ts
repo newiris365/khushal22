@@ -4,9 +4,9 @@ export interface RazorpayClient {
     [key: string]: unknown;
   };
   payments: {
-    fetch: (paymentId: string) => Promise<any>;
-    refund: (paymentId: string, params: any) => Promise<any>;
-    [key: string]: any;
+    fetch: (paymentId: string) => Promise<Record<string, unknown>>;
+    refund: (paymentId: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    [key: string]: unknown;
   };
   [key: string]: unknown;
 }

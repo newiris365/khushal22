@@ -64,9 +64,9 @@ export async function saveWhatsAppConfig(req: Request, res: Response) {
       .limit(1)
       .single();
 
-    const userId = (req as any).userId || null;
+    const userId = (req as unknown as { userId?: string }).userId || null;
 
-    const configData = {
+    const configData: Record<string, unknown> = {
       provider,
       api_url,
       api_key: api_key?.startsWith('••••') ? undefined : api_key || null,
@@ -81,8 +81,8 @@ export async function saveWhatsAppConfig(req: Request, res: Response) {
     };
 
     // Don't overwrite masked values
-    if (configData.api_key === undefined) delete (configData as any).api_key;
-    if (configData.access_token === undefined) delete (configData as any).access_token;
+    if (configData.api_key === undefined) delete configData.api_key;
+    if (configData.access_token === undefined) delete configData.access_token;
 
     let result;
     if (existing) {
@@ -106,8 +106,9 @@ export async function saveWhatsAppConfig(req: Request, res: Response) {
     reloadWhatsAppConfig();
 
     return res.json({ success: true, message: 'WhatsApp API configuration saved.' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: message });
   }
 }
 
@@ -127,8 +128,9 @@ export async function testWhatsAppMessage(req: Request, res: Response) {
       success: sent,
       message: sent ? 'Test message sent successfully!' : 'Failed to send test message. Check your API configuration.',
     });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: message });
   }
 }
 
@@ -147,7 +149,8 @@ export async function getWhatsAppDeliveryLog(req: Request, res: Response) {
     if (error) throw error;
 
     return res.json({ success: true, logs: data || [], total: count || 0 });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: message });
   }
 }
