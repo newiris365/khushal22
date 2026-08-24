@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
+import logger from '../config/logger';
 
 const ALL_ROLES = [
   'SuperAdmin', 'Admin', 'Director', 'HOD', 'Teacher', 'Staff',
@@ -62,7 +63,7 @@ export async function listUsers(req: Request, res: Response) {
       .range((pageNum - 1) * limitNum, pageNum * limitNum - 1);
 
     if (error) {
-      console.error('[listUsers] Query error:', error);
+      logger.error('[listUsers] Query error', { error });
       throw error;
     }
 
@@ -75,7 +76,7 @@ export async function listUsers(req: Request, res: Response) {
     });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[listUsers] Catch error:', errorMsg);
+    logger.error('[listUsers] Catch error', { error: errorMsg });
     return res.status(500).json({ success: false, error: errorMsg });
   }
 }
@@ -190,7 +191,7 @@ export async function createUser(req: Request, res: Response) {
         });
 
       if (sErr) {
-        console.error('[createUser] Failed to create student record:', sErr);
+        logger.error('[createUser] Failed to create student record', { error: sErr });
       }
     }
 

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { sendTextMessage } from '../services/whatsapp';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import logger from '../config/logger';
 
 export interface TransitStop {
   name: string;
@@ -1166,7 +1167,7 @@ export async function analyzeRouteOptimizer(req: Request, res: Response) {
           }
         }
       } catch (err) {
-        console.error('Claude API route optimizer failed, using fallbacks', err);
+        logger.error('Claude API route optimizer failed, using fallbacks', { error: err });
       }
     }
 
